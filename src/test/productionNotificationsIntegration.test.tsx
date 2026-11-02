@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { authManager } from "../services/authAdapter";
 import { authService } from "../services/authService";
 import { notificationService } from "../services/notificationService";
@@ -278,6 +278,11 @@ describe("Production Notifications Integration Suite", () => {
         message: "Active in prod",
       });
 
+      setProductionNotificationReaderOverride({
+        getCustomerNotifications: vi.fn().mockResolvedValue([notif]),
+        markAsRead: vi.fn().mockResolvedValue({ ...notif, read: true }),
+      });
+
       await expect(
         notificationService.markAsRead(notif.id, "SASS0000104")
       ).resolves.not.toThrow();
@@ -406,6 +411,60 @@ describe("Production Notifications Integration Suite", () => {
 
       const markAllBtn = screen.getByTestId("mark-all-read-btn");
       expect(markAllBtn).not.toBeDisabled();
+    });
+
+    it("marks an unread notification as read when its card is clicked in production mode", async () => {
+      authManager.setMode("production");
+      mockAuthUser = mockUser;
+      vi.spyOn(authService, "getCurrentUser").mockReturnValue(mockUser);
+      let markedRead = false;
+      const markRead = vi.fn(async () => {
+        markedRead = true;
+        return {
+          id: "notif_prod_click",
+          userId: "SASS0000104",
+          category: "orders" as const,
+          title: "Order update",
+          message: "Your order is being prepared.",
+          timestamp: "2026-10-23T11:00:00Z",
+          read: true,
+        };
+      });
+
+      setProductionNotificationReaderOverride({
+        getCustomerNotifications: vi.fn().mockImplementation(async () => [
+          {
+            id: "notif_prod_click",
+            userId: "SASS0000104",
+            category: "orders",
+            title: "Order update",
+            message: "Your order is being prepared.",
+            timestamp: "2026-10-23T11:00:00Z",
+            read: markedRead,
+          },
+        ]),
+        markAsRead: markRead,
+      });
+
+      render(
+        <AuthProvider>
+          <NotificationProvider>
+            <NotificationsPage />
+          </NotificationProvider>
+        </AuthProvider>
+      );
+
+      const card = await screen.findByText("Order update");
+      fireEvent.click(card);
+
+      await waitFor(() => {
+        expect(markRead).toHaveBeenCalledWith(
+          "SASS0000104",
+          "notif_prod_click",
+          undefined
+        );
+        expect(screen.queryByText("1 Unread")).not.toBeInTheDocument();
+      });
     });
 
     it("displays empty-notifications-view when notification list is genuinely empty", async () => {

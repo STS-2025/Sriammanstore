@@ -176,6 +176,7 @@ const mockSlots: DeliverySlot[] = [
 describe("Checkout Step 2 Address Opening Flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthContext = { user: mockUser, isLoading: false, isResolvingIdentity: false };
     mockSearchParams = { step: 2 };
     mockSelectedAddressId = null;
     mockSelectedSlotId = "slot_exp";
@@ -397,5 +398,15 @@ describe("Checkout Step 2 Address Opening Flow", () => {
       // Progress bar should have "No address selected"
       expect(screen.getByText("No address selected")).toBeDefined();
     });
+  });
+
+  it("shows login and account creation options before an unauthenticated visitor can check out", async () => {
+    mockAuthContext = { user: null, isLoading: false, isResolvingIdentity: false };
+
+    render(<CheckoutPage />);
+
+    expect(await screen.findByText(/sign in or create an account to choose a delivery address/i)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Sign In" }).getAttribute("href")).toBe("/login");
+    expect(screen.getByRole("link", { name: "Create Account" }).getAttribute("href")).toBe("/sign-up");
   });
 });

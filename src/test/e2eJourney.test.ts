@@ -103,7 +103,7 @@ describe("Complete Customer Shopping Journey (E2E Integration)", () => {
       phone: "+91 99999 99999",
       address: addresses[0]!,
       deliverySlot: slots[0]!,
-      paymentMethod: "online",
+      paymentMethod: "cod",
       cartItems: cart,
       subtotal,
       productSavings: 150,

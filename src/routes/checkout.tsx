@@ -138,6 +138,9 @@ export function CheckoutPage() {
     selectedSlotId,
     paymentMethod,
     selectedUpiId,
+    isGuestCartSyncing,
+    guestCartSyncError,
+    syncGuestCart,
     setDeliverySpeed,
     setSelectedAddressId,
     setSelectedSlotId,
@@ -145,6 +148,7 @@ export function CheckoutPage() {
     setSelectedUpiId,
     clearCart,
     resetDiscounts,
+    revalidateCartItems,
   } = useCart();
   const { user, isLoading: authLoading, isResolvingIdentity, refreshUser } = useAuth();
   const { refreshNotifications } = useNotifications();
@@ -359,6 +363,17 @@ export function CheckoutPage() {
   const handlePlaceOrder = async () => {
     if (isSubmitting) return;
 
+    if (!user || authLoading || isResolvingIdentity) {
+      toast.info("Sign in or create an account to continue checkout. Your cart is saved.");
+      navigate({ to: "/login", search: { redirect: "/checkout" } as any });
+      return;
+    }
+
+    if (isGuestCartSyncing || guestCartSyncError) {
+      toast.error("Your cart must finish syncing before an order can be placed.");
+      return;
+    }
+
     if (!isPhoneVerified) {
       toast.info("Verify your mobile number to continue with checkout.");
       setShowPhoneVerificationModal(true);
@@ -439,6 +454,23 @@ export function CheckoutPage() {
 
     setIsSubmitting(true);
     try {
+      const latestItems = await revalidateCartItems();
+      const unavailableItems = latestItems.filter(
+        (item) => item.stock <= 0 || item.quantity > item.stock
+      );
+      if (unavailableItems.length > 0) {
+        throw new Error(
+          `Review unavailable or low-stock items before placing your order: ${unavailableItems.map((item) => item.name).join(", ")}.`
+        );
+      }
+      const pricesChanged = latestItems.some((item, index) =>
+        item.price !== items[index]?.price || item.mrp !== items[index]?.mrp
+      );
+      if (pricesChanged) {
+        toast.info("Product prices changed. Your cart has been updated; review the new total and place your order again.");
+        return;
+      }
+
       if (paymentMethod === "cod") {
         await placeOrderInternal(false, "cod");
       } else if (paymentMethod === "upi") {
@@ -521,6 +553,50 @@ export function CheckoutPage() {
     );
   }
 
+  if (user && isGuestCartSyncing) {
+    return (
+      <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
+        <StoreHeader />
+        <main className="w-full pt-[172px] max-w-[1320px] mx-auto px-margin-desktop py-20 text-center">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-xs text-on-surface-variant font-medium">Syncing your saved cart with your account…</p>
+        </main>
+        <StoreFooter />
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (user && guestCartSyncError) {
+    return (
+      <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
+        <StoreHeader />
+        <main className="w-full pt-[172px] max-w-[800px] mx-auto px-margin-desktop py-16 text-center">
+          <div role="alert" className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-6 sm:p-8">
+            <span className="material-symbols-outlined mb-3 text-4xl text-amber-700">sync_problem</span>
+            <h2 className="mb-2 text-xl font-bold">Your cart needs attention</h2>
+            <p className="mb-6 text-sm text-on-surface-variant">{guestCartSyncError} Your guest cart is still saved on this device. Checkout will continue after the cart sync completes.</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => void syncGuestCart()}
+                disabled={isGuestCartSyncing}
+                className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {isGuestCartSyncing ? "Syncing cart…" : "Retry cart sync"}
+              </button>
+              <Link to="/cart" className="rounded-xl border border-outline-variant/30 bg-white px-5 py-2.5 text-sm font-bold text-on-surface">
+                Review cart
+              </Link>
+            </div>
+          </div>
+        </main>
+        <StoreFooter />
+        <BottomNav />
+      </div>
+    );
+  }
+
   if (!user && !loading && !authLoading && !isResolvingIdentity) {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
@@ -531,15 +607,24 @@ export function CheckoutPage() {
           </div>
           <h2 className="text-xl font-bold mb-2">Please Sign In to Complete Checkout</h2>
           <p className="text-xs text-on-surface-variant mb-6">
-            Your cart is safe. Please sign in to choose an address and place your order.
+            Sign in or create an account to choose a delivery address and place your order. Your selected items will stay in your cart.
           </p>
-          <Link
-            to="/login"
-            search={{ redirect: "/checkout" } as any}
-            className="bg-primary text-white px-6 py-2.5 rounded-xl font-headline-sm text-xs font-bold shadow-md hover:bg-primary-container"
-          >
-            Sign In with Mobile OTP
-          </Link>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Link
+              to="/login"
+              search={{ redirect: "/checkout" } as any}
+              className="bg-primary text-white px-6 py-2.5 rounded-xl font-headline-sm text-xs font-bold shadow-md hover:bg-primary-container"
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/sign-up"
+              search={{ redirect: "/checkout" } as any}
+              className="rounded-xl border border-primary/20 bg-primary/5 px-6 py-2.5 font-headline-sm text-xs font-bold text-primary"
+            >
+              Create Account
+            </Link>
+          </div>
         </main>
         <StoreFooter />
         <BottomNav />

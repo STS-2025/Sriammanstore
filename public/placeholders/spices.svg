@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="spice-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff8ed" />
+      <stop offset="1" stop-color="#f5e4cc" />
+    </linearGradient>
+    <linearGradient id="spice-bowl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a64b24" />
+      <stop offset="1" stop-color="#71351e" />
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="400" rx="24" fill="url(#spice-bg)" />
+  <rect x="12" y="12" width="376" height="376" rx="20" fill="none" stroke="#b77945" stroke-width="2" opacity=".4" />
+
+  <g transform="translate(200 155)">
+    <ellipse cx="0" cy="42" rx="82" ry="20" fill="#6b4227" opacity=".12" />
+    <path d="M-72 2h144c-5 43-31 68-72 68S-67 45-72 2Z" fill="url(#spice-bowl)" />
+    <ellipse cx="0" cy="2" rx="73" ry="24" fill="#f3c47a" />
+    <ellipse cx="0" cy="-2" rx="64" ry="18" fill="#8d3b20" />
+    <circle cx="-39" cy="-5" r="5" fill="#d89b38" />
+    <circle cx="-21" cy="-12" r="4" fill="#6f7b35" />
+    <circle cx="-3" cy="-2" r="5" fill="#e7b34a" />
+    <circle cx="16" cy="-12" r="4" fill="#a43d28" />
+    <circle cx="38" cy="-3" r="5" fill="#74823e" />
+    <circle cx="26" cy="8" r="3.5" fill="#d99a32" />
+    <circle cx="-25" cy="8" r="3.5" fill="#9c4a25" />
+    <path d="M-48-34c-14-13-12-29 0-37 14 11 16 26 0 37Zm48-42c16 12 17 28 0 42-15-13-15-29 0-42Zm48 9c15 13 12 29-5 38-13-14-11-29 5-38Z" fill="#789044" />
+    <path d="M-48-34v-35M0-34v-40M43-29l5-38" fill="none" stroke="#526737" stroke-width="3" stroke-linecap="round" />
+  </g>
+
+  <text x="200" y="260" text-anchor="middle" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="#71351e">Fresh Spices</text>
+  <text x="200" y="284" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#8c5c38">Whole spices &amp; masalas</text>
+  <rect x="67" y="309" width="266" height="30" rx="15" fill="#f7ead8" stroke="#c28a54" stroke-width="1.5" />
+  <text x="200" y="329" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#85502d">Placeholder illustration · Photo pending</text>
+</svg>

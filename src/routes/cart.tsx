@@ -30,6 +30,9 @@ export function CartPage() {
     items,
     isLoading,
     cartError,
+    isGuestCartSyncing,
+    guestCartSyncError,
+    syncGuestCart,
     cartCount,
     cartSubtotal,
     cartTotalSavings,
@@ -141,16 +144,21 @@ export function CartPage() {
     }
   };
 
-  const handleProceedToCheckout = () => {
+  const handleProceedToCheckout = async () => {
     if (items.length === 0) {
       toast.error("Your cart is empty");
       return;
     }
     if (!user) {
-      toast.info("Please sign in to proceed to checkout");
+      toast.info("Sign in or create an account to continue checkout. Your cart is saved.");
       navigate({ to: "/login", search: { redirect: "/checkout" } as any } as any);
       return;
     }
+    if (isGuestCartSyncing) {
+      toast.info("Your saved cart is still syncing. Please wait a moment.");
+      return;
+    }
+    if (guestCartSyncError && !(await syncGuestCart())) return;
     navigate({
       to: "/checkout",
       search: { step: 2 } as any,
@@ -202,6 +210,19 @@ export function CartPage() {
               Delivery settings could not be loaded. The legacy default charges are being shown. {deliverySettingsError}
             </div>
           )}
+          {guestCartSyncError && (
+            <div role="alert" className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+              <p>{guestCartSyncError} Your saved guest cart has not been deleted.</p>
+              <button
+                type="button"
+                onClick={() => void syncGuestCart()}
+                disabled={isGuestCartSyncing}
+                className="shrink-0 rounded-xl bg-amber-700 px-4 py-2 font-bold text-white disabled:opacity-60"
+              >
+                {isGuestCartSyncing ? "Syncing cart…" : "Retry cart sync"}
+              </button>
+            </div>
+          )}
           {/* Top Bar: Title & 3-Step Progress Indicator */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
@@ -236,10 +257,10 @@ export function CartPage() {
                     : "No Address"
                 }
                 onStepClick={(step) => {
-                  if (step > 1) handleProceedToCheckout();
+                  if (step > 1) void handleProceedToCheckout();
                 }}
                 canNavigateToStep={(step) =>
-                  step === 1 || (items.length > 0 && !!user)
+                  step === 1 || (items.length > 0 && !!user && !isGuestCartSyncing && !guestCartSyncError)
                 }
               />
             </div>

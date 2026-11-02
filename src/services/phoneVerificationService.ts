@@ -16,13 +16,6 @@ import type { User } from "../types";
 
 let activeRecaptchaVerifier: RecaptchaVerifier | null = null;
 
-export interface RecaptchaInitOptions {
-  size?: "invisible" | "normal";
-  onSolved?: (token?: string) => void;
-  onExpired?: () => void;
-  onError?: (error?: unknown) => void;
-}
-
 /**
  * Normalizes a country code and national number into standard E.164 format.
  * Example: ("+91", "98400 12345") -> "+919840012345"
@@ -209,51 +202,6 @@ export const phoneVerificationService = {
   },
 
   /**
-   * Initializes or returns the active RecaptchaVerifier instance.
-   * Cleans up any existing verifier via the Firebase SDK's documented clear() lifecycle.
-   */
-  initRecaptcha(
-    container: HTMLElement | string,
-    options: RecaptchaInitOptions | (() => void) = {}
-  ): RecaptchaVerifier {
-    if (typeof window === "undefined") {
-      throw new Error("RecaptchaVerifier requires a browser window environment.");
-    }
-
-    const opts: RecaptchaInitOptions =
-      typeof options === "function" ? { onExpired: options } : options;
-
-    const targetEl =
-      typeof container === "string" ? document.getElementById(container) : container;
-
-    if (!targetEl) {
-      throw new Error(
-        `reCAPTCHA target container "${typeof container === "string" ? container : "element"}" was not found in the DOM.`
-      );
-    }
-
-    // Safely clear any previous instance using the official SDK method
-    this.clearRecaptcha();
-
-    const authInstance = firebaseAuth;
-    const verifier = new RecaptchaVerifier(authInstance, targetEl, {
-      size: opts.size || "normal",
-      callback: (token?: string) => {
-        if (opts.onSolved && token) opts.onSolved(token);
-      },
-      "expired-callback": () => {
-        if (opts.onExpired) opts.onExpired();
-      },
-      "error-callback": (err: unknown) => {
-        if (opts.onError) opts.onError(err);
-      },
-    });
-
-    activeRecaptchaVerifier = verifier;
-    return verifier;
-  },
-
-  /**
    * Returns the currently active RecaptchaVerifier if already initialized and not destroyed.
    */
   getActiveVerifier(): RecaptchaVerifier | null {
@@ -265,7 +213,7 @@ export const phoneVerificationService = {
 
   /**
    * Cleans up the active RecaptchaVerifier using the official SDK clear() method.
-   * Does NOT perform destructive innerHTML wipes or independent grecaptcha.reset() calls.
+   * Clears the Firebase verifier through its SDK lifecycle without directly manipulating the widget.
    */
   clearRecaptcha(): void {
     if (activeRecaptchaVerifier) {

@@ -18,7 +18,7 @@ export function BottomNav() {
     <>
       {/* Floating cart teaser pill if cart has items and not currently on cart/checkout */}
       {cartCount > 0 && !currentPath.includes("/cart") && !currentPath.includes("/checkout") && (
-        <div className="fixed bottom-16 left-0 right-0 z-40 px-4 md:hidden">
+        <div className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-4 md:hidden">
           <Link
             to="/cart"
             className="flex items-center justify-between bg-primary text-on-primary px-4 py-3 rounded-2xl shadow-xl animate-fade-in"
@@ -39,11 +39,11 @@ export function BottomNav() {
       )}
 
       {/* 5-Tab Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-container-lowest border-t border-outline-variant/20 px-2 py-1 md:hidden shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-container-lowest border-t border-outline-variant/20 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] md:hidden shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
         <div className="grid grid-cols-5 items-center">
           <Link
             to="/"
-            className={`flex flex-col items-center py-1 transition-colors ${
+            className={`flex min-h-11 flex-col items-center py-1 transition-colors ${
               isActive("/") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
             }`}
           >
@@ -58,7 +58,7 @@ export function BottomNav() {
 
           <Link
             to="/shop"
-            className={`flex flex-col items-center py-1 transition-colors ${
+            className={`flex min-h-11 flex-col items-center py-1 transition-colors ${
               isActive("/shop") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
             }`}
           >
@@ -73,7 +73,7 @@ export function BottomNav() {
 
           <Link
             to="/wishlist"
-            className={`relative flex flex-col items-center py-1 transition-colors ${
+            className={`relative flex min-h-11 flex-col items-center py-1 transition-colors ${
               isActive("/wishlist") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
             }`}
           >
@@ -93,7 +93,8 @@ export function BottomNav() {
 
           <Link
             to="/orders"
-            className={`flex flex-col items-center py-1 transition-colors ${
+            search={{} as any}
+            className={`flex min-h-11 flex-col items-center py-1 transition-colors ${
               isActive("/orders") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
             }`}
           >
@@ -108,7 +109,7 @@ export function BottomNav() {
 
           <Link
             to="/account"
-            className={`flex flex-col items-center py-1 transition-colors ${
+            className={`flex min-h-11 flex-col items-center py-1 transition-colors ${
               isActive("/account") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
             }`}
           >

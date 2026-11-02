@@ -21,6 +21,7 @@ export function StoreHeader() {
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownButtonRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
@@ -104,7 +105,7 @@ export function StoreHeader() {
     <header className="fixed top-0 left-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-md shadow-[0_10px_25px_-5px_rgba(11,122,83,0.06),0_4px_6px_-2px_rgba(15,23,42,0.02)]">
       {/* Top Announcement Bar */}
       <div className="bg-surface-container-low text-on-surface-variant font-body-sm text-body-sm">
-        <div className="max-w-[1320px] mx-auto px-margin-desktop h-9 flex items-center justify-between">
+        <div className="max-w-[1320px] mx-auto px-margin-desktop h-9 flex items-center justify-between gap-2">
           <div className="flex items-center gap-space-lg">
             <div className="flex items-center gap-space-xs text-primary font-headline-sm text-label-button">
               <span className="material-symbols-outlined text-[16px]">local_shipping</span>
@@ -128,7 +129,7 @@ export function StoreHeader() {
             </button>
             <span className="h-3 w-px bg-outline-variant/40"></span>
             <a
-              className="flex items-center gap-space-xs hover:text-primary transition-colors text-[12px]"
+              className="hidden sm:flex items-center gap-space-xs hover:text-primary transition-colors text-[12px]"
               href="tel:+919840012345"
             >
               <span className="material-symbols-outlined text-[15px]">support_agent</span>
@@ -139,12 +140,12 @@ export function StoreHeader() {
       </div>
 
       {/* Main Navigation Bar */}
-      <div className="h-20 max-w-[1320px] mx-auto px-margin-desktop flex items-center justify-between gap-space-md">
+      <div className="h-20 max-w-[1320px] mx-auto px-margin-desktop flex items-center justify-between gap-2 sm:gap-space-md">
         {/* Brand & Location */}
         <div className="flex items-center gap-space-lg shrink-0">
           <Link to="/" className="flex items-center gap-space-sm group">
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-black text-xl shadow-md group-hover:scale-105 transition-transform">
-              <img src={logo}/>
+              <img src={logo} alt="Sri Amman Smart Store" className="h-full w-full rounded-xl object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="font-headline-md text-headline-md tracking-tight text-primary font-bold">
@@ -158,7 +159,7 @@ export function StoreHeader() {
 
           <Link
             to="/addresses"
-            className="hidden sm:flex items-center gap-space-xs bg-surface-container-low hover:bg-surface-container px-space-md py-space-sm rounded-full text-on-surface transition-all text-left shadow-[0_1px_4px_rgba(15,23,42,0.04)]"
+            className="hidden xl:flex items-center gap-space-xs bg-surface-container-low hover:bg-surface-container px-space-md py-space-sm rounded-full text-on-surface transition-all text-left shadow-[0_1px_4px_rgba(15,23,42,0.04)]"
           >
             <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
               <span className="material-symbols-outlined text-[18px]">location_on</span>
@@ -178,7 +179,7 @@ export function StoreHeader() {
         </div>
 
         {/* Global Search Bar */}
-        <form onSubmit={handleSearch} className="flex-1 max-w-2xl mx-space-md hidden md:block">
+        <form onSubmit={handleSearch} className="flex-1 min-w-0 max-w-2xl mx-3 hidden lg:block">
           <div className="flex items-center bg-surface-container-lowest rounded-full p-1 pl-space-md shadow-[0_2px_10px_-2px_rgba(15,23,42,0.08)] ring-1 ring-outline-variant/30 focus-within:ring-2 focus-within:ring-primary transition-all">
             <input
               type="text"
@@ -198,12 +199,22 @@ export function StoreHeader() {
         </form>
 
         {/* Right Actions & Navigation */}
-        <div className="flex items-center gap-space-md shrink-0">
+        <div className="flex items-center gap-0 sm:gap-space-md shrink-0">
+
+          <button
+            type="button"
+            onClick={() => setIsMobileSearchOpen((open) => !open)}
+            className="lg:hidden relative p-1.5 sm:p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full hover:bg-surface-container-low"
+            aria-label={isMobileSearchOpen ? "Close search" : "Open search"}
+            aria-expanded={isMobileSearchOpen}
+          >
+            <span className="material-symbols-outlined text-[22px]">{isMobileSearchOpen ? "close" : "search"}</span>
+          </button>
 
           {/* Notifications Bell */}
           <Link
             to="/notifications"
-            className="relative p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full hover:bg-surface-container-low"
+            className="relative p-1.5 sm:p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full hover:bg-surface-container-low"
             title="Notifications & Store Alerts"
           >
             <span className="material-symbols-outlined text-[24px]">notifications</span>
@@ -216,7 +227,7 @@ export function StoreHeader() {
 
           <Link
             to="/cart"
-            className="flex items-center gap-space-sm bg-primary-fixed text-on-primary-fixed hover:bg-primary-fixed-dim px-space-md py-2 rounded-full transition-all shadow-[0_2px_6px_rgba(11,122,83,0.12)]"
+            className="flex items-center gap-1 sm:gap-space-sm bg-primary-fixed text-on-primary-fixed hover:bg-primary-fixed-dim px-2 sm:px-space-md py-2 rounded-full transition-all shadow-[0_2px_6px_rgba(11,122,83,0.12)]"
           >
             <div className="relative flex items-center">
               <span className="material-symbols-outlined text-primary text-[22px]">
@@ -228,7 +239,7 @@ export function StoreHeader() {
                 </span>
               )}
             </div>
-            <div className="flex flex-col items-start leading-tight pr-0.5">
+            <div className="hidden sm:flex flex-col items-start leading-tight pr-0.5">
               <span className="font-label-badge text-[10px] font-bold uppercase opacity-80">
                 Cart
               </span>
@@ -263,7 +274,7 @@ export function StoreHeader() {
       {/* Category Aisles Navigation Bar */}
       <div className="bg-surface-container-lowest shadow-[0_1px_6px_rgba(15,23,42,0.03)] border-t border-outline-variant/10">
         <div className="max-w-[1320px] mx-auto px-margin-desktop">
-          <nav className="flex items-center gap-space-sm h-12 relative" aria-label="Category Navigation">
+          <nav className="flex items-center gap-space-sm h-12 relative overflow-x-auto whitespace-nowrap scrollbar-none lg:overflow-visible lg:whitespace-normal" aria-label="Category Navigation">
             {/* 1. All Categories Dropdown Trigger & Panel */}
             <div className="relative" ref={dropdownRef}>
               <button
@@ -296,7 +307,7 @@ export function StoreHeader() {
                   role="menu"
                   aria-label="Product Categories"
                   data-testid="navbar-categories-dropdown"
-                  className="absolute top-full left-0 mt-2 w-72 sm:w-80 md:w-96 max-w-[calc(100vw-2rem)] bg-surface-container-lowest rounded-2xl shadow-[0_12px_36px_rgba(15,23,42,0.14)] border border-outline-variant/20 p-2 z-50 max-h-[70vh] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150"
+                  className="fixed top-[164px] left-4 mt-2 w-[calc(100vw-2rem)] max-w-96 bg-surface-container-lowest rounded-2xl shadow-[0_12px_36px_rgba(15,23,42,0.14)] border border-outline-variant/20 p-2 z-50 max-h-[70vh] overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-150 lg:absolute lg:top-full lg:left-0 lg:mt-2 lg:w-96 lg:max-w-[calc(100vw-2rem)]"
                 >
                   {/* Loading State */}
                   {categoriesLoading && (
@@ -458,6 +469,28 @@ export function StoreHeader() {
           </nav>
         </div>
       </div>
+      {isMobileSearchOpen && (
+        <form
+          onSubmit={(event) => {
+            handleSearch(event);
+            setIsMobileSearchOpen(false);
+          }}
+          className="absolute top-full left-3 right-3 z-50 flex items-center gap-2 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-2 shadow-xl lg:hidden"
+        >
+          <input
+            autoFocus
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search groceries and more"
+            aria-label="Search products"
+            className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-on-surface placeholder:text-outline focus:outline-none"
+          />
+          <button type="submit" className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-on-primary">
+            Search
+          </button>
+        </form>
+      )}
     </header>
   );
 }

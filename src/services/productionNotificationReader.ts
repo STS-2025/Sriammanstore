@@ -1,7 +1,10 @@
 import {
   collection,
+  doc,
+  getDoc,
   getDocs,
   query,
+  updateDoc,
 } from "firebase/firestore";
 import { getProductionFirestoreInstance } from "./productionOrderReader";
 import { CANONICAL_CUSTOMER_ID_RE } from "./legacyCartAddressAdapter";
@@ -222,6 +225,11 @@ export type ProductionNotificationReaderOverride = {
     customerId: string,
     legacySassId?: string
   ) => Promise<NotificationItem[]>;
+  markAsRead?: (
+    customerId: string,
+    notificationId: string,
+    legacySassId?: string
+  ) => Promise<NotificationItem>;
 };
 
 let readerOverride: ProductionNotificationReaderOverride | null = null;
@@ -249,6 +257,66 @@ export const productionNotificationReader = {
       );
     }
     return clean;
+  },
+
+  /** Marks a notification in the customer's canonical or legacy subcollection. */
+  async markAsRead(
+    customerId: string,
+    notificationId: string,
+    legacySassId?: string
+  ): Promise<NotificationItem> {
+    const validCustomerId = this.assertValidCustomer(customerId);
+    const cleanNotificationId = notificationId.trim();
+    if (!cleanNotificationId) {
+      throw new Error("Notification ID is required.");
+    }
+    if (readerOverride?.markAsRead) {
+      return readerOverride.markAsRead(
+        validCustomerId,
+        cleanNotificationId,
+        legacySassId
+      );
+    }
+
+    const primaryCollection = validCustomerId.toUpperCase().startsWith("ONCUS")
+      ? "onlineCustomers"
+      : "users";
+    const primaryId = validCustomerId;
+    const candidates = [
+      { collection: primaryCollection, customerId: primaryId },
+      ...(primaryCollection === "onlineCustomers" && legacySassId?.trim()
+        ? [{ collection: "users", customerId: legacySassId.trim() }]
+        : []),
+    ];
+    const db = getProductionFirestoreInstance();
+    for (const candidate of candidates) {
+      const notificationRef = doc(
+        db,
+        candidate.collection,
+        candidate.customerId,
+        "notifications",
+        cleanNotificationId
+      );
+      const notificationSnapshot = await withTimeout(
+        getDoc(notificationRef),
+        8000,
+        `getDoc(${candidate.collection}/${candidate.customerId}/notifications/${cleanNotificationId})`
+      );
+      if (!notificationSnapshot.exists()) continue;
+      await withTimeout(
+        updateDoc(notificationRef, { read: true }),
+        8000,
+        `updateDoc(${candidate.collection}/${candidate.customerId}/notifications/${cleanNotificationId})`
+      );
+      return {
+        ...(notificationSnapshot.data() as NotificationItem),
+        id: cleanNotificationId,
+        userId: validCustomerId,
+        read: true,
+      };
+    }
+
+    throw new Error("Notification was not found for this customer.");
   },
 
   /**

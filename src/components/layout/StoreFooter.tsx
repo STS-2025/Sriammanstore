@@ -10,7 +10,7 @@ export function StoreFooter() {
           <div className="lg:col-span-2 flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-black text-xl shadow-md">
-                <img src={logo}/>
+                <img src={logo} alt="Sri Amman Smart Store" className="h-full w-full rounded-xl object-contain" />
               </div>
               <div>
                 <span className="font-headline-md text-headline-md font-bold text-primary block">
@@ -24,7 +24,7 @@ export function StoreFooter() {
             <p className="font-body-sm text-body-sm text-on-surface-variant max-w-sm leading-relaxed">
               South India's most authentic unpolished grains, artisanal wood-pressed oils, and farm-plucked morning greens delivered with single-store purity in 60 minutes.
             </p>
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
                 href="https://api.whatsapp.com/send?text=SriAmmanStore"
                 target="_blank"
@@ -85,8 +85,8 @@ export function StoreFooter() {
             </h4>
             <ul className="space-y-2 font-body-sm text-xs text-on-surface-variant">
               <li>
-                <Link to="/orders" className="hover:text-primary transition-colors">
-                  Order Tracking
+                <Link to="/orders" search={{} as any} className="hover:text-primary transition-colors">
+                  My Orders
                 </Link>
               </li>
               <li>
@@ -145,7 +145,7 @@ export function StoreFooter() {
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-outline-variant/20 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-on-surface-variant">
           <p>© 2026 Sri Amman Smart Store. Single-store purity guaranteed. FSSAI Reg: #12421008000412</p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 md:justify-end">
             <span className="flex items-center gap-1 text-primary font-semibold">
               <span className="material-symbols-outlined text-[16px]">verified</span>
               100% Quality Assured

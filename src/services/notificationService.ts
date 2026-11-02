@@ -626,7 +626,11 @@ export const notificationService = {
     return createdNotifications;
   },
 
-  async markAsRead(id: string, userId?: string): Promise<NotificationItem> {
+  async markAsRead(
+    id: string,
+    userId?: string,
+    legacySassId?: string
+  ): Promise<NotificationItem> {
     if (!id || !id.trim()) {
       throw new Error("Notification ID is required.");
     }
@@ -636,26 +640,57 @@ export const notificationService = {
       if (!cleanUserId) {
         throw new Error("Access denied: Missing customer userId.");
       }
-      const customerNotifications = await this.getNotifications(cleanUserId);
-      const belongsToCustomer = customerNotifications.some((n) => n.id === id);
+      const customerNotifications = await this.getNotifications(
+        cleanUserId,
+        legacySassId
+      );
+      const customerNotification = customerNotifications.find((n) => n.id === id);
+      const belongsToCustomer = Boolean(customerNotification);
       if (!belongsToCustomer) {
         try {
           const directItem = await apiClient.get<NotificationItem>(
             `/notifications/${encodeURIComponent(id)}`
           );
-          if (directItem && directItem.userId && directItem.userId !== cleanUserId) {
+          if (
+            !directItem ||
+            !directItem.userId ||
+            directItem.userId !== cleanUserId
+          ) {
             throw new Error(
               "Access denied: Cannot mark another customer's notification as read."
             );
           }
         } catch (err: any) {
           if (err.message?.includes("Access denied")) throw err;
-          if (customerNotifications.length > 0) {
-            throw new Error(
-              "Access denied: Cannot mark another customer's notification as read."
-            );
-          }
+          throw new Error(
+            "Access denied: Cannot verify ownership of this notification."
+          );
         }
+      }
+
+      if (authManager.getMode() === "production") {
+        if (!customerNotification) {
+          throw new Error("Notification was not found for this customer.");
+        }
+        let canonicalCustomerId = cleanUserId;
+        let effectiveLegacySassId =
+          legacySassId || authService.getCurrentUser()?.legacySassId;
+        try {
+          const dataSource = resolveCustomerDataSource(cleanUserId);
+          canonicalCustomerId = dataSource.canonicalCustomerId;
+          effectiveLegacySassId =
+            effectiveLegacySassId || dataSource.legacySassId;
+        } catch {
+          // Keep the authenticated ID when no linked customer mapping exists.
+        }
+        await productionNotificationReader.markAsRead(
+          canonicalCustomerId,
+          id,
+          effectiveLegacySassId
+        );
+        const updated = { ...customerNotification, read: true };
+        this.notifyListeners();
+        return updated;
       }
     }
 
@@ -667,13 +702,37 @@ export const notificationService = {
     return updated;
   },
 
-  async markAllAsRead(userId?: string): Promise<void> {
+  async markAllAsRead(userId?: string, legacySassId?: string): Promise<void> {
     const effectiveUserId = this.resolveCustomerId(userId);
     if (!effectiveUserId) return;
 
-    const unread = (await this.getNotifications(effectiveUserId)).filter(
-      (n) => !n.read && n.userId === effectiveUserId
+    const unread = (await this.getNotifications(effectiveUserId, legacySassId)).filter(
+      (n) => !n.read
     );
+    if (authManager.getMode() === "production") {
+      let canonicalCustomerId = effectiveUserId;
+      let effectiveLegacySassId =
+        legacySassId || authService.getCurrentUser()?.legacySassId;
+      try {
+        const dataSource = resolveCustomerDataSource(effectiveUserId);
+        canonicalCustomerId = dataSource.canonicalCustomerId;
+        effectiveLegacySassId =
+          effectiveLegacySassId || dataSource.legacySassId;
+      } catch {
+        // Keep the authenticated ID when no linked customer mapping exists.
+      }
+      await Promise.all(
+        unread.map((notification) =>
+          productionNotificationReader.markAsRead(
+            canonicalCustomerId,
+            notification.id,
+            effectiveLegacySassId
+          )
+        )
+      );
+      this.notifyListeners();
+      return;
+    }
     await Promise.all(
       unread.map((n) =>
         apiClient.patch(`/notifications/${encodeURIComponent(n.id)}`, {

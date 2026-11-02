@@ -10,7 +10,6 @@ import {
   notificationService,
   type NotificationPreferences,
 } from "../services/notificationService";
-import { authManager } from "../services/authAdapter";
 import { useAuth } from "./AuthContext";
 import type { NotificationItem } from "../types";
 
@@ -165,20 +164,13 @@ export function NotificationProvider({
   const markAsRead = async (id: string) => {
     if (!customerId) return;
 
-    if (authManager.getMode() === "production") {
-      console.warn("NotificationContext: markAsRead ignored in production read-only mode.");
-      return;
-    }
-
     // Optimistic local state update scoped to current customer
     setNotifications((prev) =>
-      prev.map((n) =>
-        n.id === id && n.userId === customerId ? { ...n, read: true } : n
-      )
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
 
     try {
-      await notificationService.markAsRead(id, customerId);
+      await notificationService.markAsRead(id, customerId, user?.legacySassId);
     } catch (err) {
       console.error("Failed to mark notification as read:", err);
       await loadCustomerNotifications(false);
@@ -189,17 +181,12 @@ export function NotificationProvider({
   const markAllAsRead = async () => {
     if (!customerId) return;
 
-    if (authManager.getMode() === "production") {
-      console.warn("NotificationContext: markAllAsRead ignored in production read-only mode.");
-      return;
-    }
-
     setNotifications((prev) =>
-      prev.map((n) => (n.userId === customerId ? { ...n, read: true } : n))
+      prev.map((n) => ({ ...n, read: true }))
     );
 
     try {
-      await notificationService.markAllAsRead(customerId);
+      await notificationService.markAllAsRead(customerId, user?.legacySassId);
     } catch (err) {
       console.error("Failed to mark all notifications as read:", err);
       await loadCustomerNotifications(false);
@@ -213,9 +200,7 @@ export function NotificationProvider({
     setPreferences(updated);
   };
 
-  const unreadCount = notifications.filter(
-    (n) => n.userId === customerId && !n.read
-  ).length;
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <NotificationContext.Provider

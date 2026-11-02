@@ -20,14 +20,18 @@ import { orderService } from "../services/orderService";
 import { supportService } from "../services/supportService";
 import { apiClient } from "../services/apiClient";
 import { StorageAdapterError } from "../services/firestoreAdapter";
-import { OrdersPage } from "../routes/orders";
+import { buildOrderTimeline, OrdersPage } from "../routes/orders";
 import type { Order, User } from "../types";
 
 // ── Router mock ──────────────────────────────────────────────────────────────
+const { mockSearch, mockNavigate } = vi.hoisted(() => ({
+  mockSearch: { id: undefined as string | undefined, placed: undefined as string | undefined },
+  mockNavigate: vi.fn(),
+}));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (opts: any) => opts,
-  useSearch: () => ({}),
-  useNavigate: () => vi.fn(),
+  useSearch: () => mockSearch,
+  useNavigate: () => mockNavigate,
   Link: ({ children, to, className, ...props }: any) => (
     <a href={to} className={className} data-testid="router-link" {...props}>
       {children}
@@ -129,6 +133,9 @@ describe("Production Orders Page Integration Suite", () => {
   beforeEach(() => {
     authManager.resetMode();
     mockAuthUser = null;
+    mockSearch.id = undefined;
+    mockSearch.placed = undefined;
+    mockNavigate.mockClear();
     vi.restoreAllMocks();
   });
 
@@ -237,6 +244,7 @@ describe("Production Orders Page Integration Suite", () => {
     it("shows active Cancel button for pending orders in production mode", async () => {
       authManager.setMode("production");
       mockAuthUser = ONCUS_USER;
+      mockSearch.id = "ORD-PEND";
       vi.spyOn(orderService, "getOrders").mockResolvedValue([
         makeOrder({ orderId: "ORD-PEND", status: "pending" }),
       ]);
@@ -246,7 +254,7 @@ describe("Production Orders Page Integration Suite", () => {
       });
 
       await waitFor(() =>
-        expect(screen.getByText(/cancel order or change address/i)).toBeTruthy()
+        expect(screen.getByText(/^Cancel Order$/i)).toBeTruthy()
       );
       expect(screen.queryByTestId("cancel-order-disabled")).toBeNull();
     });
@@ -254,8 +262,9 @@ describe("Production Orders Page Integration Suite", () => {
     it("shows active Return button for delivered orders in production mode", async () => {
       authManager.setMode("production");
       mockAuthUser = ONCUS_USER;
+      mockSearch.id = "ORD-DEL";
       vi.spyOn(orderService, "getOrders").mockResolvedValue([
-        makeOrder({ orderId: "ORD-DEL", status: "delivered" }),
+        makeOrder({ orderId: "ORD-DEL", status: "delivered", deliveredAt: new Date().toISOString() }),
       ]);
 
       await act(async () => {
@@ -263,7 +272,7 @@ describe("Production Orders Page Integration Suite", () => {
       });
 
       await waitFor(() =>
-        expect(screen.getByText(/request 24-hr return/i)).toBeTruthy()
+        expect(screen.getByText(/^Request Return$/i)).toBeTruthy()
       );
       expect(screen.queryByTestId("return-order-disabled")).toBeNull();
     });
@@ -271,6 +280,7 @@ describe("Production Orders Page Integration Suite", () => {
     it("shows active Reorder 1-Click button in production mode", async () => {
       authManager.setMode("production");
       mockAuthUser = ONCUS_USER;
+      mockSearch.id = "ORD-001";
       vi.spyOn(orderService, "getOrders").mockResolvedValue([makeOrder()]);
 
       await act(async () => {
@@ -286,6 +296,7 @@ describe("Production Orders Page Integration Suite", () => {
     it("shows Reorder 1-Click button in emulator mode (local workflow intact)", async () => {
       authManager.setMode("emulator");
       mockAuthUser = ONCUS_USER;
+      mockSearch.id = "ORD-001";
       vi.spyOn(orderService, "getOrders").mockResolvedValue([makeOrder()]);
 
       await act(async () => {
@@ -350,6 +361,7 @@ describe("Production Orders Page Integration Suite", () => {
     it("shows Rate & Review button in production mode", async () => {
       authManager.setMode("production");
       mockAuthUser = ONCUS_USER;
+      mockSearch.id = "ORD-001";
       vi.spyOn(orderService, "getOrders").mockResolvedValue([makeOrder()]);
 
       await act(async () => {
@@ -364,6 +376,7 @@ describe("Production Orders Page Integration Suite", () => {
     it("shows Need Help modal button in production mode", async () => {
       authManager.setMode("production");
       mockAuthUser = ONCUS_USER;
+      mockSearch.id = "ORD-001";
       vi.spyOn(orderService, "getOrders").mockResolvedValue([makeOrder()]);
 
       await act(async () => {
@@ -466,21 +479,89 @@ describe("Production Orders Page Integration Suite", () => {
   // 6. Order status rendering
   // ─────────────────────────────────────────────────────────────────────────────
   describe("6. Order status and milestone rendering", () => {
-    it("renders order tracking panel with correct status badge for in-transit order", async () => {
+    it("opens on the order list and does not select an order automatically", async () => {
       authManager.setMode("production");
       mockAuthUser = ONCUS_USER;
       vi.spyOn(orderService, "getOrders").mockResolvedValue([
         makeOrder({ orderId: "ORD-TRANSIT", status: "in transit" }),
+        makeOrder({ orderId: "ORD-SECOND", status: "pending" }),
       ]);
 
       await act(async () => {
         render(<OrdersPage />);
       });
 
-      await waitFor(() =>
-        expect(screen.getByTestId("active-order-tracking")).toBeTruthy()
-      );
-      expect(screen.getByText("OUT FOR DELIVERY")).toBeTruthy();
+      await waitFor(() => expect(screen.getByTestId("orders-list-view")).toBeTruthy());
+      expect(screen.queryByTestId("order-details-view")).toBeNull();
+      expect(screen.getByTestId("order-history-card-ORD-TRANSIT")).toBeTruthy();
+      expect(screen.getByTestId("order-history-card-ORD-SECOND")).toBeTruthy();
+      expect(screen.queryByText(/demonstration route|route preview|real-time tracking/i)).toBeNull();
+      fireEvent.click(screen.getByTestId("order-history-card-ORD-TRANSIT"));
+      expect(mockNavigate).toHaveBeenCalledWith({ to: "/orders", search: { id: "ORD-TRANSIT" } });
+    });
+
+    it("navigates from an order card to its own details and timeline", async () => {
+      authManager.setMode("production");
+      mockAuthUser = ONCUS_USER;
+      mockSearch.id = "ORD-TRANSIT";
+      vi.spyOn(orderService, "getOrders").mockResolvedValue([
+        makeOrder({ orderId: "ORD-TRANSIT", status: "in transit", rawStatus: "out for delivery" }),
+        makeOrder({ orderId: "ORD-OTHER", status: "delivered" }),
+      ]);
+
+      await act(async () => render(<OrdersPage />));
+      await waitFor(() => expect(screen.getByTestId("order-details-view")).toBeTruthy());
+      expect(screen.getByTestId("order-progress-timeline")).toBeTruthy();
+      expect(screen.getAllByText("Out for Delivery")).toHaveLength(2);
+      expect(screen.queryByText("ORD-OTHER")).toBeNull();
+      expect(screen.queryByText(/demonstration route|route preview|tracking map/i)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: /back to orders/i }));
+      expect(mockNavigate).toHaveBeenCalledWith({ to: "/orders", search: {} });
+    });
+
+    it("uses the URL order ID when opening a detail link and shows not found for foreign IDs", async () => {
+      authManager.setMode("production");
+      mockAuthUser = ONCUS_USER;
+      mockSearch.id = "ORD-NOT-MINE";
+      vi.spyOn(orderService, "getOrders").mockResolvedValue([makeOrder({ orderId: "ORD-OWN" })]);
+
+      await act(async () => render(<OrdersPage />));
+      await waitFor(() => expect(screen.getByTestId("order-not-found")).toBeTruthy());
+      expect(screen.queryByText("ORD-OWN")).toBeNull();
+    });
+
+    it("builds timeline states from the actual order status and available dates", () => {
+      const pending = buildOrderTimeline(makeOrder({ status: "pending", createdAt: "2026-10-01T10:00:00Z" }));
+      expect(pending[0]?.state).toBe("current");
+      expect(pending[0]?.timestamp).toBe("2026-10-01T10:00:00.000Z");
+      expect(pending[1]?.state).toBe("pending");
+
+      const processing = buildOrderTimeline(makeOrder({ status: "processing" }));
+      expect(processing[1]?.state).toBe("completed");
+      expect(processing[2]?.state).toBe("current");
+
+      const dispatched = buildOrderTimeline(makeOrder({ status: "in transit", rawStatus: "dispatched" }));
+      expect(dispatched[3]?.state).toBe("current");
+      expect(dispatched[4]?.state).toBe("pending");
+
+      const outForDelivery = buildOrderTimeline(makeOrder({ status: "in transit", rawStatus: "out for delivery" }));
+      expect(outForDelivery[4]?.state).toBe("current");
+
+      const delivered = buildOrderTimeline(makeOrder({ status: "delivered", deliveredAt: "2026-10-01T12:00:00Z" }));
+      expect(delivered[5]?.state).toBe("completed");
+      expect(delivered[5]?.timestamp).toBe("2026-10-01T12:00:00.000Z");
+
+      const cancelled = buildOrderTimeline(makeOrder({ status: "cancelled", cancelledAt: "2026-10-01T11:00:00Z" }));
+      expect(cancelled[3]?.state).toBe("pending");
+      expect(cancelled.at(-1)?.label).toBe("Cancelled");
+      expect(cancelled.at(-1)?.timestamp).toBe("2026-10-01T11:00:00.000Z");
+
+      const returned = buildOrderTimeline(makeOrder({ status: "returned", rawStatus: "returned" }));
+      expect(returned[5]?.state).toBe("completed");
+      expect(returned.at(-1)?.label).toBe("Returned");
+
+      const failed = buildOrderTimeline(makeOrder({ status: "cancelled", rawStatus: "failed" }));
+      expect(failed.at(-1)?.label).toBe("Failed");
     });
 
     it("renders order history card with correct order ID", async () => {

@@ -310,12 +310,6 @@ describe("Phone Verification & Checkout Enforcement Test Suite", () => {
       expect(phoneVerificationService.getActiveVerifier()).toBeNull();
     });
 
-    it("throws a descriptive error if the reCAPTCHA container is missing from the DOM", () => {
-      expect(() => {
-        phoneVerificationService.initRecaptcha("non-existent-recaptcha-element");
-      }).toThrow(/reCAPTCHA target container "non-existent-recaptcha-element" was not found in the DOM/i);
-    });
-
     it("throws a descriptive error in initVisibleRecaptcha if the container is missing from the DOM", async () => {
       await expect(
         phoneVerificationService.initVisibleRecaptcha("non-existent-recaptcha-container")

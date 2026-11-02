@@ -17,6 +17,7 @@ import {
   type LegacyCheckoutSettings,
 } from "../services/settingsService";
 import { useAuth } from "./AuthContext";
+import { toast } from "sonner";
 import type { CartItem, Product } from "../types";
 
 function getStored<T>(key: string, defaultValue: T): T {
@@ -47,6 +48,9 @@ interface CartContextType {
   items: CartItem[];
   isLoading: boolean;
   cartError: string | null;
+  isGuestCartSyncing: boolean;
+  guestCartSyncError: string | null;
+  syncGuestCart: () => Promise<boolean>;
   cartCount: number;
   cartTotalMrp: number;
   cartSubtotal: number;
@@ -85,6 +89,7 @@ interface CartContextType {
   removeFromCart: (cartKey: string) => Promise<void>;
   clearCart: () => Promise<void>;
   refreshCart: () => Promise<void>;
+  revalidateCartItems: () => Promise<CartItem[]>;
   getItemQuantity: (cartKey: string) => number;
 }
 
@@ -95,6 +100,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cartError, setCartError] = useState<string | null>(null);
+  const [isSyncingGuestCart, setIsSyncingGuestCart] = useState(false);
+  const [cartSyncAttemptedCustomerId, setCartSyncAttemptedCustomerId] = useState<string | null>(null);
+  const [guestCartSyncError, setGuestCartSyncError] = useState<string | null>(null);
 
   // Scoped storage keys based on user ID
   const storageUserKey = user?.id || "guest";
@@ -236,9 +244,46 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.id, user?.legacySassId]);
 
+  const syncGuestCart = useCallback(async () => {
+    if (!user?.id) {
+      await refreshCart();
+      return true;
+    }
+
+    setIsSyncingGuestCart(true);
+    setGuestCartSyncError(null);
+    try {
+      const mergedGuestItems = await cartService.mergeGuestCart(user.id, user.legacySassId, !!user.isVIP);
+      await refreshCart();
+      if (mergedGuestItems.length > 0) {
+        toast.success("Your saved cart has been synced with your account.");
+      }
+      return true;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Could not sync your saved cart.";
+      setGuestCartSyncError(message);
+      // Keep the guest cart visible and recoverable if the authenticated sync fails.
+      try {
+        const guestItems = await cartService.getGuestCart(!!user.isVIP);
+        if (guestItems.length > 0) setItems(guestItems);
+        else await refreshCart();
+      } catch {
+        setCartError("Your saved guest cart could not be loaded. Please retry the cart sync.");
+      }
+      return false;
+    } finally {
+      setCartSyncAttemptedCustomerId(user.id);
+      setIsSyncingGuestCart(false);
+    }
+  }, [user?.id, user?.legacySassId, user?.isVIP, refreshCart]);
+
+  const isGuestCartSyncing =
+    isSyncingGuestCart || (!!user?.id && cartSyncAttemptedCustomerId !== user.id);
+
   useEffect(() => {
-    refreshCart();
-  }, [refreshCart]);
+    if (user?.id) void syncGuestCart();
+    else void refreshCart();
+  }, [user?.id, refreshCart, syncGuestCart]);
 
   const addToCart = async (
     product: Product,
@@ -246,23 +291,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     quantity: number = 1
   ) => {
     const isVIP = !!user?.isVIP;
-    await cartService.addToCart(product, optionIndex, quantity, user?.id, isVIP);
-    await refreshCart();
+    const cartOwnerId = guestCartSyncError ? "guest_session" : user?.id;
+    await cartService.addToCart(product, optionIndex, quantity, cartOwnerId, isVIP);
+    if (guestCartSyncError) setItems(await cartService.getGuestCart(isVIP));
+    else await refreshCart();
   };
 
   const updateQty = async (cartKey: string, quantity: number) => {
-    await cartService.updateQuantity(cartKey, quantity, user?.id);
-    await refreshCart();
+    await cartService.updateQuantity(cartKey, quantity, guestCartSyncError ? "guest_session" : user?.id);
+    if (guestCartSyncError) setItems(await cartService.getGuestCart(!!user?.isVIP));
+    else await refreshCart();
   };
 
   const removeFromCart = async (cartKey: string) => {
-    await cartService.removeFromCart(cartKey, user?.id);
-    await refreshCart();
+    await cartService.removeFromCart(cartKey, guestCartSyncError ? "guest_session" : user?.id);
+    if (guestCartSyncError) setItems(await cartService.getGuestCart(!!user?.isVIP));
+    else await refreshCart();
   };
 
   const clearCart = async () => {
-    await cartService.clearCart(user?.id);
+    await cartService.clearCart(guestCartSyncError ? "guest_session" : user?.id);
     setItems([]);
+  };
+
+  const revalidateCartItems = async () => {
+    const refreshedItems = await cartService.refreshCartItemDetails(items, !!user?.isVIP);
+    setItems(refreshedItems);
+    return refreshedItems;
   };
 
   const getItemQuantity = (cartKey: string): number => {
@@ -392,6 +447,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         items,
         isLoading,
         cartError,
+        isGuestCartSyncing,
+        guestCartSyncError,
+        syncGuestCart,
         cartCount,
         cartTotalMrp,
         cartSubtotal,
@@ -430,6 +488,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeFromCart,
         clearCart,
         refreshCart,
+        revalidateCartItems,
         getItemQuantity,
       }}
     >

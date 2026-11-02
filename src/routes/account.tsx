@@ -583,16 +583,17 @@ export function AccountPage() {
                   <span className="material-symbols-outlined text-[18px]">chevron_right</span>
                 </div>
 
-                {/* 2. My Orders & Tracking */}
+                {/* 2. My Orders */}
                 <Link
                   to="/orders"
+                  search={{} as any}
                   className="px-4 py-3 rounded-2xl flex items-center justify-between text-on-surface hover:bg-surface-container-low transition-colors group"
                 >
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary text-[20px]">
                       receipt_long
                     </span>
-                    <span className="font-headline-sm text-xs font-bold">My Orders & Tracking</span>
+                    <span className="font-headline-sm text-xs font-bold">My Orders</span>
                   </div>
                   {ordersError ? (
                     <span className="bg-red-50 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">

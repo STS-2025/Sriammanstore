@@ -120,6 +120,9 @@ export const orderService = {
     if (!cleanUserId) {
       throw new Error("Cannot place an order without a valid customer userId");
     }
+    if (cleanUserId === "guest_session" || cleanUserId.startsWith("guest_")) {
+      throw new Error("Authentication required: guest carts cannot place orders.");
+    }
 
     if (
       params.paymentMethod === "online" &&

@@ -1,7 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { CustomerRegistrationForm } from "../components/auth/CustomerRegistrationForm";
 
 export const Route = createFileRoute("/sign-up")({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+    const redirect = typeof search["redirect"] === "string" ? search["redirect"] : undefined;
+    return redirect?.startsWith("/") && !redirect.startsWith("//") ? { redirect } : {};
+  },
   head: () => ({
     meta: [
       { title: "Create a Customer Account — Sri Amman Smart Store" },
@@ -12,6 +16,8 @@ export const Route = createFileRoute("/sign-up")({
 });
 
 export function SignUpPage() {
+  const { redirect } = useSearch({ from: "/sign-up" });
+
   return (
     <main className="min-h-screen bg-surface px-4 py-12 text-on-surface sm:px-6 lg:px-8">
       <div className="mx-auto max-w-2xl">
@@ -24,15 +30,17 @@ export function SignUpPage() {
               Create your account
             </h1>
             <p className="text-sm leading-relaxed text-on-surface-variant">
-              Create your customer account with email and password to start shopping at Sri Amman Smart Store.
+              {redirect?.startsWith("/checkout")
+                ? "Create your account to continue checkout. Your selected cart items are saved and will be ready when you return."
+                : "Create your customer account with email and password to start shopping at Sri Amman Smart Store."}
             </p>
           </div>
 
-          <CustomerRegistrationForm />
+          <CustomerRegistrationForm redirectTo={redirect} />
 
           <p className="mt-6 text-center text-sm text-on-surface-variant">
             Already have an account?{" "}
-            <Link to="/login" className="font-bold text-primary underline-offset-4 hover:underline">
+            <Link to="/login" search={redirect ? { redirect } as any : undefined} className="font-bold text-primary underline-offset-4 hover:underline">
               Login
             </Link>
           </p>

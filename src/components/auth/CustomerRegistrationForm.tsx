@@ -38,7 +38,7 @@ interface FormFieldErrors {
   termsAccepted?: string;
 }
 
-export function CustomerRegistrationForm() {
+export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string | undefined }) {
   const { authMode, resolveFirebaseSession, logout } = useAuth();
   const navigate = useNavigate();
   const methods = getCustomerRegistrationMethods(authMode);
@@ -67,6 +67,10 @@ export function CustomerRegistrationForm() {
 
   // Partial failure recovery state
   const [partialAuth, setPartialAuth] = useState<PartialAuthSession | null>(null);
+
+  const navigateAfterRegistration = () => {
+    navigate({ to: (redirectTo || "/account") as never });
+  };
 
   const clearFieldError = (field: keyof FormFieldErrors) => {
     if (fieldErrors[field]) {
@@ -137,7 +141,7 @@ export function CustomerRegistrationForm() {
     setStatus(`Welcome, ${profile.name || cleanName}! Your customer account is ready.`);
     setPartialAuth(null);
     setTimeout(() => {
-      navigate({ to: "/account" });
+      navigateAfterRegistration();
     }, 800);
   };
 
@@ -261,7 +265,7 @@ export function CustomerRegistrationForm() {
 
       if (resolution.status === "resolved") {
         setStatus("Welcome back! Redirecting to your account…");
-        navigate({ to: "/account" });
+        navigateAfterRegistration();
         return;
       }
 
@@ -291,7 +295,7 @@ export function CustomerRegistrationForm() {
 
       setStatus(`Welcome, ${cleanName}! Your customer account is ready.`);
       setTimeout(() => {
-        navigate({ to: "/account" });
+        navigateAfterRegistration();
       }, 800);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : "Google sign-up failed.");

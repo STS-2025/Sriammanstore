@@ -605,11 +605,18 @@ export function LoginPage() {
             </div>
             <Link
               to="/sign-up"
+              search={searchParams.redirect ? { redirect: searchParams.redirect } as any : undefined}
               className="whitespace-nowrap rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
             >
               Create account
             </Link>
           </div>
+
+          {searchParams.redirect?.startsWith("/checkout") && (
+            <p role="status" className="mb-5 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-on-surface-variant">
+              Sign in or create an account to continue checkout. The items in your cart are saved and will be ready when you return.
+            </p>
+          )}
 
           <div className="mb-6 flex items-center rounded-xl bg-surface-container-low p-1" role="tablist">
             <button

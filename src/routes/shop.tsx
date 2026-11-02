@@ -835,63 +835,10 @@ function ShopPage() {
 
           {/* 2. Top Header & Action Bar */}
           <header className="mb-6 flex flex-col gap-4 bg-surface-container-lowest p-4 md:p-6 rounded-2xl shadow-sm border border-outline-variant/15">
-            
-            
-            
-            {/* Live Production Active Notice Banner
-            {catalogMode === "production-readonly" && (
-              <div
-                data-testid="production-mode-active-banner"
-                className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-sm"
-              >
-                <div className="flex items-start gap-2.5">
-                  <span className="material-symbols-outlined text-[22px] text-amber-600 shrink-0 mt-0.5">
-                    verified_user
-                  </span>
-                  <div className="space-y-0.5">
-                    <div className="font-bold text-sm flex items-center gap-2">
-                      <span>Live Production Catalogue</span>
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-900 dark:text-emerald-200 rounded font-mono text-[10px]">
-                        sri-amman-smart-store
-                      </span>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
-                      Showing real products from production Firestore (8 unique products from 20 raw documents, 12 duplicates resolved).
-                      {productionDiagnostics?.isComplete && " Bounded cursor pagination verified complete."}
-                      {productionDiagnostics?.totalCategoryDocsRead !== undefined && ` Live Categories: ${productionDiagnostics.totalCategoryDocsRead} verified document (Grocery), ${productionDiagnostics.fallbackCategoryCount ?? 1} product fallback (Spices & Masala Powders).`}
-                      {productionDiagnostics?.dataQualityErrors !== undefined && ` Data Quality: ${productionDiagnostics.dataQualityErrors} Critical Errors, ${productionDiagnostics.dataQualityWarnings ?? 0} Warnings.`}
-                      {" Live customer cart, addresses, checkout, and orders are active."}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link
-                    to="/prod-preview"
-                    className="px-3 py-1.5 rounded-xl bg-surface-container-lowest text-on-surface font-bold text-xs border border-outline-variant/30 hover:bg-surface-container transition-all"
-                  >
-                    Inspect Raw &rarr;
-                  </Link>
-                </div>
-              </div>
-            )} */}
-
-
-
-
             {/* Developer Catalogue Source Switcher */}
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-
-
-
-                  {/* <span className="text-[10px] font-headline-sm uppercase tracking-wider text-secondary font-bold bg-secondary-fixed/40 px-2 py-0.5 rounded-full">
-                    {catalogMode === "production-readonly" ? "Live Production" : "Artisanal Fresh"}
-                  </span> */}
-
-
-
-
                   <span className="text-xs text-on-surface-variant">
                     {loading ? "Loading..." : "Verified Quality"}
                   </span>

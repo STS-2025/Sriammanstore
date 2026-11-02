@@ -208,7 +208,7 @@ Command: `npm run build` (`vite build`)
 ## 8. Steps Requiring Future Explicit Approval
 
 Before live production authentication or customer profile registration can be enabled, the following steps will require separate, explicit approval:
-1. **Production Phone Verification (OTP Provider):** Defining the production SMS OTP provider or enabling Firebase Phone Auth with reCAPTCHA verification.
+1. **Production Phone Verification (OTP Provider):** Confirming Firebase Phone Auth SMS-provider status and authorized domains in the Firebase Console. Web phone verification uses Firebase's SDK-managed reCAPTCHA verifier; no custom site key is required.
 2. **Atomic SASS ID Sequence Allocation:** Deploying a Cloud Function or transactional rule to allocate sequential `meta/userSequence` IDs for newly registered customers.
 3. **Account Linking Deduplication Policy:** Finalizing the policy for handling customers who sign in with an email that matches an existing phone-registered customer record.
 4. **Customer Profile Creation in Production Firestore:** Granting explicit authorization to write `usersByUid/{uid}` and `users/{userDocId}` documents in live production.

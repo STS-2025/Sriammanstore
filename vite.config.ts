@@ -15,6 +15,14 @@ export default defineConfig({
       host: "localhost",
       port: 5173,
     },
+    build: {
+      outDir: "dist",
+    },
+  },
+  nitro: {
+    output: {
+      dir: "dist",
+    },
   },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
