@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="turmericBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb" />
+      <stop offset="100%" stop-color="#fef3c7" />
+    </linearGradient>
+    <linearGradient id="turmericGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="400" fill="url(#turmericBg)" rx="24" />
+  <rect x="12" y="12" width="376" height="376" fill="none" stroke="#f59e0b" stroke-width="2" rx="20" opacity="0.4" />
+
+  <!-- Central Badge -->
+  <g transform="translate(200, 150)">
+    <circle r="60" fill="url(#turmericGrad)" />
+    <!-- Turmeric Rhizome / Powder Bowl Icon -->
+    <path d="M -32 -5 Q 0 -35 32 -5 Q 35 25 0 35 Q -35 25 -32 -5 Z" fill="#ffffff" opacity="0.95" />
+    <ellipse cx="0" cy="-6" rx="28" ry="10" fill="#fde68a" />
+    <circle cx="-6" cy="-6" r="3" fill="#d97706" />
+    <circle cx="8" cy="-5" r="2.5" fill="#d97706" />
+    <circle cx="0" cy="-3" r="2" fill="#b45309" />
+  </g>
+
+  <!-- Text Details -->
+  <text x="200" y="245" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="19" font-weight="bold" fill="#78350f">
+    Sakthi Turmeric Powder
+  </text>
+  <text x="200" y="270" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="#92400e">
+    சக்தி மஞ்சள் தூள்
+  </text>
+
+  <!-- Notice Badge -->
+  <rect x="50" y="296" width="300" height="32" rx="16" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5" />
+  <text x="200" y="317" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" fill="#b45309">
+    Neutral Placeholder · Development
+  </text>
+
+  <text x="200" y="352" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#92400e" opacity="0.8">
+    Placeholder illustration · Verified photograph pending
+  </text>
+</svg>
+
