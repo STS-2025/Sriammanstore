@@ -1,0 +1,611 @@
+rules_version = '2';
+
+// ============================================================================
+// LOCAL EMULATOR DEVELOPMENT RULES ONLY (demo-sri-amman-store)
+// ============================================================================
+// WARNING: DO NOT DEPLOY THESE RULES TO PRODUCTION!
+//
+// 1. Mock Authentication & Hybrid Auth Context:
+//    Most collections in this application remain compatible with client-side
+//    mock authentication stored in localStorage (e.g., customer IDs like
+//    "SASS0000104") where `request.auth` may be `null` for local Firestore
+//    Emulator reads, writes, and seed script operations.
+//    However, `usersByUid/{uid}` enforces strict Firebase Authentication UID
+//    self-lookup (`request.auth != null && request.auth.uid == uid`) for single
+//    document `get` only, and denies all collection listing and client writes.
+//
+// 2. Security Limitation Notice:
+//    A client-supplied `userId` field in document payloads or queries is NOT a
+//    secure authorization mechanism because any unauthenticated client can
+//    supply any `userId`. These rules are strictly for local development and
+//    automated testing against the local Firestore Emulator (`demo-sri-amman-store`).
+//    Never claim production-grade security from this emulator configuration.
+//
+// 3. Production Requirement:
+//    Before deploying to a production Firebase project, you MUST integrate
+//    Firebase Authentication across all collections and require
+//    `request.auth != null` and `request.auth.uid == userId` (or verified
+//    custom claims) on all customer-scoped collections.
+// ============================================================================
+
+// ============================================================================
+// Assumed Data Model
+// ============================================================================
+//
+// Collection: users/{userId}
+//   - userId: string (required, non-empty)
+//   - phone: string (required)
+//   - coins: number (required)
+//
+// Subcollection: users/{userId}/cart/{cartDocId}
+//   - productId: string (required, <= 128)
+//   - quantity: number (required, > 0)
+//   - userId: string (optional, non-empty string <= 128 when present)
+//
+// Subcollection: users/{userId}/addresses/{addressId}
+//   - city | town: string (required, <= 256)
+//   - lat | latitude: number | string (required, string <= 64)
+//   - lng | longitude: number | string (required, string <= 64)
+//   - userId: string (optional, non-empty string <= 128 when present)
+//
+// Subcollection: users/{userId}/orders/{orderDocId}
+//   - Customer order history subcollection (Milestone: read-only legacy integration)
+//   - Access: read allowed only if isAuthorizedCustomer(userId); write strictly denied (if false)
+//
+// Collection: onlineCustomers/{customerId} (Local development emulator rule block)
+//   - userId: string (required, non-empty)
+//   - phone: string (required)
+//   - coins: number (required)
+//
+// Subcollection: onlineCustomers/{customerId}/cart/{cartDocId}
+//   - productId: string (required, <= 128)
+//   - quantity: number (required, > 0)
+//   - userId: string (optional, non-empty string <= 128 when present)
+//
+// Subcollection: onlineCustomers/{customerId}/addresses/{addressId}
+//   - city | town: string (required, <= 256)
+//   - lat | latitude: number | string (required, string <= 64)
+//   - lng | longitude: number | string (required, string <= 64)
+//   - userId: string (optional, non-empty string <= 128 when present)
+//
+// Subcollection: onlineCustomers/{customerId}/orders/{orderDocId}
+//   - Customer order history subcollection (Milestone: read-only legacy integration)
+//   - Access: read allowed only if isAuthorizedCustomer(customerId); write strictly denied (if false)
+//
+// Collection: usersByUid/{uid}
+//   - Read-only UID-to-customer mapping (server/Cloud Functions managed)
+//   - Access: `get` allowed only when `request.auth != null && request.auth.uid == uid`
+//   - `list`, `create`, `update`, `delete`: strictly denied (`if false`)
+//
+// Collection: products/{productId} (and legacy products/{category}/items/{productId})
+//   - id: string (optional for legacy items, bounded string when present)
+//   - name | productName | title: string (required, bounded string)
+//
+// Collection: categories/{categoryId}
+//   - id: string (required)
+//   - name: string (required)
+//   - slug: string (required)
+//
+// Collection: banners/{bannerId}
+//   - id: string (required)
+//   - title: string (required)
+//
+// Collection: cart/{cartDocId}
+//   - userId: string (required, non-empty)
+//   - productId: string (required)
+//   - quantity: number (required, > 0)
+//
+// Collection: addresses/{addressId}
+//   - userId: string (required, non-empty)
+//   - city: string (required)
+//   - lat: number (required)
+//   - lng: number (required)
+//
+// Collection: wishlists/{wishlistId}
+//   - userId: string (required, non-empty)
+//   - title: string (required)
+//
+// Collection: wishlistProducts/{wlpId}
+//   - userId: string (required, non-empty)
+//   - wishlistId: string (required)
+//   - productId: string (required)
+//
+// Collection: orders/{orderId}
+//   - userId: string (required, non-empty)
+//   - buyerId: string (optional legacy identifier)
+//   - orderId: string (required)
+//   - status: string (required, enum: pending, processing, packed, in transit, delivered, cancelled, returned)
+//   - Access: read requires customer ownership (isAuthorizedCustomer on userId or buyerId) when request.auth != null;
+//             allowed when request.auth == null (preserving local unauthenticated mock mode and fixture seeding);
+//             create, update validated by isValidOrder; delete allowed
+//
+// Collection: coinHistory/{txId}
+//   - userId: string (required, non-empty)
+//   - amount: number (required)
+//   - type: string (required, enum: earned, redeemed)
+//
+// Collection: referrals/{refId}
+//   - userId: string (required, non-empty)
+//   - friendName: string (required)
+//
+// Collection: notifications/{notifId}
+//   - userId: string (required, non-empty)
+//   - title: string (required)
+//   - read: bool (required)
+//
+// Collection: reportedProblems/{repId}
+//   - userId: string (required, non-empty)
+//   - message: string (required)
+//
+// Collection: productRequests/{reqId}
+//   - userId: string (required, non-empty)
+//   - productName: string (required)
+//
+// Collection: deliverySlots/{slotId}
+//   - id: string (required)
+//   - title: string (required)
+//
+// Collection: deliverySettings/{docId} (singleton docId == 'default')
+//   - minOrderForFreeDelivery: number (required)
+//
+// Collection: storeInfo/{docId} (singleton docId == 'default')
+//   - storeName: string (required)
+//
+// Collection: _metadata/{docId}
+//   - Atomic counters (e.g., orderSequence) and seed/emulator metadata
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================================
+    // Helper Functions & Domain Validators
+    // ========================================================================
+
+    function isNonEmptyString(val, maxLen) {
+      return val is string && val.size() > 0 && val.size() <= maxLen;
+    }
+
+    function isBoundedString(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    function hasValidCustomerScope(data) {
+      return isNonEmptyString(data.userId, 128);
+    }
+
+    function isAuthorizedOnlineCustomer(customerId) {
+      return request.auth != null && (
+        (
+          exists(/databases/$(database)/documents/usersByUid/$(request.auth.uid)) &&
+          (
+            get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.userDocId == customerId ||
+            (
+              'customerId' in get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data &&
+              get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.customerId == customerId
+            )
+          )
+        ) ||
+        (
+          exists(/databases/$(database)/documents/onlineCustomers/$(customerId)) &&
+          (
+            (
+              'uid' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+              get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.uid == request.auth.uid
+            ) ||
+            (
+              'linkedUids' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+              request.auth.uid in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.linkedUids
+            ) ||
+            (
+              exists(/databases/$(database)/documents/usersByUid/$(request.auth.uid)) &&
+              'legacySassId' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+              (
+                get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.userDocId ==
+                  get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.legacySassId ||
+                (
+                  'legacySassId' in get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data &&
+                  get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.legacySassId ==
+                    get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.legacySassId
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+
+    function isAuthorizedCustomer(userId) {
+      return request.auth != null && (
+        request.auth.uid == userId ||
+        isAuthorizedOnlineCustomer(userId) ||
+        (
+          exists(/databases/$(database)/documents/usersByUid/$(request.auth.uid)) &&
+          (
+            get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.userDocId == userId ||
+            (
+              'legacySassId' in get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data &&
+              get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.legacySassId == userId
+            )
+          )
+        ) ||
+        (
+          exists(/databases/$(database)/documents/users/$(userId)) &&
+          (
+            ('uid' in get(/databases/$(database)/documents/users/$(userId)).data &&
+             get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid) ||
+            (
+              'linkedUids' in get(/databases/$(database)/documents/users/$(userId)).data &&
+              request.auth.uid in get(/databases/$(database)/documents/users/$(userId)).data.linkedUids
+            )
+          )
+        )
+      );
+    }
+
+    function isValidUser(data) {
+      return hasValidCustomerScope(data) &&
+             isBoundedString(data.phone, 64) &&
+             data.coins is number;
+    }
+
+    function isValidProduct(data) {
+      return (
+        (!('id' in data) || isBoundedString(data.id, 128)) &&
+        (
+          ('name' in data && isBoundedString(data.name, 500)) ||
+          ('productName' in data && isBoundedString(data.productName, 500)) ||
+          ('title' in data && isBoundedString(data.title, 500))
+        )
+      );
+    }
+
+    function isValidCategory(data) {
+      return isBoundedString(data.id, 128) &&
+             isBoundedString(data.name, 256) &&
+             isBoundedString(data.slug, 256);
+    }
+
+    function isValidBanner(data) {
+      return isBoundedString(data.id, 128) &&
+             isBoundedString(data.title, 500);
+    }
+
+    function isValidCartItem(data) {
+      return hasValidCustomerScope(data) &&
+             isBoundedString(data.productId, 128) &&
+             data.quantity is number &&
+             data.quantity > 0;
+    }
+
+    function isValidAddress(data) {
+      return hasValidCustomerScope(data) &&
+             isBoundedString(data.city, 256) &&
+             data.lat is number &&
+             data.lng is number;
+    }
+
+    function isValidCoordinateValue(val) {
+      return (val is number) || (val is string && val.size() <= 64);
+    }
+
+    function hasValidLatitude(data) {
+      return (('lat' in data) || ('latitude' in data)) &&
+             (!('lat' in data) || isValidCoordinateValue(data.lat)) &&
+             (!('latitude' in data) || isValidCoordinateValue(data.latitude));
+    }
+
+    function hasValidLongitude(data) {
+      return (('lng' in data) || ('longitude' in data)) &&
+             (!('lng' in data) || isValidCoordinateValue(data.lng)) &&
+             (!('longitude' in data) || isValidCoordinateValue(data.longitude));
+    }
+
+    function hasValidCityOrTown(data) {
+      return (('city' in data) || ('town' in data)) &&
+             (!('city' in data) || isBoundedString(data.city, 256)) &&
+             (!('town' in data) || isBoundedString(data.town, 256));
+    }
+
+    function isValidCustomerCartItem(data) {
+      return ('productId' in data) &&
+             isBoundedString(data.productId, 128) &&
+             ('quantity' in data) &&
+             data.quantity is number &&
+             data.quantity > 0 &&
+             (!('userId' in data) || hasValidCustomerScope(data));
+    }
+
+    function isValidCustomerAddress(data) {
+      return hasValidCityOrTown(data) &&
+             hasValidLatitude(data) &&
+             hasValidLongitude(data) &&
+             (!('userId' in data) || hasValidCustomerScope(data));
+    }
+
+    function isValidWishlist(data) {
+      return ('title' in data) &&
+             isBoundedString(data.title, 256) &&
+             (!('userId' in data) || hasValidCustomerScope(data));
+    }
+
+    function isValidWishlistProduct(data) {
+      return ('productId' in data) &&
+             isBoundedString(data.productId, 128) &&
+             (!('wishlistId' in data) || isBoundedString(data.wishlistId, 128)) &&
+             (!('userId' in data) || hasValidCustomerScope(data));
+    }
+
+    function isValidOrder(data) {
+      return hasValidCustomerScope(data) &&
+             isBoundedString(data.orderId, 128) &&
+             data.status in [
+               'pending',
+               'processing',
+               'packed',
+               'in transit',
+               'delivered',
+               'cancelled',
+               'returned'
+             ];
+    }
+
+    function isValidCoinTransaction(data) {
+      return hasValidCustomerScope(data) &&
+             data.amount is number &&
+             data.type in ['earned', 'redeemed'];
+    }
+
+    function isValidReferral(data) {
+      return hasValidCustomerScope(data) &&
+             isBoundedString(data.friendName, 256);
+    }
+
+    function isValidNotification(data) {
+      return hasValidCustomerScope(data) &&
+             isBoundedString(data.title, 500) &&
+             data.read is bool;
+    }
+
+    function isValidReportedProblem(data) {
+      return hasValidCustomerScope(data) &&
+             isBoundedString(data.message, 5000);
+    }
+
+    function isValidProductRequest(data) {
+      return hasValidCustomerScope(data) &&
+             isBoundedString(data.productName, 500);
+    }
+
+    function isValidDeliverySlot(data) {
+      return isBoundedString(data.id, 128) &&
+             isBoundedString(data.title, 256);
+    }
+
+    function isValidDeliverySettings(docId, data) {
+      return docId == 'default' &&
+             data.minOrderForFreeDelivery is number;
+    }
+
+    function isValidStoreInfo(docId, data) {
+      return docId == 'default' &&
+             isBoundedString(data.storeName, 256);
+    }
+
+    // ========================================================================
+    // Collection Rules
+    // ========================================================================
+
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isValidUser(request.resource.data);
+      allow update: if isValidUser(request.resource.data) &&
+                       (request.auth != null
+                         ? isAuthorizedCustomer(userId)
+                         : (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['primaryAddressId'])));
+      allow delete: if request.auth != null && isAuthorizedCustomer(userId);
+
+      match /cart/{cartDocId} {
+        allow read, delete: if isAuthorizedCustomer(userId);
+        allow create, update: if isAuthorizedCustomer(userId) && isValidCustomerCartItem(request.resource.data);
+      }
+
+      match /addresses/{addressId} {
+        allow read, delete: if isAuthorizedCustomer(userId);
+        allow create, update: if isAuthorizedCustomer(userId) && isValidCustomerAddress(request.resource.data);
+      }
+
+      match /orders/{orderDocId} {
+        allow read: if isAuthorizedCustomer(userId);
+        allow write: if false; // Milestone requirement: strictly read-only! No order creation, checkout writes, or status updates in this milestone.
+      }
+    }
+
+    // ========================================================================
+    // onlineCustomers/{customerId} - Hardened Customer Domain
+    // Owner-only read access; client writes denied for profile, orders, coins
+    // Owner client mutations permitted for cart, addresses, wishlists
+    // ========================================================================
+    match /onlineCustomers/{customerId} {
+      allow read: if isAuthorizedOnlineCustomer(customerId);
+      allow write: if false;
+
+      match /orders/{orderDocId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow write: if false;
+      }
+
+      match /coinsHistory/{txId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow write: if false;
+      }
+
+      match /cart/{cartDocId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow create, update: if isAuthorizedOnlineCustomer(customerId) &&
+                                 isValidCustomerCartItem(request.resource.data) &&
+                                 (!('userId' in request.resource.data) ||
+                                  request.resource.data.userId == customerId ||
+                                  (resource != null && 'legacySassId' in resource.data && request.resource.data.userId == resource.data.legacySassId) ||
+                                  (exists(/databases/$(database)/documents/onlineCustomers/$(customerId)) &&
+                                   'legacySassId' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+                                   request.resource.data.userId == get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.legacySassId));
+        allow delete: if isAuthorizedOnlineCustomer(customerId);
+      }
+
+      match /addresses/{addressId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow create, update: if isAuthorizedOnlineCustomer(customerId) &&
+                                 isValidCustomerAddress(request.resource.data) &&
+                                 (!('userId' in request.resource.data) ||
+                                  request.resource.data.userId == customerId ||
+                                  (resource != null && 'legacySassId' in resource.data && request.resource.data.userId == resource.data.legacySassId) ||
+                                  (exists(/databases/$(database)/documents/onlineCustomers/$(customerId)) &&
+                                   'legacySassId' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+                                   request.resource.data.userId == get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.legacySassId));
+        allow delete: if isAuthorizedOnlineCustomer(customerId);
+      }
+
+      match /wishlists/{wishlistId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow create, update: if isAuthorizedOnlineCustomer(customerId) &&
+                                 isValidWishlist(request.resource.data);
+        allow delete: if isAuthorizedOnlineCustomer(customerId);
+
+        match /products/{productId} {
+          allow read: if isAuthorizedOnlineCustomer(customerId);
+          allow create, update: if isAuthorizedOnlineCustomer(customerId) &&
+                                   isValidWishlistProduct(request.resource.data);
+          allow delete: if isAuthorizedOnlineCustomer(customerId);
+        }
+      }
+    }
+
+    match /usersByUid/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update: if isValidProduct(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /products/{category}/items/{productId} {
+      allow read: if true;
+      allow create, update: if isValidProduct(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /{path=**}/items/{productId} {
+      allow read: if true;
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isValidCategory(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow create, update: if isValidBanner(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /cart/{cartDocId} {
+      allow read, delete: if true;
+      allow create, update: if isValidCartItem(request.resource.data);
+    }
+
+    match /addresses/{addressId} {
+      allow read, delete: if true;
+      allow create, update: if isValidAddress(request.resource.data);
+    }
+
+    match /wishlists/{wishlistId} {
+      allow read, delete: if true;
+      allow create, update: if isValidWishlist(request.resource.data);
+    }
+
+    match /wishlistProducts/{wlpId} {
+      allow read, delete: if true;
+      allow create, update: if isValidWishlistProduct(request.resource.data);
+    }
+
+    match /orders/{orderId} {
+      allow get: if request.auth == null || (
+                    request.auth != null && resource != null && (
+                      ('userId' in resource.data && isAuthorizedCustomer(resource.data.userId)) ||
+                      ('buyerId' in resource.data && isAuthorizedCustomer(resource.data.buyerId)) ||
+                      ('buyerUid' in resource.data && resource.data.buyerUid == request.auth.uid) ||
+                      ('userProfile' in resource.data && 'uid' in resource.data.userProfile && resource.data.userProfile.uid == request.auth.uid)
+                    )
+                  );
+      allow list: if request.auth == null || (
+                     request.auth != null && (
+                       ('buyerUid' in resource.data && resource.data.buyerUid == request.auth.uid) ||
+                       ('userProfile' in resource.data && 'uid' in resource.data.userProfile && resource.data.userProfile.uid == request.auth.uid) ||
+                       ('userId' in resource.data && isAuthorizedCustomer(resource.data.userId)) ||
+                       ('buyerId' in resource.data && isAuthorizedCustomer(resource.data.buyerId))
+                     )
+                   );
+      allow create, update: if isValidOrder(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /coinHistory/{txId} {
+      allow read, delete: if true;
+      allow create, update: if isValidCoinTransaction(request.resource.data);
+    }
+
+    match /referrals/{refId} {
+      allow read, delete: if true;
+      allow create, update: if isValidReferral(request.resource.data);
+    }
+
+    match /notifications/{notifId} {
+      allow read, delete: if true;
+      allow create, update: if isValidNotification(request.resource.data);
+    }
+
+    match /reportedProblems/{repId} {
+      allow read, delete: if true;
+      allow create, update: if isValidReportedProblem(request.resource.data);
+    }
+
+    match /productRequests/{reqId} {
+      allow read, delete: if true;
+      allow create, update: if isValidProductRequest(request.resource.data);
+    }
+
+    match /deliverySlots/{slotId} {
+      allow read: if true;
+      allow create, update: if isValidDeliverySlot(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /deliverySettings/{docId} {
+      allow read: if true;
+      allow create, update: if isValidDeliverySettings(docId, request.resource.data);
+      allow delete: if docId == 'default';
+    }
+
+    match /storeInfo/{docId} {
+      allow read: if true;
+      allow create, update: if isValidStoreInfo(docId, request.resource.data);
+      allow delete: if docId == 'default';
+    }
+
+    match /_metadata/{docId} {
+      allow read, write: if true;
+    }
+
+    // Default deny for all unknown collections and paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

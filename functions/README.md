@@ -1,0 +1,64 @@
+# Isolated Customer Registration Function
+
+This separate Firebase Functions codebase exports `registerCustomer`. It does not
+replace or edit any other Functions source.
+
+## Current registration flow
+
+The registration UI is in `src/routes/login.tsx`. In Local Emulator mode, it sends
+and confirms an OTP through Firebase Phone Authentication, then calls
+`registerCustomer` through the Functions Emulator. The callable accepts the name
+from the UI and obtains the phone number from the authenticated Firebase token.
+Production registration remains blocked by the UI and production authentication
+safeguards.
+
+## Emulator project and endpoints
+
+The local project is `demo-sri-amman-store` by default (`.firebaserc`). The configured
+loopback endpoints are:
+
+| Emulator | Endpoint |
+| --- | --- |
+| Auth | `127.0.0.1:9099` |
+| Firestore | `127.0.0.1:8081` |
+| Functions | `127.0.0.1:5001` |
+| Emulator UI | `127.0.0.1:4000` |
+
+From a state where no Firebase emulator is running, `npm.cmd run emulator` starts
+Auth, Firestore, and Functions together and imports `.firebase-emulator-data` when
+an export snapshot is present. The launcher does not start a second emulator set
+when it detects any of those services already listening. In that case, use the
+existing session or coordinate an intentional full-suite restart before testing.
+
+## Customer ID sequence prerequisite
+
+The function creates `onlineCustomers/{ONCUSxxxxxxx}`, `usersByUid/{uid}` with
+`collection: "onlineCustomers"` and `accountType: "customer"`,
+`customerPhoneIndex/{E.164 phone}`, and updates `meta/onlineCustomerSequence` in one
+Firestore transaction. This sequence is independent of the legacy SASS sequence.
+Existing migrated ONCUS IDs and approved aliases remain stable; registration does
+not rewrite legacy customer records or routes.
+
+Do not initialize or advance this sequence until the active emulator project and
+all existing `onlineCustomers` IDs have been inventoried and checked for a
+consistent highest ID. Do not infer the sequence from `db.json` or a partial
+export. The function intentionally fails closed when the sequence document is
+absent or invalid, and checks the candidate profile ID transactionally before
+creating it.
+
+## Safe local test outline
+
+1. Confirm the complete emulator suite is running for `demo-sri-amman-store` at the
+   endpoints above. Do not connect this flow to a production project.
+2. Verify all existing emulator `onlineCustomers` records and the sequence value;
+   only then initialize the sequence to the verified highest ONCUS suffix if
+   needed. Keep `meta/userSequence` reserved for legacy SASS allocation.
+3. In the app, select Emulator mode, open registration, enter the proposed test
+   name and phone number, and complete the OTP supplied by the Auth Emulator.
+4. Confirm that the callable creates `onlineCustomers/ONCUSxxxxxxx`, a customer
+   UID mapping with matching `uid`, `collection`, and `accountType`, the phone
+   index, and the incremented online-customer sequence in the emulator.
+
+Do not perform an OTP registration or create test customer records until the test
+name and phone number have been reported and approved. No production deployment,
+production database write, or Firestore rules deployment is part of this flow.

@@ -1,0 +1,480 @@
+rules_version = '2';
+
+// ============================================================================
+// PRODUCTION SECURITY RULES PROPOSAL: SRI AMMAN SMART STORE
+// Target Environment: Cloud Firestore Production (sri-amman-smart-store)
+// Focus Milestone: Migrated onlineCustomers & Customer-Owned Subcollections
+// ============================================================================
+// Security Architecture Principles:
+// 1. Default Deny:
+//    All document reads and writes are denied by default at root /{document=**}.
+//
+// 2. Verified Authentication & Authority Source:
+//    Access to customer records requires request.auth != null and verified
+//    identity mapping via usersByUid/$(request.auth.uid). A client-supplied
+//    customerId in a query or payload is never accepted as authorization.
+//
+// 3. Strict Owner Isolation & Separation of Duties:
+//    - Customers can only access their own profile and subcollections.
+//    - Cross-customer access (Customer B reading Customer A) is strictly blocked.
+//    - Operational staff accounts (store_manager, super_admin, delivery_agent)
+//      mapped in usersByUid (e.g. to users/SASS0000018) are strictly isolated
+//      and granted zero customer frontend read/write access to onlineCustomers.
+//      Administrative duties must use the Firebase Admin SDK / Cloud Functions.
+//
+// 4. Secure Customer Mutations & Deny Ledger Writes:
+//    - onlineCustomers/{customerId}: allow write: if false; (profile strictly server-managed)
+//    - orders/{orderDocId}: allow write: if false; (orders strictly Cloud Functions managed)
+//    - coinsHistory/{txId}: allow write: if false; (Amman Coins strictly server managed)
+//    - cart/{cartDocId}: allow create, update, delete for verified owner with schema validation
+//    - addresses/{addressId}: allow create, update, delete for verified owner with schema validation
+//    - wishlists/{wishlistId}: allow create, update, delete for verified owner with schema validation
+//    - wishlists/.../products/{productId}: allow create, update, delete for verified owner with schema validation
+//
+// 5. Dual-Path Migration Bridge:
+//    Supports both legacy users/{userId} (SASS...) and migrated
+//    onlineCustomers/{customerId} (ONCUS...) during data transition.
+// ============================================================================
+
+// ============================================================================
+// Assumed Data Model
+// ============================================================================
+//
+// Collection: onlineCustomers/{customerId}
+//   - id: string (required, canonical ONCUS customer ID, e.g. "ONCUS0000010")
+//   - customerId: string (required, matching document ID)
+//   - legacySassId: string (optional, legacy SASS reference, e.g. "SASS0000010")
+//   - uid: string (optional, primary Firebase Auth UID)
+//   - linkedUids: list of strings (optional, linked Firebase Auth UIDs)
+//   - fullName | name: string (required, bounded <= 256)
+//   - number | phone: string (required, bounded <= 64)
+//   - email: string (optional, bounded <= 256)
+//   - gender: string (optional, enum: Male, Female, Other)
+//   - dob: string (optional, ISO date YYYY-MM-DD)
+//   - coins | availableCoins: number (optional)
+//   - earnedCoins: number (optional)
+//   - primaryAddressId: string (optional, bounded <= 128)
+//   - phoneVerified: bool (optional)
+//   - lastUpdated: timestamp (optional)
+//   - Access: Read allowed only for verified owner via isAuthorizedOnlineCustomer(customerId);
+//             Write strictly denied (if false) for client SDKs.
+//
+// Subcollection: onlineCustomers/{customerId}/orders/{orderDocId}
+//   - Migrated and new customer orders
+//   - orderId: string (required, bounded <= 128)
+//   - status: string (required, enum)
+//   - totalAmount | total: number (required)
+//   - Access: Read allowed only for verified owner; write strictly denied (if false).
+//
+// Subcollection: onlineCustomers/{customerId}/addresses/{addressId}
+//   - Saved delivery addresses
+//   - city | town: string (required, bounded <= 256)
+//   - lat | latitude: number | string (required)
+//   - lng | longitude: number | string (required)
+//   - Access: Read allowed only for verified owner; write strictly denied (if false).
+//
+// Subcollection: onlineCustomers/{customerId}/coinsHistory/{txId}
+//   - Amman Coins transaction ledger
+//   - amount: number (required)
+//   - type: string (required, enum: earned, redeemed, refunded, adjusted)
+//   - Access: Read allowed only for verified owner; write strictly denied (if false).
+//
+// Subcollection: onlineCustomers/{customerId}/cart/{cartDocId}
+//   - Active shopping cart items
+//   - productId: string (required, bounded <= 128)
+//   - quantity: number (required, > 0)
+//   - Access: Read allowed only for verified owner; write strictly denied (if false).
+//
+// Subcollection: onlineCustomers/{customerId}/wishlists/{wishlistId}
+//   - Customer wishlists
+//   - title: string (required, bounded <= 256)
+//   - Access: Read allowed only for verified owner; write strictly denied (if false).
+//
+// Subcollection: onlineCustomers/{customerId}/wishlists/{wishlistId}/products/{productId}
+//   - Products saved in customer wishlist
+//   - productId: string (required, bounded <= 128)
+//   - Access: Read allowed only for verified owner; write strictly denied (if false).
+//
+// Collection: usersByUid/{uid}
+//   - UID-to-customer pointer mapping
+//   - uid: string (required, matching document ID)
+//   - userDocId: string (required, canonical customer document ID: ONCUS... or SASS...)
+//   - customerId: string (optional, ONCUS alias)
+//   - legacySassId: string (optional, legacy SASS reference)
+//   - collection: string (optional, "onlineCustomers" | "users")
+//   - Access: Get allowed ONLY when request.auth != null && request.auth.uid == uid.
+//             List and write strictly denied (if false).
+//
+// Collection: users/{userId}
+//   - Legacy customer records (read-only in production)
+//   - Access: Read allowed only for verified owner via isAuthorizedCustomer(userId);
+//             Write strictly denied (if false).
+//
+// Collection: products/{productId} (and products/{category}/items/{productId})
+//   - Store catalog items (public read, write denied to clients)
+//
+// Collection: categories/{categoryId}
+//   - Store categories (public read, write denied to clients)
+//
+// Collection: banners/{bannerId}
+//   - Store promotional banners (public read, write denied to clients)
+//
+// Collection: orders/{orderId}
+//   - Top-level orders collection (owner read only, write denied to clients)
+//
+// Collection: deliverySlots/{slotId}
+//   - Delivery time slots (public read, write denied to clients)
+//
+// Collection: deliverySettings/{docId}
+//   - Store delivery thresholds (public read, write denied to clients)
+//
+// Collection: storeInfo/{docId}
+//   - Store metadata (public read, write denied to clients)
+//
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================================
+    // Helper Functions & Domain Validators
+    // ========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isNonEmptyString(val, maxLen) {
+      return val is string && val.size() > 0 && val.size() <= maxLen;
+    }
+
+    function isBoundedString(val, maxLen) {
+      return val is string && val.size() <= maxLen;
+    }
+
+    function hasValidCustomerScope(data) {
+      return isNonEmptyString(data.userId, 128);
+    }
+
+    // ========================================================================
+    // Customer Authorization Logic
+    // ========================================================================
+
+    // Dedicated authorization helper for migrated online customers (onlineCustomers/{customerId})
+    // Strictly verifies caller identity against:
+    // 1. usersByUid/{uid} mapping pointing to customerId (userDocId or customerId)
+    // 2. onlineCustomers/{customerId} document's primary uid field
+    // 3. onlineCustomers/{customerId} document's linkedUids array
+    // 4. Migration bridge: usersByUid/{uid} pointing to legacySassId matching
+    //    the customer's legacySassId property.
+    // Rejects staff accounts (e.g. users/SASS0000018) and cross-customer access.
+    function isAuthorizedOnlineCustomer(customerId) {
+      return isAuthenticated() && (
+        (
+          exists(/databases/$(database)/documents/usersByUid/$(request.auth.uid)) &&
+          (
+            get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.userDocId == customerId ||
+            (
+              'customerId' in get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data &&
+              get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.customerId == customerId
+            )
+          )
+        ) ||
+        (
+          exists(/databases/$(database)/documents/onlineCustomers/$(customerId)) &&
+          (
+            (
+              'uid' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+              get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.uid == request.auth.uid
+            ) ||
+            (
+              'linkedUids' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+              request.auth.uid in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.linkedUids
+            ) ||
+            (
+              exists(/databases/$(database)/documents/usersByUid/$(request.auth.uid)) &&
+              'legacySassId' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+              (
+                get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.userDocId ==
+                  get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.legacySassId ||
+                (
+                  'legacySassId' in get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data &&
+                  get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.legacySassId ==
+                    get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.legacySassId
+                )
+              )
+            )
+          )
+        )
+      );
+    }
+
+    // Unified customer authorization helper supporting both legacy users/{userId} and onlineCustomers/{customerId}
+    function isAuthorizedCustomer(userId) {
+      return isAuthenticated() && (
+        request.auth.uid == userId ||
+        isAuthorizedOnlineCustomer(userId) ||
+        (
+          exists(/databases/$(database)/documents/usersByUid/$(request.auth.uid)) &&
+          (
+            get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.userDocId == userId ||
+            (
+              'legacySassId' in get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data &&
+              get(/databases/$(database)/documents/usersByUid/$(request.auth.uid)).data.legacySassId == userId
+            )
+          )
+        ) ||
+        (
+          exists(/databases/$(database)/documents/users/$(userId)) &&
+          (
+            (
+              'uid' in get(/databases/$(database)/documents/users/$(userId)).data &&
+              get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid
+            ) ||
+            (
+              'linkedUids' in get(/databases/$(database)/documents/users/$(userId)).data &&
+              request.auth.uid in get(/databases/$(database)/documents/users/$(userId)).data.linkedUids
+            )
+          )
+        )
+      );
+    }
+
+    // Domain validators for reference and server contract alignment
+    function isValidCoordinateValue(val) {
+      return (val is number) || (val is string && val.size() <= 64);
+    }
+
+    function hasValidCityOrTown(data) {
+      return (('city' in data) || ('town' in data)) &&
+             (!('city' in data) || isBoundedString(data.city, 256)) &&
+             (!('town' in data) || isBoundedString(data.town, 256));
+    }
+
+    function hasValidLatitude(data) {
+      return (('lat' in data) || ('latitude' in data)) &&
+             (!('lat' in data) || isValidCoordinateValue(data.lat)) &&
+             (!('latitude' in data) || isValidCoordinateValue(data.latitude));
+    }
+
+    function hasValidLongitude(data) {
+      return (('lng' in data) || ('longitude' in data)) &&
+             (!('lng' in data) || isValidCoordinateValue(data.lng)) &&
+             (!('longitude' in data) || isValidCoordinateValue(data.longitude));
+    }
+
+    function isValidCustomerAddress(data) {
+      return hasValidCityOrTown(data) &&
+             hasValidLatitude(data) &&
+             hasValidLongitude(data) &&
+             (!('userId' in data) || hasValidCustomerScope(data));
+    }
+
+    function isValidCustomerCartItem(data) {
+      return ('productId' in data) &&
+             isBoundedString(data.productId, 128) &&
+             ('quantity' in data) &&
+             data.quantity is number &&
+             data.quantity > 0 &&
+             (!('userId' in data) || hasValidCustomerScope(data));
+    }
+
+    function isValidWishlist(data) {
+      return ('title' in data) &&
+             isBoundedString(data.title, 256) &&
+             (!('userId' in data) || hasValidCustomerScope(data));
+    }
+
+    function isValidWishlistProduct(data) {
+      return ('productId' in data) &&
+             isBoundedString(data.productId, 128) &&
+             (!('wishlistId' in data) || isBoundedString(data.wishlistId, 128)) &&
+             (!('userId' in data) || hasValidCustomerScope(data));
+    }
+
+    // ========================================================================
+    // Collection Rules: onlineCustomers (Migrated Customer Domain)
+    // ========================================================================
+
+    match /onlineCustomers/{customerId} {
+      // Owner-only read access; client writes strictly denied for profile, orders, coins
+      allow read: if isAuthorizedOnlineCustomer(customerId);
+      allow write: if false;
+
+      // Customer Orders Subcollection: strictly read-only for owner; Cloud Functions managed
+      match /orders/{orderDocId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow write: if false;
+      }
+
+      // Amman Coins Transaction Ledger: strictly read-only for owner; server-managed
+      match /coinsHistory/{txId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow write: if false;
+      }
+
+      // Shopping Cart Subcollection: owner read, create, update, delete with validation
+      match /cart/{cartDocId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow create, update: if isAuthorizedOnlineCustomer(customerId) &&
+                                 isValidCustomerCartItem(request.resource.data) &&
+                                 (!('userId' in request.resource.data) ||
+                                  request.resource.data.userId == customerId ||
+                                  (resource != null && 'legacySassId' in resource.data && request.resource.data.userId == resource.data.legacySassId) ||
+                                  (exists(/databases/$(database)/documents/onlineCustomers/$(customerId)) &&
+                                   'legacySassId' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+                                   request.resource.data.userId == get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.legacySassId));
+        allow delete: if isAuthorizedOnlineCustomer(customerId);
+      }
+
+      // Customer Addresses Subcollection: owner read, create, update, delete with validation
+      match /addresses/{addressId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow create, update: if isAuthorizedOnlineCustomer(customerId) &&
+                                 isValidCustomerAddress(request.resource.data) &&
+                                 (!('userId' in request.resource.data) ||
+                                  request.resource.data.userId == customerId ||
+                                  (resource != null && 'legacySassId' in resource.data && request.resource.data.userId == resource.data.legacySassId) ||
+                                  (exists(/databases/$(database)/documents/onlineCustomers/$(customerId)) &&
+                                   'legacySassId' in get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data &&
+                                   request.resource.data.userId == get(/databases/$(database)/documents/onlineCustomers/$(customerId)).data.legacySassId));
+        allow delete: if isAuthorizedOnlineCustomer(customerId);
+      }
+
+      // Customer Wishlists Subcollection: owner read, create, update, delete with validation
+      match /wishlists/{wishlistId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow create, update: if isAuthorizedOnlineCustomer(customerId) &&
+                                 isValidWishlist(request.resource.data);
+        allow delete: if isAuthorizedOnlineCustomer(customerId);
+
+        match /products/{productId} {
+          allow read: if isAuthorizedOnlineCustomer(customerId);
+          allow create, update: if isAuthorizedOnlineCustomer(customerId) &&
+                                   isValidWishlistProduct(request.resource.data);
+          allow delete: if isAuthorizedOnlineCustomer(customerId);
+        }
+      }
+    }
+
+    // ========================================================================
+    // Collection Rules: usersByUid (Identity Pointer Resolution)
+    // ========================================================================
+
+    match /usersByUid/{uid} {
+      // Self-lookup get only for authenticated user; collection list & writes strictly denied
+      allow get: if isAuthenticated() && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    // ========================================================================
+    // Collection Rules: users (Legacy Customer Profiles - Read-Only Bridge)
+    // ========================================================================
+
+    match /users/{userId} {
+      allow read: if isAuthorizedCustomer(userId);
+      allow write: if false;
+
+      match /cart/{cartDocId} {
+        allow read: if isAuthorizedCustomer(userId);
+        allow write: if false;
+      }
+
+      match /addresses/{addressId} {
+        allow read: if isAuthorizedCustomer(userId);
+        allow write: if false;
+      }
+
+      match /orders/{orderDocId} {
+        allow read: if isAuthorizedCustomer(userId);
+        allow write: if false;
+      }
+
+      match /coinsHistory/{txId} {
+        allow read: if isAuthorizedCustomer(userId);
+        allow write: if false;
+      }
+    }
+
+    // ========================================================================
+    // Collection Rules: orders (Top-Level Reconciled Orders)
+    // ========================================================================
+
+    match /orders/{orderId} {
+      allow get: if isAuthenticated() && (
+        resource != null && (
+          ('userId' in resource.data && isAuthorizedCustomer(resource.data.userId)) ||
+          ('buyerId' in resource.data && isAuthorizedCustomer(resource.data.buyerId)) ||
+          ('buyerUid' in resource.data && resource.data.buyerUid == request.auth.uid) ||
+          ('userProfile' in resource.data && 'uid' in resource.data.userProfile && resource.data.userProfile.uid == request.auth.uid)
+        )
+      );
+      allow list: if isAuthenticated() && (
+        ('buyerUid' in resource.data && resource.data.buyerUid == request.auth.uid) ||
+        ('userProfile' in resource.data && 'uid' in resource.data.userProfile && resource.data.userProfile.uid == request.auth.uid) ||
+        ('userId' in resource.data && isAuthorizedCustomer(resource.data.userId)) ||
+        ('buyerId' in resource.data && isAuthorizedCustomer(resource.data.buyerId))
+      );
+      allow write: if false;
+    }
+
+    // ========================================================================
+    // Collection Rules: Public Storefront Catalog & Settings (Read-Only)
+    // ========================================================================
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /products/{category}/items/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /{path=**}/items/{productId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /deliverySlots/{slotId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /deliverySettings/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /storeInfo/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Administrative metadata (counters, sequence, seed locks)
+    match /_metadata/{docId} {
+      allow read, write: if false;
+    }
+
+    // ========================================================================
+    // Default Deny Root
+    // ========================================================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

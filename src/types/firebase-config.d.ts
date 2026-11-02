@@ -1,0 +1,10 @@
+declare module "*.jsx" {
+  import type { FirebaseApp } from "firebase/app";
+  import type { Auth, GoogleAuthProvider } from "firebase/auth";
+  import type { Firestore } from "firebase/firestore";
+
+  export const app: FirebaseApp;
+  export const auth: Auth;
+  export const db: Firestore;
+  export const provider: GoogleAuthProvider;
+}
