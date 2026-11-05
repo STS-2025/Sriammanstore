@@ -543,7 +543,7 @@ export function CheckoutPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1320px] mx-auto px-margin-desktop py-20 text-center">
+        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-20 text-center">
           <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">Preparing checkout...</p>
         </main>
@@ -557,7 +557,7 @@ export function CheckoutPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1320px] mx-auto px-margin-desktop py-20 text-center">
+        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-20 text-center">
           <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">Syncing your saved cart with your account…</p>
         </main>
@@ -571,7 +571,7 @@ export function CheckoutPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[800px] mx-auto px-margin-desktop py-16 text-center">
+        <main className="w-full pt-20 max-w-[800px] mx-auto px-margin-desktop py-16 text-center">
           <div role="alert" className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-6 sm:p-8">
             <span className="material-symbols-outlined mb-3 text-4xl text-amber-700">sync_problem</span>
             <h2 className="mb-2 text-xl font-bold">Your cart needs attention</h2>
@@ -601,7 +601,7 @@ export function CheckoutPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1320px] mx-auto px-margin-desktop py-16 text-center">
+        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-16 text-center">
           <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center text-3xl mx-auto mb-4">
             🔒
           </div>
@@ -636,7 +636,7 @@ export function CheckoutPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1320px] mx-auto px-margin-desktop py-16 text-center">
+        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-16 text-center">
           <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center text-3xl mx-auto mb-4">
             🛒
           </div>
@@ -661,7 +661,7 @@ export function CheckoutPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-[172px] bg-surface min-h-[calc(100vh-172px)]">
+      <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
           {deliverySettingsError && (
             <div role="status" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900">
@@ -1482,7 +1482,7 @@ export function CheckoutPage() {
                               />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-headline-sm text-xs font-bold text-on-surface line-clamp-1">
+                              <h4 className="whitespace-normal break-words font-headline-sm text-xs font-bold text-on-surface">
                                 {item.name}
                               </h4>
                               <p className="text-[10px] text-on-surface-variant">

@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
 import { cartService } from "../services/cartService";
 import { convertCoinsToRupees, getMaxRedeemableCoins } from "../services/coinService";
@@ -103,6 +104,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [isSyncingGuestCart, setIsSyncingGuestCart] = useState(false);
   const [cartSyncAttemptedCustomerId, setCartSyncAttemptedCustomerId] = useState<string | null>(null);
   const [guestCartSyncError, setGuestCartSyncError] = useState<string | null>(null);
+  const cartMutationVersionRef = useRef(0);
 
   // Scoped storage keys based on user ID
   const storageUserKey = user?.id || "guest";
@@ -230,17 +232,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const refreshCart = useCallback(async () => {
+    const requestVersion = cartMutationVersionRef.current;
     setIsLoading(true);
     setCartError(null);
     try {
       const cartItems = await cartService.getCart(user?.id, user?.legacySassId);
-      setItems(cartItems || []);
+      if (cartMutationVersionRef.current === requestVersion) setItems(cartItems || []);
     } catch (err: unknown) {
       console.error("Failed to load cart items:", err);
       const msg = err instanceof Error ? err.message : "Failed to load cart items";
-      setCartError(msg);
+      if (cartMutationVersionRef.current === requestVersion) setCartError(msg);
     } finally {
-      setIsLoading(false);
+      if (cartMutationVersionRef.current === requestVersion) setIsLoading(false);
     }
   }, [user?.id, user?.legacySassId]);
 
@@ -292,15 +295,43 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   ) => {
     const isVIP = !!user?.isVIP;
     const cartOwnerId = guestCartSyncError ? "guest_session" : user?.id;
-    await cartService.addToCart(product, optionIndex, quantity, cartOwnerId, isVIP);
-    if (guestCartSyncError) setItems(await cartService.getGuestCart(isVIP));
-    else await refreshCart();
+    const updatedItem = await cartService.addToCart(product, optionIndex, quantity, cartOwnerId, isVIP);
+    cartMutationVersionRef.current += 1;
+    setItems((currentItems) => {
+      const existingIndex = currentItems.findIndex(
+        (item) => (item.cartKey || item.id) === (updatedItem.cartKey || updatedItem.id),
+      );
+      if (existingIndex < 0) return [...currentItems, updatedItem];
+      return currentItems.map((item, index) =>
+        index === existingIndex ? { ...item, ...updatedItem } : item,
+      );
+    });
+    setCartError(null);
+    setIsLoading(false);
   };
 
   const updateQty = async (cartKey: string, quantity: number) => {
-    await cartService.updateQuantity(cartKey, quantity, guestCartSyncError ? "guest_session" : user?.id);
-    if (guestCartSyncError) setItems(await cartService.getGuestCart(!!user?.isVIP));
-    else await refreshCart();
+    const updatedItem = await cartService.updateQuantity(
+      cartKey,
+      quantity,
+      guestCartSyncError ? "guest_session" : user?.id,
+    );
+    cartMutationVersionRef.current += 1;
+    setItems((currentItems) => {
+      if (!updatedItem) {
+        return currentItems.filter((item) => item.id !== cartKey && item.cartKey !== cartKey);
+      }
+      const updatedKey = updatedItem.cartKey || updatedItem.id;
+      const existingIndex = currentItems.findIndex(
+        (item) => item.id === cartKey || item.cartKey === cartKey || item.id === updatedKey || item.cartKey === updatedKey,
+      );
+      if (existingIndex < 0) return [...currentItems, updatedItem];
+      return currentItems.map((item, index) =>
+        index === existingIndex ? { ...item, ...updatedItem } : item,
+      );
+    });
+    setCartError(null);
+    setIsLoading(false);
   };
 
   const removeFromCart = async (cartKey: string) => {

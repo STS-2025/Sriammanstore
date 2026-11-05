@@ -258,22 +258,17 @@ export function normalizeLegacyItems(rawItems: unknown): OrderItem[] {
       const price = Number(it["price"] ?? it["sellingPrice"] ?? it["mrp"] ?? 0);
       const quantity = Math.max(1, Number(it["quantity"] ?? it["qty"] ?? 1));
 
-      let image = "";
-      if (typeof it["image"] === "string" && it["image"].trim()) {
-        image = it["image"].trim();
-      } else if (typeof it["imageUrl"] === "string" && it["imageUrl"].trim()) {
-        image = it["imageUrl"].trim();
-      } else if (typeof it["frontImageUrl"] === "string" && it["frontImageUrl"].trim()) {
-        image = it["frontImageUrl"].trim();
-      } else if (Array.isArray(it["imageUrls"]) && it["imageUrls"][0]) {
-        image = String(it["imageUrls"][0]);
-      } else if (Array.isArray(it["images"]) && it["images"][0]) {
-        image = String(it["images"][0]);
-      }
-
-      if (!image) {
-        image = "/assets/images/placeholder.jpg";
-      }
+      const imageCandidates = [
+        it["image"],
+        it["imageUrl"],
+        it["frontImageUrl"],
+        it["backImageUrl"],
+        ...(Array.isArray(it["imageUrls"]) ? it["imageUrls"] : []),
+        ...(Array.isArray(it["images"]) ? it["images"] : []),
+      ].filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        .map((value) => value.trim())
+        .filter((value, index, values) => values.indexOf(value) === index);
+      const image = imageCandidates[0] || "";
 
       return {
         productId,
@@ -283,6 +278,7 @@ export function normalizeLegacyItems(rawItems: unknown): OrderItem[] {
         price,
         quantity,
         image,
+        imageCandidates,
       };
     });
 }

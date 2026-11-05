@@ -6,6 +6,8 @@ import { useCart } from "../../context/CartContext";
 import { useWishlist } from "../../context/WishlistContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { buildCartKey } from "../../lib/productUtils";
+import { CART_ADD_ANIMATION_EVENT, type CartAddAnimationDetail } from "../../hooks/useCartFlyAnimation";
+import { WishlistHeartButton } from "./WishlistHeartButton";
 import { toast } from "sonner";
 
 interface ProductCardProps {
@@ -19,13 +21,14 @@ export function ProductCard({
   className = "",
   readOnly = false,
 }: ProductCardProps) {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { addToCart, updateQty, getItemQuantity } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
   const { t } = useLanguage();
 
   const [optIndex, setOptIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const currentOption = product.options[optIndex] || product.options[0];
   if (!currentOption) return null;
 
@@ -49,8 +52,19 @@ export function ProductCard({
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    const productImageArea = e.currentTarget
+      .closest<HTMLElement>("[data-product-card-root]")
+      ?.querySelector<HTMLElement>("[data-product-image-container]");
+    const imageRect = productImageArea?.getBoundingClientRect();
     try {
       await addToCart(product, optIndex, 1);
+      if (imageRect && product.imageUrl) {
+        const detail: CartAddAnimationDetail = {
+          imageUrl: product.imageUrl,
+          origin: { x: imageRect.left + imageRect.width / 2, y: imageRect.top + imageRect.height / 2 },
+        };
+        window.dispatchEvent(new CustomEvent(CART_ADD_ANIMATION_EVENT, { detail }));
+      }
       toast.success(`Added ${product.name} to cart`);
     } catch (err: any) {
       toast.error(err.message || "Failed to add to cart");
@@ -77,9 +91,12 @@ export function ProductCard({
     }
   };
 
-  const handleToggleWishlist = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleToggleWishlist = async () => {
+    if (isAuthLoading) return false;
+    if (!user) {
+      setShowLoginPrompt(true);
+      return false;
+    }
     try {
       const added = await toggleWishlist(product, optIndex);
       if (added) {
@@ -87,8 +104,10 @@ export function ProductCard({
       } else {
         toast.info("Removed from wishlist");
       }
+      return added;
     } catch (err: any) {
       toast.error(err.message || "Could not update wishlist");
+      return false;
     }
   };
 
@@ -106,11 +125,12 @@ export function ProductCard({
 
   return (
     <div
+      data-product-card-root
       className={`bg-surface-container-lowest rounded-2xl p-space-md flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow relative group border border-outline-variant/15 ${className}`}
     >
       <div>
         {/* Product Image & Badges */}
-        <div className="relative w-full aspect-square rounded-2xl overflow-hidden bg-surface-container-low mb-space-md flex items-center justify-center p-3 border border-outline-variant/10">
+        <div data-product-image-container className="relative w-full aspect-square rounded-2xl overflow-hidden bg-surface-container-low mb-space-md flex items-center justify-center p-3 border border-outline-variant/10">
           {product.imageUrl && !imageError ? (
             readOnly ? (
               <div className="flex items-center justify-center w-full h-full cursor-default">
@@ -141,7 +161,7 @@ export function ProductCard({
               <span className="material-symbols-outlined text-[32px] text-outline-variant">
                 inventory_2
               </span>
-              <span className="text-[11px] font-semibold text-on-surface-variant truncate max-w-[140px]">
+              <span className="max-w-full whitespace-normal break-words text-center text-[11px] font-semibold text-on-surface-variant">
                 {product.name}
               </span>
             </div>
@@ -163,20 +183,12 @@ export function ProductCard({
 
           {/* Quick Wishlist Heart (Omitted in Read-Only Preview) */}
           {!readOnly && (
-            <button
-              onClick={handleToggleWishlist}
-              className={`absolute top-2 right-2 w-8 h-8 rounded-full bg-surface-container-lowest/90 flex items-center justify-center transition-all shadow-sm cursor-pointer ${
-                wishlisted ? "text-tertiary scale-110" : "text-on-surface-variant hover:text-tertiary"
-              }`}
-              title={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
-            >
-              <span
-                className="material-symbols-outlined text-[18px]"
-                style={wishlisted ? { fontVariationSettings: "'FILL' 1" } : {}}
-              >
-                favorite
-              </span>
-            </button>
+            <WishlistHeartButton
+              active={wishlisted}
+              onToggle={handleToggleWishlist}
+              className={`absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-surface-container-lowest/90 text-on-surface-variant shadow-sm ${wishlisted ? "text-rose-600" : "hover:text-rose-600"}`}
+              size="sm"
+            />
           )}
         </div>
 
@@ -208,7 +220,7 @@ export function ProductCard({
           } as any}
           className="block"
         >
-          <h3 className="font-headline-sm text-label-button font-bold text-on-surface line-clamp-1 group-hover:text-primary transition-colors text-sm">
+          <h3 className="font-headline-sm text-label-button whitespace-normal break-words font-bold text-on-surface group-hover:text-primary transition-colors text-sm">
             {t(product.name, product.tamilName)}
           </h3>
         </Link>
@@ -317,6 +329,49 @@ export function ProductCard({
           </div>
         )}
       </div>
+
+      {showLoginPrompt && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowLoginPrompt(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setShowLoginPrompt(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="wishlist-login-title"
+            className="w-full max-w-sm rounded-2xl bg-surface-container-lowest p-6 text-center text-on-surface shadow-2xl"
+          >
+            <span className="material-symbols-outlined text-4xl text-primary">favorite</span>
+            <h2 id="wishlist-login-title" className="mt-3 text-lg font-bold">
+              Login to add your favourite products
+            </h2>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Sign in to save products to your wishlist.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowLoginPrompt(false)}
+                className="rounded-xl border border-outline-variant/40 px-4 py-2.5 text-sm font-semibold text-on-surface hover:bg-surface-container-low"
+              >
+                Cancel
+              </button>
+              <Link
+                to="/login"
+                onClick={() => setShowLoginPrompt(false)}
+                className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-on-primary hover:bg-primary/90"
+              >
+                Go to Login
+              </Link>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

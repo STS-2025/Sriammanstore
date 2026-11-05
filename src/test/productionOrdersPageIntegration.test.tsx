@@ -17,6 +17,8 @@ import React from "react";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { authManager } from "../services/authAdapter";
 import { orderService } from "../services/orderService";
+import { productService } from "../services/productService";
+import { normalizeProductImageSource } from "../components/product/OrderProductImage";
 import { supportService } from "../services/supportService";
 import { apiClient } from "../services/apiClient";
 import { StorageAdapterError } from "../services/firestoreAdapter";
@@ -142,6 +144,13 @@ describe("Production Orders Page Integration Suite", () => {
   afterEach(() => {
     authManager.resetMode();
     vi.restoreAllMocks();
+  });
+
+  it("preserves valid image URLs and maps public files to browser-root paths", () => {
+    expect(normalizeProductImageSource("https://cdn.example.com/product.jpg?size=small")).toBe("https://cdn.example.com/product.jpg?size=small");
+    expect(normalizeProductImageSource("/placeholders/spices.svg")).toBe("/placeholders/spices.svg");
+    expect(normalizeProductImageSource("public/placeholders/spices.svg")).toBe("/placeholders/spices.svg");
+    expect(normalizeProductImageSource("assets/images/placeholder.jpg")).toBeNull();
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -512,6 +521,7 @@ describe("Production Orders Page Integration Suite", () => {
       await act(async () => render(<OrdersPage />));
       await waitFor(() => expect(screen.getByTestId("order-details-view")).toBeTruthy());
       expect(screen.getByTestId("order-progress-timeline")).toBeTruthy();
+      expect(screen.getByRole("img", { name: "Cold Pressed Groundnut Oil product image" }).getAttribute("src")).toBe("https://example.com/oil.jpg");
       expect(screen.getAllByText("Out for Delivery")).toHaveLength(2);
       expect(screen.queryByText("ORD-OTHER")).toBeNull();
       expect(screen.queryByText(/demonstration route|route preview|tracking map/i)).toBeNull();
@@ -578,6 +588,90 @@ describe("Production Orders Page Integration Suite", () => {
       await waitFor(() =>
         expect(screen.getByTestId("order-history-card-ORD-HIST-42")).toBeTruthy()
       );
+    });
+
+    it("shows snapshot product details, image overflow, and catalogue image fallback", async () => {
+      authManager.setMode("production");
+      mockAuthUser = ONCUS_USER;
+      const firstItem = makeOrder().items[0]!;
+      const items = [
+        { ...firstItem, productId: "prod-1", name: "Groundnut Oil", image: "https://images.example/oil.jpg", price: 280, quantity: 2 },
+        { ...firstItem, productId: "prod-2", name: "Turmeric Powder", image: "https://images.example/turmeric.jpg", price: 45, quantity: 1 },
+        { ...firstItem, productId: "prod-3", name: "Rice", image: "https://images.example/rice.jpg", price: 90, quantity: 1 },
+        { ...firstItem, productId: "prod-5", name: "Ghee", image: "", price: 120, quantity: 1 },
+        { ...firstItem, productId: "prod-4", name: "Jaggery", image: "https://images.example/jaggery.jpg", price: 60, quantity: 1 },
+      ];
+      vi.spyOn(orderService, "getOrders").mockResolvedValue([makeOrder({ orderId: "ORD-PRODUCTS", items })]);
+      vi.spyOn(productService, "getProductById").mockResolvedValue({ imageUrl: "https://catalog.example/ghee.jpg" } as any);
+
+      await act(async () => render(<OrdersPage />));
+
+      await waitFor(() => expect(screen.getByTestId("order-history-card-ORD-PRODUCTS")).toBeTruthy());
+      await waitFor(() => expect(screen.getByRole("img", { name: "Ghee" }).getAttribute("src")).toBe("https://catalog.example/ghee.jpg"));
+      const card = screen.getByTestId("order-history-card-ORD-PRODUCTS");
+      expect(card.querySelectorAll("img")).toHaveLength(4);
+      expect(card.textContent).toContain("+1 more");
+      expect(card.textContent).toContain("Groundnut Oil");
+      expect(card.textContent).toContain("Qty 2");
+      expect(card.textContent).toContain("₹280 each");
+      expect(card.textContent).toContain("₹280");
+      expect(productService.getProductById).toHaveBeenCalledWith("prod-5");
+    });
+
+    it("uses the existing product placeholder when a snapshot and catalogue image are missing", async () => {
+      authManager.setMode("production");
+      mockAuthUser = ONCUS_USER;
+      vi.spyOn(orderService, "getOrders").mockResolvedValue([makeOrder({
+        orderId: "ORD-NO-IMAGE",
+        items: [{ ...makeOrder().items[0]!, image: "" }],
+      })]);
+      vi.spyOn(productService, "getProductById").mockResolvedValue(null);
+
+      await act(async () => render(<OrdersPage />));
+
+      const image = await screen.findByRole("img", { name: "Cold Pressed Groundnut Oil" });
+      await waitFor(() => expect(image.getAttribute("src")).toBe("/placeholders/spices.svg"));
+    });
+
+    it("tries catalogue images after a snapshot 404 and does not retry the fallback", async () => {
+      authManager.setMode("production");
+      mockAuthUser = ONCUS_USER;
+      vi.spyOn(orderService, "getOrders").mockResolvedValue([makeOrder({
+        orderId: "ORD-BROKEN-IMAGE",
+        items: [{ ...makeOrder().items[0]!, productId: "prod-broken-image", image: "https://invalid.example/missing.jpg" }],
+      })]);
+      const catalogueLookup = vi.spyOn(productService, "getProductById").mockResolvedValue({
+        imageUrl: "https://catalog.example/groundnut-oil.jpg",
+        images: ["https://catalog.example/groundnut-oil.jpg"],
+      } as any);
+
+      await act(async () => render(<OrdersPage />));
+      const image = await screen.findByRole("img", { name: "Cold Pressed Groundnut Oil" });
+      expect(image.getAttribute("src")).toBe("https://invalid.example/missing.jpg");
+
+      fireEvent.error(image);
+      await waitFor(() => expect(image.getAttribute("src")).toBe("https://catalog.example/groundnut-oil.jpg"));
+      fireEvent.error(image);
+      await waitFor(() => expect(image.getAttribute("src")).toBe("/placeholders/spices.svg"));
+      fireEvent.error(image);
+
+      expect(image.getAttribute("src")).toBe("/placeholders/spices.svg");
+      expect(catalogueLookup).toHaveBeenCalledTimes(1);
+    });
+
+    it("reorders the selected card through the existing cart workflow", async () => {
+      authManager.setMode("emulator");
+      mockAuthUser = ONCUS_USER;
+      const order = makeOrder({ orderId: "ORD-REORDER" });
+      vi.spyOn(orderService, "getOrders").mockResolvedValue([order]);
+      const reorderSpy = vi.spyOn(orderService, "reorder").mockResolvedValue({ addedCount: 1, unavailableCount: 0 } as any);
+
+      await act(async () => render(<OrdersPage />));
+      await waitFor(() => expect(screen.getByTestId("order-history-card-ORD-REORDER")).toBeTruthy());
+      fireEvent.click(screen.getAllByRole("button", { name: "Reorder" })[0]!);
+
+      await waitFor(() => expect(reorderSpy).toHaveBeenCalledWith(order, ONCUS_USER.id));
+      expect(mockNavigate).toHaveBeenCalledWith({ to: "/cart" });
     });
 
     it("renders sign-in prompt when user is not authenticated", async () => {

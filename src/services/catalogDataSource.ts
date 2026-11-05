@@ -1,9 +1,6 @@
 import { apiClient } from "./apiClient";
 import type { Product, Category, Banner } from "../types";
-import {
-  normalizeLegacyProduct,
-  normalizeLegacyProductList,
-} from "./legacySchemaMapper";
+import { normalizeLegacyProduct, normalizeLegacyProductList } from "./legacySchemaMapper";
 import {
   APPROVED_PRODUCTION_PRODUCT_IDS,
   EXPECTED_PRODUCTION_PROJECT_ID,
@@ -18,19 +15,10 @@ import {
   resolveProductionCategories,
   type ProductionCategoryResolverResult,
 } from "./productionCategoryResolver";
-import {
-  filterAndSortProducts,
-  type ProductFilterState,
-} from "../lib/filterUtils";
-import {
-  getSimilarProducts,
-  getComplementaryProducts,
-} from "../lib/recommendationUtils";
+import { filterAndSortProducts, type ProductFilterState } from "../lib/filterUtils";
+import { getSimilarProducts, getComplementaryProducts } from "../lib/recommendationUtils";
 
-export type CatalogDataSourceMode =
-  | "local"
-  | "production-preview"
-  | "production-readonly";
+export type CatalogDataSourceMode = "local" | "production-preview" | "production-readonly";
 
 export interface CatalogDataSourceStatus {
   mode: CatalogDataSourceMode;
@@ -80,6 +68,7 @@ export class CatalogDataSource {
   private mode: CatalogDataSourceMode;
   private cachedCategories: Category[] | null = null;
   private pendingCategoriesPromise: Promise<Category[]> | null = null;
+  private cachedProductionCataloguePromise: Promise<ProductionCatalogueResult> | null = null;
 
   constructor(initialMode?: CatalogDataSourceMode) {
     this.mode = initialMode ?? resolveDefaultCatalogMode();
@@ -95,17 +84,20 @@ export class CatalogDataSource {
     this.mode = import.meta.env.MODE === "test" ? mode : "production-readonly";
     this.cachedCategories = null;
     this.pendingCategoriesPromise = null;
+    this.cachedProductionCataloguePromise = null;
   }
 
   public resetMode(): void {
     this.mode = resolveDefaultCatalogMode();
     this.cachedCategories = null;
     this.pendingCategoriesPromise = null;
+    this.cachedProductionCataloguePromise = null;
   }
 
   public clearCategoryCache(): void {
     this.cachedCategories = null;
     this.pendingCategoriesPromise = null;
+    this.cachedProductionCataloguePromise = null;
   }
 
   public getStatus(): CatalogDataSourceStatus {
@@ -124,7 +116,7 @@ export class CatalogDataSource {
    * the common filtering and sorting engine.
    */
   public async getProducts(
-    params?: ProductFilterParams & { fullCatalogue?: boolean }
+    params?: ProductFilterParams & { fullCatalogue?: boolean },
   ): Promise<Product[]> {
     let items: Product[] = [];
 
@@ -133,7 +125,7 @@ export class CatalogDataSource {
       (this.mode === "production-preview" && params?.fullCatalogue)
     ) {
       // Full production catalogue read-only query
-      const result = await fetchFullProductionCatalogue({ optIn: true });
+      const result = await this.loadProductionCatalogue();
       items = result.products;
     } else if (this.mode === "production-preview") {
       // Strictly read from allowlisted production product documents
@@ -166,20 +158,12 @@ export class CatalogDataSource {
       ...(filterSubcategories.length > 0 ? { subcategories: filterSubcategories } : {}),
       ...(params?.search !== undefined ? { search: params.search } : {}),
       ...(params?.isFlashDeal || params?.onlyDeals ? { onlyDeals: true } : {}),
-      ...(params?.inStockOnly !== undefined
-        ? { inStockOnly: params.inStockOnly }
-        : {}),
+      ...(params?.inStockOnly !== undefined ? { inStockOnly: params.inStockOnly } : {}),
       ...(params?.minPrice !== undefined ? { minPrice: params.minPrice } : {}),
       ...(params?.maxPrice !== undefined ? { maxPrice: params.maxPrice } : {}),
-      ...(params?.minRating !== undefined
-        ? { minRating: params.minRating }
-        : {}),
-      ...(params?.minDiscount !== undefined
-        ? { minDiscount: params.minDiscount }
-        : {}),
-      ...(params?.packSizes !== undefined
-        ? { packSizes: params.packSizes }
-        : {}),
+      ...(params?.minRating !== undefined ? { minRating: params.minRating } : {}),
+      ...(params?.minDiscount !== undefined ? { minDiscount: params.minDiscount } : {}),
+      ...(params?.packSizes !== undefined ? { packSizes: params.packSizes } : {}),
       ...(params?.methods !== undefined ? { methods: params.methods } : {}),
       ...(params?.sort !== undefined ? { sort: params.sort } : {}),
     };
@@ -196,10 +180,7 @@ export class CatalogDataSource {
         const product = await fetchProductionProductById(id, { optIn: true });
         return product;
       } catch (err: any) {
-        if (
-          err.message?.includes("404") ||
-          err.message?.includes("not found")
-        ) {
+        if (err.message?.includes("404") || err.message?.includes("not found")) {
           return null;
         }
         throw err;
@@ -208,11 +189,7 @@ export class CatalogDataSource {
 
     if (this.mode === "production-preview") {
       // Enforce production allowlist: only approved products can be fetched
-      if (
-        !APPROVED_PRODUCTION_PRODUCT_IDS.includes(
-          id as ApprovedProductionProductId
-        )
-      ) {
+      if (!APPROVED_PRODUCTION_PRODUCT_IDS.includes(id as ApprovedProductionProductId)) {
         return null;
       }
 
@@ -222,10 +199,7 @@ export class CatalogDataSource {
         });
         return preview.product;
       } catch (err: any) {
-        if (
-          err.message?.includes("404") ||
-          err.message?.includes("not found")
-        ) {
+        if (err.message?.includes("404") || err.message?.includes("not found")) {
           return null;
         }
         throw err;
@@ -251,7 +225,19 @@ export class CatalogDataSource {
     if (this.mode !== "production-readonly" && this.mode !== "production-preview") {
       return null;
     }
-    return fetchFullProductionCatalogue({ optIn: true });
+    return this.loadProductionCatalogue();
+  }
+
+  private loadProductionCatalogue(): Promise<ProductionCatalogueResult> {
+    if (!this.cachedProductionCataloguePromise) {
+      this.cachedProductionCataloguePromise = fetchFullProductionCatalogue({ optIn: true }).catch(
+        (error) => {
+          this.cachedProductionCataloguePromise = null;
+          throw error;
+        },
+      );
+    }
+    return this.cachedProductionCataloguePromise;
   }
 
   /**
@@ -273,7 +259,10 @@ export class CatalogDataSource {
         let categories: Category[] = [];
         if (this.mode === "production-readonly") {
           const fullResult = await this.getFullProductionCatalogueResult();
-          if (fullResult?.categoryResult?.categories && fullResult.categoryResult.categories.length > 0) {
+          if (
+            fullResult?.categoryResult?.categories &&
+            fullResult.categoryResult.categories.length > 0
+          ) {
             categories = fullResult.categoryResult.categories;
           } else {
             const resolverResult = await resolveProductionCategories({ optIn: true });
@@ -302,10 +291,7 @@ export class CatalogDataSource {
   /**
    * Retrieves similar product recommendations.
    */
-  public async getSimilarProducts(
-    productId: string,
-    limit = 4
-  ): Promise<Product[]> {
+  public async getSimilarProducts(productId: string, limit = 4): Promise<Product[]> {
     const allProducts = await this.getProducts();
     const currentProduct = allProducts.find((p) => p.id === productId);
     if (!currentProduct) return [];
@@ -318,7 +304,7 @@ export class CatalogDataSource {
   public async getComplementaryProducts(
     productId: string,
     limit = 4,
-    excludeIds: string[] = []
+    excludeIds: string[] = [],
   ): Promise<Product[]> {
     const allProducts = await this.getProducts();
     const currentProduct = allProducts.find((p) => p.id === productId);
@@ -331,4 +317,3 @@ export class CatalogDataSource {
 }
 
 export const catalogDataSource = new CatalogDataSource();
-

@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="grocery-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f2f9f4" />
+      <stop offset="100%" stop-color="#e1f3e7" />
+    </linearGradient>
+    <linearGradient id="bag-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#005f3f" />
+      <stop offset="100%" stop-color="#003d28" />
+    </linearGradient>
+    <linearGradient id="produce-orange" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fb923c" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+    <linearGradient id="produce-red" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f87171" />
+      <stop offset="100%" stop-color="#dc2626" />
+    </linearGradient>
+    <linearGradient id="produce-green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4ade80" />
+      <stop offset="100%" stop-color="#16a34a" />
+    </linearGradient>
+    <linearGradient id="grain-gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#ca8a04" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="400" height="400" rx="32" fill="url(#grocery-bg)" />
+  <rect x="12" y="12" width="376" height="376" rx="24" fill="none" stroke="#005f3f" stroke-width="2" opacity="0.15" />
+
+  <!-- Grocery Basket & Produce Group -->
+  <g transform="translate(200 170)">
+    <!-- Shadow -->
+    <ellipse cx="0" cy="85" rx="85" ry="18" fill="#005f3f" opacity="0.12" />
+
+    <!-- Bag/Basket Back Silhouette -->
+    <rect x="-65" y="-10" width="130" height="85" rx="16" fill="#003d28" opacity="0.3" />
+
+    <!-- Fresh Items Peeking Out -->
+    <!-- Bread / Grain Bag -->
+    <rect x="-48" y="-60" width="28" height="60" rx="6" fill="url(#grain-gold)" transform="rotate(-8 -34 -30)" />
+    <path d="M-45 -48 L-25 -45 M-44 -36 L-24 -33" stroke="#a16207" stroke-width="2" stroke-linecap="round" />
+
+    <!-- Bottle / Oil Jar -->
+    <rect x="18" y="-65" width="26" height="65" rx="6" fill="#fef08a" opacity="0.85" stroke="#eab308" stroke-width="2" />
+    <rect x="25" y="-76" width="12" height="12" rx="3" fill="#ca8a04" />
+
+    <!-- Fresh Apple/Tomato -->
+    <circle cx="-12" cy="-12" r="22" fill="url(#produce-red)" />
+    <!-- Leaf on Tomato -->
+    <path d="M-12 -34 C-8 -42 2 -40 -6 -30 Z" fill="url(#produce-green)" />
+
+    <!-- Fresh Orange / Citrus -->
+    <circle cx="16" cy="-6" r="18" fill="url(#produce-orange)" />
+
+    <!-- Fresh Green Vegetable Stalks / Leaves -->
+    <path d="M-2 -18 C10 -55 35 -40 20 -15 Z" fill="url(#produce-green)" />
+    <path d="M-10 -20 C-30 -50 0 -45 -5 -15 Z" fill="#22c55e" />
+
+    <!-- Main Front Shopping Bag (Brand Green) -->
+    <path d="M-68 0 L68 0 L58 78 C56 84 50 88 44 88 L-44 88 C-50 88 -56 84 -58 78 Z" fill="url(#bag-body)" />
+
+    <!-- Bag Handles -->
+    <path d="M-28 0 C-28 -32 28 -32 28 0" fill="none" stroke="#00875a" stroke-width="6" stroke-linecap="round" />
+    <path d="M-28 -4 C-28 -30 28 -30 28 -4" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" opacity="0.6" />
+
+    <!-- Sri Amman Store Emblem on Bag -->
+    <circle cx="0" cy="44" r="20" fill="#ffffff" opacity="0.15" />
+    <path d="M-10 44 L0 34 L10 44 L0 54 Z" fill="#ffffff" opacity="0.9" />
+    <circle cx="0" cy="44" r="4" fill="#005f3f" />
+  </g>
+
+  <!-- Typography Labels -->
+  <text x="200" y="295" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="800" fill="#005f3f" letter-spacing="0.5">
+    Sri Amman Groceries
+  </text>
+  <text x="200" y="322" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#15803d">
+    Farm Fresh &amp; Heritage Quality
+  </text>
+
+  <!-- Badge Tag -->
+  <g transform="translate(130 342)">
+    <rect width="140" height="24" rx="12" fill="#dcfce7" stroke="#86efac" stroke-width="1" />
+    <text x="70" y="16" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#166534">
+      100% Pure &amp; Natural
+    </text>
+  </g>
+</svg>
+

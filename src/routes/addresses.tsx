@@ -169,7 +169,7 @@ export function AddressesPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1000px] mx-auto px-margin-desktop py-20 text-center">
+        <main className="w-full pt-20 max-w-[1000px] mx-auto px-margin-desktop py-20 text-center">
           <div className="w-9 h-9 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">
             Loading saved addresses...
@@ -185,7 +185,7 @@ export function AddressesPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1000px] mx-auto px-margin-desktop py-16 text-center">
+        <main className="w-full pt-20 max-w-[1000px] mx-auto px-margin-desktop py-16 text-center">
           <div className="w-20 h-20 rounded-full bg-surface-container flex items-center justify-center text-4xl mx-auto mb-4">
             📍
           </div>
@@ -213,7 +213,7 @@ export function AddressesPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-[172px] bg-surface min-h-[calc(100vh-172px)]">
+      <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1000px] mx-auto px-margin-desktop py-space-xl">
           {searchParams.redirect && (
             <div className="mb-4">

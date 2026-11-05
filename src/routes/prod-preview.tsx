@@ -143,7 +143,7 @@ function ProductionProductPreviewPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen flex flex-col">
       <StoreHeader />
 
-      <main className="flex-1 w-full pt-[172px] bg-surface min-h-[calc(100vh-172px)]">
+      <main className="flex-1 w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1200px] mx-auto px-margin-mobile md:px-margin-desktop py-space-xl">
           {/* Isolation & Security Notice Banner */}
           <div className="bg-surface-container-low border border-outline-variant/30 rounded-3xl p-6 md:p-8 mb-8 shadow-sm">

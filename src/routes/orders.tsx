@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { BottomNav } from "../components/layout/BottomNav";
+import { OrderProductImage } from "../components/product/OrderProductImage";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { useAuth } from "../context/AuthContext";
@@ -131,8 +132,34 @@ function isFailedOrder(order: Order): boolean {
 }
 
 function isRefundedOrder(order: Order): boolean {
-  const status = `${order.rawStatus || ""} ${String(rawOrder(order)["status"] || "")}`.toLowerCase();
+  const status = `${order.rawStatus || ""} ${String(rawOrder(order)["status"] || "")} ${order.payment?.status || ""}`.toLowerCase();
   return status.includes("refund");
+}
+
+function getOrderStatusMessage(order: Order): string {
+  if (isRefundedOrder(order)) {
+    const paymentStatus = order.payment?.status?.trim();
+    return paymentStatus && paymentStatus.toLowerCase().includes("refund")
+      ? `Refund status: ${paymentStatus}.`
+      : "This order has been marked as refunded.";
+  }
+  if (isFailedOrder(order)) return "This order could not be completed.";
+  if (order.status === "pending") {
+    const status = `${order.rawStatus || ""} ${String(rawOrder(order)["status"] || "")}`.toLowerCase();
+    return status.includes("confirm") ? "Your order has been confirmed." : "Your order has been placed and is awaiting confirmation.";
+  }
+  if (order.status === "processing") return "Your order is being prepared.";
+  if (order.status === "packed") return "Your order has been packed and is awaiting dispatch.";
+  if (order.status === "in transit") {
+    const status = `${order.rawStatus || ""} ${String(rawOrder(order)["status"] || "")}`.toLowerCase();
+    if (status.includes("out for delivery")) return "Your order is on its way for delivery.";
+    if (status.includes("dispatch") || status.includes("ship")) return "Your order has been dispatched.";
+    return "Your order is in transit.";
+  }
+  if (order.status === "delivered") return "Your order was delivered successfully.";
+  if (order.status === "cancelled") return "This order has been cancelled.";
+  if (order.status === "returned") return "This order has been returned.";
+  return "Order status updated.";
 }
 
 function getDisplayStatus(order: Order): string {
@@ -399,12 +426,12 @@ export function OrdersPage() {
     return <PageShell><LoadingState label="Restoring your session…" /></PageShell>;
   }
   if (!user) {
-    return <PageShell><main className="mx-auto max-w-3xl px-4 py-20 pt-[172px] text-center"><h1 className="text-2xl font-black text-on-surface">Please sign in to view your orders</h1><p className="mx-auto mt-3 max-w-lg text-sm text-on-surface-variant">Sign in to view order details and delivery progress.</p><Link to="/login" search={{ redirect: "/orders" } as any} className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white">Sign In</Link></main></PageShell>;
+    return <PageShell><main className="mx-auto max-w-3xl px-4 py-20 pt-20 text-center"><h1 className="text-2xl font-black text-on-surface">Please sign in to view your orders</h1><p className="mx-auto mt-3 max-w-lg text-sm text-on-surface-variant">Sign in to view order details and delivery progress.</p><Link to="/login" search={{ redirect: "/orders" } as any} className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white">Sign In</Link></main></PageShell>;
   }
 
   return (
     <PageShell>
-      <main className="min-h-[calc(100vh-172px)] bg-surface pb-24 pt-[172px]">
+      <main className="min-h-[calc(100vh-80px)] bg-surface pb-24 pt-20">
         <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8">
           <nav aria-label="Breadcrumb" className="mb-5 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
             <Link to="/" className="hover:text-primary">Home</Link><span>/</span><Link to="/account" className="hover:text-primary">My Account</Link><span>/</span><span className="font-bold text-on-surface">My Orders</span>
@@ -452,7 +479,7 @@ export function OrdersPage() {
               </div>
               {filteredOrders.length === 0 ? <div className="rounded-2xl border border-outline-variant/20 bg-white p-8 text-center text-sm text-on-surface-variant">No orders match this filter.</div> : (
                 <div className="space-y-3" data-testid="orders-list">
-                  {filteredOrders.map((order) => <OrderCard key={order.orderId} order={order} onOpen={() => openOrder(order.orderId)} />)}
+                  {filteredOrders.map((order) => <OrderCard key={order.orderId} order={order} onOpen={() => openOrder(order.orderId)} onReorder={() => void handleReorder(order)} isReordering={isReordering} />)}
                 </div>
               )}
             </section>
@@ -484,26 +511,55 @@ function PageShell({ children }: { children: ReactNode }) {
 }
 
 function LoadingState({ label }: { label: string }) {
-  return <div className="px-4 py-20 pt-[172px] text-center"><div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /><p className="text-sm text-on-surface-variant">{label}</p></div>;
+  return <div className="px-4 py-20 pt-20 text-center"><div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /><p className="text-sm text-on-surface-variant">{label}</p></div>;
 }
 
 function FilterButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
   return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`shrink-0 rounded-full px-4 py-2.5 text-xs font-bold transition-colors ${active ? "bg-primary text-white" : "border border-outline-variant/20 bg-white text-on-surface-variant hover:text-primary"}`}>{children}</button>;
 }
 
-function OrderCard({ order, onOpen }: { order: Order; onOpen: () => void }) {
+function OrderCard({ order, onOpen, onReorder, isReordering }: { order: Order; onOpen: () => void; onReorder: () => void; isReordering: boolean }) {
   const itemCount = order.items.reduce((count, item) => count + item.quantity, 0);
   const placedAt = formatDate(order.createdAt, true);
-  return <article data-testid={`order-history-card-${order.orderId}`} tabIndex={0} onClick={onOpen} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } }} className="cursor-pointer rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-sm transition-colors hover:border-primary/40 sm:p-5">
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2"><h2 className="text-base font-extrabold text-on-surface">Order #{order.orderId}</h2><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${statusClasses(order)}`}>{getDisplayStatus(order)}</span></div>
-        <p className="mt-1 text-xs text-on-surface-variant">{placedAt || "Date unavailable"} · {itemCount} item{itemCount === 1 ? "" : "s"}</p>
-        <p className="mt-1 text-sm font-semibold text-on-surface">Total {money(order.pricingSummary.totalAmount)}</p>
+  const productsToShow = order.items.slice(0, 2);
+  const imageLimit = order.items.length === 1 ? 1 : 4;
+  const moreImages = Math.max(order.items.length - imageLimit, 0);
+  return <article data-testid={`order-history-card-${order.orderId}`} tabIndex={0} onClick={onOpen} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onOpen(); } }} className="cursor-pointer overflow-hidden rounded-2xl border border-outline-variant/20 bg-white shadow-sm transition-colors hover:border-primary/40 hover:shadow-md">
+    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-outline-variant/15 bg-surface-container-lowest px-4 py-3 sm:px-5">
+      <div className="flex min-w-0 flex-wrap items-center gap-2"><h2 className="text-sm font-extrabold text-on-surface">Order #{order.orderId}</h2><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${statusClasses(order)}`}>{getDisplayStatus(order)}</span></div>
+      <time className="text-xs text-on-surface-variant">{placedAt || "Date unavailable"}</time>
+    </header>
+    <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_210px] lg:items-center">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
+        <div className={`flex shrink-0 items-center gap-2 ${order.items.length === 1 ? "" : "flex-wrap"}`} aria-label={`${order.items.length} products in this order`}>
+          {order.items.slice(0, imageLimit).map((item, index) => {
+            return <div key={`${item.productId}-${item.unitSize}-${index}`} className={`${order.items.length === 1 ? "h-28 w-28" : "h-[68px] w-[68px]"} flex items-center justify-center overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-low p-1.5`}>
+              <OrderProductImage item={item} className="h-full w-full object-contain" />
+            </div>;
+          })}
+          {moreImages > 0 && <span className="flex h-[68px] min-w-[68px] items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container-low px-2 text-xs font-extrabold text-on-surface-variant">+{moreImages} more</span>}
+        </div>
+        <div className="min-w-0 flex-1">
+          <ul className="space-y-2">
+            {productsToShow.map((item, index) => <li key={`${item.productId}-${item.unitSize}-${index}`} className="min-w-0">
+              <p className="whitespace-normal break-words text-sm font-bold text-on-surface">{item.name}</p>
+              <p className="mt-0.5 text-xs text-on-surface-variant">{[item.unitSize, item.unit].filter(Boolean).join(" ") || "Variant unavailable"} · Qty {item.quantity} · {money(item.price)} each</p>
+            </li>)}
+          </ul>
+          {order.items.length > productsToShow.length && <p className="mt-2 text-xs font-semibold text-primary">+{order.items.length - productsToShow.length} more product{order.items.length - productsToShow.length === 1 ? "" : "s"} in this order</p>}
+          <p className="mt-3 text-xs text-on-surface-variant">{getOrderStatusMessage(order)}</p>
+          <p className="mt-1 text-xs font-semibold text-on-surface-variant">{order.payment.method.toUpperCase()} · {order.payment.status}</p>
+        </div>
       </div>
-      <button type="button" onClick={(event) => { event.stopPropagation(); onOpen(); }} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-container" aria-label={`View details for order ${order.orderId}`}>
-        View Details<span className="material-symbols-outlined text-base">arrow_forward</span>
-      </button>
+      <div className="flex items-center justify-between gap-3 border-t border-outline-variant/15 pt-3 sm:justify-end lg:flex-col lg:items-stretch lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
+        <div className="lg:text-right"><p className="text-[11px] font-semibold uppercase tracking-wide text-on-surface-variant">{itemCount} item{itemCount === 1 ? "" : "s"}</p><p className="mt-0.5 text-lg font-black text-on-surface">{money(order.pricingSummary.totalAmount)}</p></div>
+        <div className="flex gap-2">
+          <button type="button" disabled={isReordering} onClick={(event) => { event.stopPropagation(); onReorder(); }} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-primary/30 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/5 disabled:opacity-60">Reorder</button>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onOpen(); }} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary-container" aria-label={`View details for order ${order.orderId}`}>
+            View Details<span className="material-symbols-outlined text-base">arrow_forward</span>
+          </button>
+        </div>
+      </div>
     </div>
   </article>;
 }
@@ -549,7 +605,7 @@ function OrderDetails({ order, onBack, onInvoice, onHelp, onCancel, onReturn, on
           <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-lg font-extrabold text-on-surface">Items ({itemCount})</h2><span className="text-sm font-bold text-on-surface">{money(order.pricingSummary.totalAmount)} total</span></div>
           <ul className="mt-4 divide-y divide-outline-variant/15">
             {order.items.map((item, index) => <li key={`${item.productId}-${item.unitSize}-${index}`} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-              {item.image && !item.image.endsWith("/assets/images/placeholder.jpg") ? <img src={item.image} alt="" className="h-16 w-16 shrink-0 rounded-xl bg-surface-container object-cover" /> : <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-surface-container text-primary"><span className="material-symbols-outlined">inventory_2</span></div>}
+              <OrderProductImage item={item} alt={`${item.name} product image`} className="h-16 w-16 shrink-0 rounded-xl bg-surface-container object-contain p-1" />
               <div className="min-w-0 flex-1"><p className="font-bold text-on-surface">{item.name}</p><p className="mt-0.5 text-xs text-on-surface-variant">{[item.unitSize, item.unit].filter(Boolean).join(" ")} · Qty {item.quantity}</p><p className="mt-1 text-xs text-on-surface-variant">{money(item.price)} each</p></div>
               <p className="shrink-0 text-sm font-bold text-on-surface">{money(item.price * item.quantity)}</p>
             </li>)}

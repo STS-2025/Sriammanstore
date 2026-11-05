@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { ProductCard } from "../components/product/ProductCard";
 import { productService } from "../services/productService";
-import type { Product, Category, Banner } from "../types";
+import type { Announcement, Banner, Product, Category } from "../types";
 import { useLanguage } from "../context/LanguageContext";
 
 export const Route = createFileRoute("/")({
@@ -15,361 +16,628 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Wood-pressed oils, heritage grains, and farm-fresh produce delivered in 60 minutes with single-store purity.",
+          "Shop South Indian groceries, heritage grains, and everyday essentials from Sri Amman Smart Store.",
       },
     ],
   }),
   component: HomePage,
 });
 
+const INITIAL_CATEGORY_COUNT = 10;
+const BANNER_INTERVAL_MS = 6000;
+const BANNER_DATA_REFRESH_MS = 3_000;
+
 function HomePage() {
   const { t } = useLanguage();
-  const [banners, setBanners] = useState<Banner[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [flashDeals, setFlashDeals] = useState<Product[]>([]);
-  const [bestSellers, setBestSellers] = useState<Product[]>([]);
-  const [activeTab, setActiveTab] = useState("all");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [bannersLoading, setBannersLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Client-side visual countdown for flash deals
-  const [timeLeft, setTimeLeft] = useState({ hours: 4, minutes: 32, seconds: 15 });
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
-        if (prev.minutes > 0) return { ...prev, minutes: 59, seconds: 59 };
-        if (prev.hours > 0) return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        return { hours: 4, minutes: 0, seconds: 0 };
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const [error, setError] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const categoryScroller = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function loadHomeData() {
       try {
-        const [bannersData, categoriesData, productsData] = await Promise.all([
-          productService.getBanners(),
-          productService.getCategories(),
-          productService.getProducts(),
+        const [categoryResult, productResult, announcementResult] = await Promise.all([
+          productService.getHomepageCategories(),
+          productService.getProducts({ sort: "popular" }),
+          productService.getAnnouncements().catch(() => [] as Announcement[]),
         ]);
-        setBanners(bannersData || []);
-        setCategories(categoriesData || []);
-        setFlashDeals(productsData.filter((p) => p.isFlashDeal) || []);
-        setBestSellers(productsData || []);
-      } catch (err) {
-        console.error("Failed to load home page data:", err);
+        if (cancelled) return;
+        setCategories(categoryResult || []);
+        setProducts(
+          (productResult || []).filter((product) => product.isActive && product.options.length > 0),
+        );
+        setAnnouncements(announcementResult || []);
+      } catch (loadError) {
+        console.error("Failed to load home page data:", loadError);
+        if (!cancelled) setError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
-    loadHomeData();
+    void loadHomeData();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const heroBanner = banners[0];
+  useEffect(() => {
+    let cancelled = false;
+    const refreshBanners = async () => {
+      try {
+        const latestBanners = await productService.getBanners();
+        if (!cancelled) {
+          setBanners((latestBanners || []).filter((banner) => Boolean(banner.imageUrl)));
+        }
+      } catch (refreshError) {
+        console.error("Failed to refresh homepage banners:", refreshError);
+      } finally {
+        if (!cancelled) setBannersLoading(false);
+      }
+    };
 
-  const filteredBestSellers =
-    activeTab === "all"
-      ? bestSellers
-      : bestSellers.filter((p) => p.categorySlug === activeTab);
+    void refreshBanners();
+    const timer = window.setInterval(() => void refreshBanners(), BANNER_DATA_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const productsByCategory = useMemo(() => {
+    const bySlug = new Map<string, Product[]>();
+    for (const product of products) {
+      const group = bySlug.get(product.categorySlug) || [];
+      if (!group.some((item) => item.id === product.id)) group.push(product);
+      bySlug.set(product.categorySlug, group);
+    }
+    return bySlug;
+  }, [products]);
+
+  const visibleCategories = showAllCategories
+    ? categories
+    : categories.slice(0, INITIAL_CATEGORY_COUNT);
 
   return (
-    <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
+    <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased">
       <StoreHeader />
+      <main className="min-h-[calc(100vh-80px)] w-full overflow-hidden bg-surface pt-20">
+        <div className="w-full pb-24 md:pb-10">
+          <OffersScroller announcements={announcements} />
+          <PromotionalBannerCarousel banners={banners} loading={bannersLoading} />
+          <div className="mx-auto mt-7 flex w-full max-w-[1440px] flex-col gap-7 px-4 sm:px-6 lg:mt-9 lg:gap-9 lg:px-8">
 
-      <main className="w-full pt-[172px] bg-surface min-h-[calc(100vh-172px)]">
-        <div className="flex flex-col w-full">
-          {/* Hero Section */}
-          <section className="max-w-[1320px] mx-auto px-margin-desktop w-full py-space-md">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-md items-stretch">
-              {/* Main Hero Card */}
-              <div className="lg:col-span-8 bg-surface-container-low rounded-3xl relative overflow-hidden flex flex-col justify-between p-space-xl md:p-space-2xl min-h-[440px] shadow-sm">
-                <div
-                  className="absolute inset-0 z-0 bg-cover bg-center"
-                  style={{
-                    backgroundImage: `url('${
-                      heroBanner?.imageUrl ||
-                      "https://lh3.googleusercontent.com/aida-public/AB6AXuCbMy1ghExJ7-a2yVEjsclWptdjYZIjvFHcy_NCGtWIQKXA8U6idZNaYmAApJuGPk_vYIetXbusIf6a0m30H-tD1o0NWK2ntUzznyvlJFaMyS4c1zRFgWxajT879uU1Gg7HxNxU139AOpCLCWZ1NvWRmQjEQd0wreLX1o7v1dFpQ3SXNGKwX06McDeI45kfTlc2ljGyIJ1DPi1xatizCypjaQmE0zxeOgeQ_R__MeC5"
-                    }')`,
-                  }}
-                ></div>
-                <div className="absolute inset-0 z-0 bg-gradient-to-r from-surface-container-low via-surface-container-low/95 to-surface-container-low/30 backdrop-blur-[1px]"></div>
-
-                <div className="relative z-10 max-w-xl flex flex-col items-start gap-space-md">
-                  <div className="inline-flex items-center gap-space-xs px-space-md py-1 rounded-full bg-primary-fixed text-on-primary-fixed font-label-badge text-xs uppercase tracking-wider shadow-sm font-bold">
-                    <span
-                      className="material-symbols-outlined text-[15px]"
-                      style={{ fontVariationSettings: "'FILL' 1" }}
-                    >
-                      eco
-                    </span>
-                    <span>Harvest Fresh Guaranteed</span>
-                  </div>
-                  <h1 className="font-display-hero text-3xl md:text-5xl text-on-surface font-extrabold tracking-tight leading-tight">
-                    Direct from Heritage Farms to Kitchen in{" "}
-                    <span className="text-primary underline decoration-secondary decoration-wavy decoration-2">
-                      60 Mins
-                    </span>
-                    .
-                  </h1>
-                  <p className="font-body-lg text-body-lg text-on-surface-variant line-clamp-2">
-                    South India's most authentic unpolished grains, artisanal wood-pressed oils,
-                    and farm-plucked morning greens delivered with single-store purity.
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-space-sm pt-space-xs">
-                    <div className="flex items-center gap-space-sm bg-surface-container-lowest px-space-md py-2.5 rounded-xl shadow-sm border border-outline-variant/20">
-                      <span className="text-secondary font-black font-headline-sm text-sm">
-                        FLAT 20% OFF
-                      </span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
-                      <span className="font-body-sm text-xs text-on-surface-variant">Code:</span>
-                      <span className="font-headline-sm text-xs text-primary bg-primary/10 px-2 py-0.5 rounded tracking-wide font-bold">
-                        SMART20
-                      </span>
-                    </div>
-                    <Link
-                      to="/shop"
-                      className="bg-primary hover:bg-primary-container text-on-primary font-label-button text-sm font-bold px-space-lg py-3 rounded-xl flex items-center gap-space-xs transition-all shadow-md active:scale-95 cursor-pointer"
-                    >
-                      <span>Order Harvest Today</span>
-                      <span className="material-symbols-outlined text-[18px]">
-                        arrow_forward
-                      </span>
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="relative z-10 pt-space-xl flex items-center gap-space-lg text-on-surface-variant font-body-sm text-xs">
-                  <div className="flex items-center gap-space-xs">
-                    <span className="material-symbols-outlined text-primary text-[18px]">
-                      verified
-                    </span>
-                    <span>Zero Preservatives</span>
-                  </div>
-                  <div className="flex items-center gap-space-xs">
-                    <span className="material-symbols-outlined text-primary text-[18px]">
-                      speed
-                    </span>
-                    <span>Avg 38m Express Delivery</span>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-space-xs">
-                    <span className="material-symbols-outlined text-secondary text-[18px]">
-                      stars
-                    </span>
-                    <span>4.9/5 Store Rating</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 Feature Highlights */}
-              <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-space-md">
-                <div className="bg-surface-container-lowest rounded-2xl p-space-md flex items-center gap-space-md shadow-sm transition-all hover:bg-surface-container-low border border-outline-variant/15 group">
-                  <div className="w-12 h-12 rounded-xl bg-primary-fixed/60 text-primary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <span className="material-symbols-outlined text-[26px]">local_shipping</span>
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-headline-sm text-sm font-bold text-on-surface">
-                      Free Delivery on ₹499+
-                    </span>
-                    <span className="font-body-sm text-xs text-on-surface-variant truncate">
-                      Zero packaging or surge fees
-                    </span>
-                  </div>
-                </div>
-
-                <div className="bg-surface-container-lowest rounded-2xl p-space-md flex items-center gap-space-md shadow-sm transition-all hover:bg-surface-container-low border border-outline-variant/15 group">
-                  <div className="w-12 h-12 rounded-xl bg-secondary-fixed/70 text-secondary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <span className="material-symbols-outlined text-[26px]">timer</span>
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-headline-sm text-sm font-bold text-on-surface">
-                      60 Min Express Window
-                    </span>
-                    <span className="font-body-sm text-xs text-on-surface-variant truncate">
-                      Direct electric fleet dispatch from hub
-                    </span>
-                  </div>
-                </div>
-
-                <div className="bg-surface-container-lowest rounded-2xl p-space-md flex items-center gap-space-md shadow-sm transition-all hover:bg-surface-container-low border border-outline-variant/15 group">
-                  <div className="w-12 h-12 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <span className="material-symbols-outlined text-[26px]">verified_user</span>
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-headline-sm text-sm font-bold text-on-surface">
-                      100% Quality Assured
-                    </span>
-                    <span className="font-body-sm text-xs text-on-surface-variant truncate">
-                      Doorstep inspection & immediate replacement
-                    </span>
-                  </div>
-                </div>
-
-                <div className="bg-surface-container-lowest rounded-2xl p-space-md flex items-center gap-space-md shadow-sm transition-all hover:bg-surface-container-low border border-outline-variant/15 group">
-                  <div className="w-12 h-12 rounded-xl bg-secondary-container text-on-secondary flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <span className="material-symbols-outlined text-[26px]">monetization_on</span>
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-headline-sm text-sm font-bold text-on-surface">
-                      Earn Smart Coins
-                    </span>
-                    <span className="font-body-sm text-xs text-on-surface-variant truncate">
-                      Redeem directly against every basket
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <section
+            aria-label="Store benefits"
+            className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3"
+          >
+            <Benefit
+              icon="local_shipping"
+              title="Free Delivery on ₹499+"
+              detail="Zero packaging or surge fees"
+            />
+            <Benefit
+              icon="timer"
+              title="60 Min Express Window"
+              detail="Quick dispatch from our hub"
+            />
+            <Benefit
+              icon="verified_user"
+              title="Quality Assured"
+              detail="Doorstep inspection support"
+            />
+            <Benefit
+              icon="monetization_on"
+              title="Earn Smart Coins"
+              detail="Redeem against your basket"
+            />
           </section>
 
-          {/* Curated Aisles Categories */}
-          <section className="max-w-[1320px] mx-auto px-margin-desktop w-full py-space-xl">
-            <div className="flex items-center justify-between mb-space-lg">
-              <div className="flex flex-col">
-                <span className="font-label-badge text-xs uppercase tracking-wider text-primary font-bold">
+          <section aria-labelledby="shop-categories-heading">
+            <div className="mb-4 flex items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-primary">
                   Curated Aisles
-                </span>
-                <h2 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-on-surface">
-                  Shop by Categories
+                </p>
+                <h2
+                  id="shop-categories-heading"
+                  className="mt-1 text-xl font-extrabold text-on-surface sm:text-2xl"
+                >
+                  Shop by Category
                 </h2>
               </div>
-              <Link
-                to="/shop"
-                className="font-headline-sm text-sm font-bold text-primary hover:underline flex items-center gap-1"
-              >
-                <span>View All Aisles</span>
-                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-space-md overflow-x-auto pb-2 scrollbar-none">
-              {categories.map((cat) => (
-                <Link
-                  key={cat.id}
-                  to="/shop"
-                  search={{ category: cat.slug } as any}
-                  className="group flex flex-col items-center bg-surface-container-lowest p-space-md rounded-2xl shadow-sm transition-all hover:bg-surface-container-low text-center border border-outline-variant/15"
+              <div className="flex shrink-0 items-center gap-3">
+              {categories.length > INITIAL_CATEGORY_COUNT && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllCategories((value) => !value)}
+                  className="shrink-0 text-sm font-bold text-primary hover:underline"
                 >
-                  <div className="w-20 h-20 rounded-full bg-surface-container-low overflow-hidden mb-space-sm p-1 shadow-inner group-hover:scale-105 transition-transform">
-                    <img
-                      src={cat.image}
-                      alt={cat.name}
-                      className="w-full h-full object-cover rounded-full"
-                      loading="lazy"
-                    />
-                  </div>
-                  <span className="font-headline-sm text-xs font-bold text-on-surface leading-snug">
-                    {t(cat.name, cat.tamilName)}
-                  </span>
-                  <span className="font-body-sm text-[11px] text-on-surface-variant mt-0.5">
-                    {cat.itemCount}
-                  </span>
-                </Link>
-              ))}
+                  {showAllCategories ? "Show less" : "See all"}
+                </button>
+              )}
+              {categories.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => categoryScroller.current?.scrollBy({ left: 240, behavior: "smooth" })}
+                  aria-label="Scroll categories right"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant/40 bg-surface-container-lowest text-on-surface hover:border-primary/40 hover:text-primary"
+                >
+                  <ChevronRight size={18} />
+                </button>
+              )}
+              </div>
             </div>
+            {loading ? (
+              <div className="flex gap-4 overflow-hidden">
+                {Array.from({ length: 10 }, (_, index) => (
+                  <div
+                    key={index}
+                    className="h-20 w-20 shrink-0 animate-pulse rounded-full bg-surface-container"
+                  />
+                ))}
+              </div>
+            ) : categories.length === 0 ? (
+              <p className="py-6 text-sm text-on-surface-variant">
+                {error
+                  ? "Categories are temporarily unavailable."
+                  : "No categories are available right now."}
+              </p>
+            ) : (
+              <div
+                ref={categoryScroller}
+                aria-label="Browse product categories"
+                className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 scrollbar-none sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+                style={{ overscrollBehaviorX: "contain" }}
+              >
+                {visibleCategories.map((category) => (
+                  <CategoryTile
+                    key={category.id || category.slug}
+                    category={category}
+                    label={t(category.name, category.tamilName)}
+                  />
+                ))}
+              </div>
+            )}
           </section>
 
-          
-          {/* VIP Club Prestige Banner */}
-          <section className="max-w-[1320px] mx-auto px-margin-desktop w-full py-space-md">
-            <div className="bg-gradient-to-r from-[#2a1700] via-[#452700] to-[#1a0f00] text-[#ffddb8] rounded-3xl p-8 md:p-12 shadow-xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="relative z-10 max-w-xl">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#fea619]/20 text-[#fea619] font-headline-sm text-xs font-bold uppercase tracking-wider mb-3">
-                  <span className="material-symbols-outlined text-[16px]">workspace_premium</span>
-                  <span>Sri Amman VIP Prestige Club</span>
+          <section aria-label="Shop products by category" className="flex flex-col gap-8 lg:gap-10">
+            {loading ? (
+              <div className="space-y-3">
+                <div className="h-7 w-56 animate-pulse rounded bg-surface-container" />
+                <div className="flex gap-3 overflow-hidden">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <div
+                      key={index}
+                      className="h-72 w-44 shrink-0 animate-pulse rounded-2xl bg-surface-container"
+                    />
+                  ))}
                 </div>
-                <h3 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-white mb-2">
+              </div>
+            ) : error ? (
+              <p role="status" className="py-8 text-center text-sm text-on-surface-variant">
+                Products are temporarily unavailable. Please try again shortly.
+              </p>
+            ) : (
+              categories.map((category) => {
+                const categoryProducts = productsByCategory.get(category.slug) || [];
+                if (!categoryProducts.length) return null;
+                return (
+                  <ProductCategorySection
+                    key={category.id || category.slug}
+                    category={category}
+                    products={categoryProducts}
+                    title={t(category.name, category.tamilName)}
+                  />
+                );
+              })
+            )}
+          </section>
+
+          <section className="rounded-3xl bg-gradient-to-r from-[#2a1700] via-[#452700] to-[#1a0f00] p-6 text-[#ffddb8] shadow-xl sm:p-10">
+            <div className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
+              <div className="max-w-2xl">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#fea619]/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#fea619]">
+                  <span className="material-symbols-outlined text-base">workspace_premium</span>Sri
+                  Amman VIP Prestige Club
+                </div>
+                <h2 className="mb-2 text-xl font-extrabold text-white sm:text-3xl">
                   Unlock Exclusive Member Pricing on Every Order
-                </h3>
-                <p className="text-sm opacity-90 leading-relaxed">
-                  Spend ₹5,000 within 30 rolling calendar days on delivered orders to maintain active VIP status. Enjoy exclusive lower pricing, 2X Smart Coins, and priority express packing.
+                </h2>
+                <p className="text-sm leading-relaxed opacity-90">
+                  Spend ₹5,000 within 30 rolling calendar days on delivered orders to maintain
+                  active VIP status. Enjoy exclusive lower pricing, 2X Smart Coins, and priority
+                  express packing.
                 </p>
               </div>
-              <div className="relative z-10 shrink-0">
-                <Link
-                  to="/rewards"
-                  className="bg-[#fea619] hover:bg-[#ffb95f] text-[#2a1700] px-6 py-3.5 rounded-2xl font-headline-sm text-sm font-extrabold flex items-center gap-2 shadow-lg transition-transform active:scale-95 cursor-pointer"
-                >
-                  <span>Explore VIP Benefits</span>
-                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                </Link>
-              </div>
+              <Link
+                to="/rewards"
+                className="flex shrink-0 items-center gap-2 rounded-2xl bg-[#fea619] px-5 py-3 font-bold text-[#2a1700] shadow-lg transition hover:bg-[#ffb95f]"
+              >
+                Explore VIP Benefits{" "}
+                <span className="material-symbols-outlined text-lg">arrow_forward</span>
+              </Link>
             </div>
           </section>
-
-          {/* Best Sellers & Staples Tabbed Grid */}
-          <section className="max-w-[1320px] mx-auto px-margin-desktop w-full py-space-xl">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-space-md mb-space-xl">
-              <div>
-                <span className="font-label-badge text-xs uppercase tracking-wider text-primary font-bold">
-                  Trusted Pantry
-                </span>
-                <h2 className="font-headline-lg text-2xl md:text-3xl text-on-surface font-extrabold">
-                  Smart Store Best Sellers & Staples
-                </h2>
-              </div>
-
-              <div className="flex items-center gap-space-xs bg-surface-container-low p-1.5 rounded-full overflow-x-auto scrollbar-none border border-outline-variant/20">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("all")}
-                  className={`px-space-md py-1.5 rounded-full font-label-button text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === "all"
-                      ? "bg-primary text-white shadow-sm"
-                      : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  All Items
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("cold-pressed-oils")}
-                  className={`px-space-md py-1.5 rounded-full font-label-button text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === "cold-pressed-oils"
-                      ? "bg-primary text-white shadow-sm"
-                      : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  Cold Pressed Oils
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("staples-grains")}
-                  className={`px-space-md py-1.5 rounded-full font-label-button text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === "staples-grains"
-                      ? "bg-primary text-white shadow-sm"
-                      : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  Heritage Rice
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("fruits-veggies")}
-                  className={`px-space-md py-1.5 rounded-full font-label-button text-xs font-bold transition-all cursor-pointer ${
-                    activeTab === "fruits-veggies"
-                      ? "bg-primary text-white shadow-sm"
-                      : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  Farm Fresh Veggies
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
-              {filteredBestSellers.slice(0, 8).map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </section>
+          </div>
         </div>
       </main>
-
       <StoreFooter />
       <BottomNav />
+    </div>
+  );
+}
+
+function OffersScroller({ announcements }: { announcements: Announcement[] }) {
+  if (announcements.length === 0) return null;
+  const items = [...announcements, ...announcements];
+  const primaryAnnouncement = announcements[0]!;
+  return (
+    <section
+      aria-label="Store announcements"
+      className="overflow-hidden bg-primary py-1.5 text-white"
+      style={{
+        backgroundColor: primaryAnnouncement.bgColor || undefined,
+        color: primaryAnnouncement.textColor || undefined,
+      }}
+    >
+      <Link to="/shop">
+        <div  className="announcement-track flex w-max items-center gap-8 px-3">
+          {items.map((announcement, index) => (
+            <span
+              key={`${announcement.id}-${index}`}
+              className="flex shrink-0 items-center gap-1.5 px-1 text-xs font-semibold sm:text-sm"
+              style={{
+                backgroundColor: announcement.bgColor || "transparent",
+                color: announcement.textColor || "inherit",
+              }}
+            >
+              <span className="material-symbols-outlined text-sm" style={{ color: announcement.textColor || "inherit" }}>sell</span>
+              {announcement.text}
+            </span>
+          ))}
+        </div>
+      </Link>
+    </section>
+  );
+}
+
+function PromotionalBannerCarousel({ banners, loading }: { banners: Banner[]; loading: boolean }) {
+  const { language } = useLanguage();
+  const [activeIndex, setActiveIndex] = useState(0);
+  useEffect(() => {
+    if (banners.length < 2) return;
+    const timer = window.setInterval(
+      () => setActiveIndex((current) => (current + 1) % banners.length),
+      BANNER_INTERVAL_MS,
+    );
+    return () => window.clearInterval(timer);
+  }, [banners.length]);
+  const banner = banners[activeIndex];
+  const mobileImage = banner?.mobileImageUrl;
+  const categorySlug = banner?.categorySlug;
+  const title = banner?.title
+    ? language === "ta" && banner.tamilTitle ? banner.tamilTitle : banner.title
+    : "";
+  const subheading = banner
+    ? language === "ta" && banner.tamilSubheading
+      ? banner.tamilSubheading
+      : banner.subheading || banner.subtitle
+    : "";
+  const description = banner
+    ? language === "ta" && banner.tamilShortDescription
+      ? banner.tamilShortDescription
+      : banner.shortDescription
+    : "";
+  const textPosition = banner?.textPosition?.toLowerCase();
+  const verticalAlignment = banner?.verticalAlignment?.toLowerCase();
+  const textAlignment = banner?.textAlignment?.toLowerCase();
+  const horizontalAlignment = textPosition === "right" ? "flex-end" : textPosition === "center" ? "center" : "flex-start";
+  const verticalJustification = verticalAlignment === "top" ? "flex-start" : verticalAlignment === "bottom" ? "flex-end" : "center";
+  const alignment = textAlignment === "right" || textAlignment === "center" ? textAlignment : "left";
+  const imageSrc = banner?.desktopImageUrl || banner?.imageUrl || "";
+  const buttonText = banner?.buttonText || "Shop Now";
+  const configuredRedirect = banner?.redirectUrl?.trim();
+  const bannerHref = configuredRedirect === "/products"
+    ? "/shop"
+    : configuredRedirect || (categorySlug ? `/shop?category=${encodeURIComponent(categorySlug)}` : "/shop");
+
+  if (!banner) {
+    if (!loading) return null;
+    return (
+      <section
+        aria-label="Promotions loading"
+        aria-busy="true"
+        role="status"
+        className="flex aspect-[1.7/1] min-h-[180px] max-h-[440px] w-full items-center justify-center bg-surface-container-low sm:aspect-[3.1/1]"
+      >
+        <span className="flex items-center gap-3 text-sm font-semibold text-on-surface-variant">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary/25 border-t-primary" />
+          Loading banners…
+        </span>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      aria-label="Promotions"
+      className="relative w-full overflow-hidden bg-surface-container-lowest shadow-sm"
+    >
+      <a
+        href={bannerHref}
+        aria-label={banner ? `View promotion: ${title}` : "Shop Sri Amman groceries"}
+        className="relative block aspect-[1.7/1] max-h-[440px] min-h-[180px] w-full overflow-hidden sm:aspect-[3.1/1]"
+        style={{ backgroundColor: banner?.bannerBackgroundColor || "#f4f4f5" }}
+      >
+        {banner?.videoUrl ? (
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            src={banner.videoUrl}
+            poster={imageSrc}
+            autoPlay
+            muted
+            loop
+            playsInline
+          />
+        ) : (
+          <picture>
+            <source media="(max-width: 640px)" srcSet={mobileImage || imageSrc} />
+            <img
+              src={imageSrc}
+              alt={title || "Sri Amman Smart Store grocery collection"}
+              className="h-full w-full object-cover"
+              fetchPriority="high"
+            />
+          </picture>
+        )}
+        {banner?.imageOverlayEnabled && (
+          <span
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              backgroundColor: banner.customOverlayColor || banner.overlayColor || "#000000",
+              opacity: Math.min(100, Math.max(0, banner.overlayOpacity ?? 40)) / 100,
+            }}
+          />
+        )}
+        {banner && (
+          <span
+            className="absolute inset-0 flex p-4 sm:p-10"
+            style={{ alignItems: horizontalAlignment, justifyContent: verticalJustification }}
+          >
+            <span
+              className="flex max-h-full max-w-[92%] flex-col overflow-y-auto sm:max-w-[80%]"
+              style={{
+                maxWidth: banner.contentMaxWidth ? `${Math.max(160, Math.min(1200, banner.contentMaxWidth))}px` : undefined,
+                textAlign: alignment,
+                color: banner.headingColor || "#ffffff",
+                backgroundColor: banner.imageOverlayEnabled ? undefined : "rgba(0, 0, 0, 0.48)",
+                padding: banner.imageOverlayEnabled ? undefined : "clamp(12px, 2vw, 24px)",
+                borderRadius: banner.imageOverlayEnabled ? undefined : "16px",
+                textShadow: "0 1px 4px rgba(0, 0, 0, 0.65)",
+              }}
+            >
+              {title && banner.showTitle !== false && (
+                <span
+                  className="font-extrabold leading-tight tracking-tight drop-shadow"
+                  style={{
+                    color: banner.headingColor || "#ffffff",
+                    fontSize: `clamp(20px, ${Math.min(8, Math.max(2.5, (banner.headingFontSize || 38) / 10))}vw, ${Math.min(96, Math.max(18, banner.headingFontSize || 38))}px)`,
+                  }}
+                >
+                  {title}
+                </span>
+              )}
+              {subheading && banner.showSubheading !== false && (
+                <span
+                  className="mt-2 font-medium leading-relaxed drop-shadow"
+                  style={{
+                    color: banner.subheadingColor || "#ffffff",
+                    fontSize: `clamp(13px, ${Math.min(5, Math.max(1.5, (banner.subheadingFontSize || 20) / 10))}vw, ${Math.min(56, Math.max(12, banner.subheadingFontSize || 20))}px)`,
+                  }}
+                >
+                  {subheading}
+                </span>
+              )}
+              {description && description !== subheading && banner.showDescription !== false && (
+                <span className="mt-2 text-sm leading-relaxed drop-shadow sm:text-base">{description}</span>
+              )}
+              {banner.promoDiscount && banner.showPromoDiscount !== false && (
+                <span className="mt-3 inline-flex w-fit rounded-full bg-primary px-4 py-1.5 text-xs font-bold text-white sm:text-sm">
+                  {banner.promoDiscount}
+                </span>
+              )}
+              {banner.promoCode && banner.showPromoCode && (
+                <span className="mt-2 text-sm font-bold drop-shadow">Code: {banner.promoCode}</span>
+              )}
+              {banner.showButton !== false && (
+                <span
+                  className="mt-4 inline-flex w-fit items-center rounded-full px-5 py-2.5 text-sm font-bold shadow-md sm:text-base"
+                  style={{
+                    backgroundColor: banner.buttonBackgroundColor || "#ffffff",
+                    color: banner.buttonTextColor || "#005f3f",
+                    alignSelf: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start",
+                  }}
+                >
+                  {buttonText}
+                </span>
+              )}
+            </span>
+          </span>
+        )}
+      </a>
+      {banners.length > 1 && (
+        <div
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-2"
+          aria-label="Choose promotion"
+        >
+          {banners.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              aria-label={`Show promotion ${index + 1}`}
+              aria-current={index === activeIndex}
+              onClick={() => setActiveIndex(index)}
+              className={`h-2 rounded-full transition-all ${index === activeIndex ? "w-6 bg-primary" : "w-2 bg-white/80"}`}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function CategoryTile({
+  category,
+  label,
+}: {
+  category: Category;
+  label: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const rawImage = category.image?.trim();
+  const hasValidCustomImage = Boolean(
+    rawImage &&
+    !rawImage.includes("/placeholders/") &&
+    !rawImage.endsWith("grocery.svg")
+  );
+
+  return (
+    <Link
+      to="/shop"
+      search={{ category: category.slug }}
+      className="group flex w-[82px] shrink-0 snap-start flex-col items-center text-center sm:w-[92px]"
+      aria-label={`Shop ${label}`}
+    >
+      <span className="relative flex shrink-0 items-center justify-center transition-all duration-300 ease-out group-hover:scale-[1.03] group-hover:shadow-[0_10px_26px_rgba(24,92,54,0.18)] motion-reduce:transform-none motion-reduce:transition-none">
+        <span className="block h-[72px] w-[72px] overflow-hidden rounded-full border border-primary/20 bg-surface-container-lowest shadow-sm transition-all duration-300 ease-out group-hover:border-primary group-hover:shadow-[0_10px_22px_rgba(24,92,54,0.18)] sm:h-[82px] sm:w-[82px] md:h-[88px] md:w-[88px] lg:h-[96px] lg:w-[96px] motion-reduce:transition-none">
+          {!imageFailed ? (
+            <img
+              src={hasValidCustomImage ? rawImage : "/placeholders/grocery.svg"}
+              alt=""
+              className="h-full w-full rounded-full object-cover object-center transition-transform duration-300 ease-out group-hover:scale-[1.08] motion-reduce:transform-none motion-reduce:transition-none"
+              loading="lazy"
+              onError={(event) => {
+                event.currentTarget.onerror = null;
+                if (hasValidCustomImage) {
+                  event.currentTarget.onerror = () => setImageFailed(true);
+                  event.currentTarget.src = "/placeholders/grocery.svg";
+                } else {
+                  setImageFailed(true);
+                }
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-primary/5 text-primary">
+              <span className="material-symbols-outlined text-[32px] text-primary/80">
+                shopping_basket
+              </span>
+            </div>
+          )}
+        </span>
+      </span>
+      <span className="mt-2 w-full max-w-[82px] whitespace-normal break-words text-[10px] font-bold leading-tight text-on-surface opacity-100 transition-all duration-300 ease-out sm:max-w-[92px] sm:text-[11px] group-hover:opacity-100 group-hover:text-primary motion-reduce:opacity-100 motion-reduce:transition-none sm:group-hover:translate-y-0 sm:opacity-0 sm:group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100">
+        {label}
+      </span>
+    </Link>
+  );
+}
+
+function ProductCategorySection({
+  category,
+  products,
+  title,
+}: {
+  category: Category;
+  products: Product[];
+  title: string;
+}) {
+  const scroller = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const updateArrows = useCallback(() => {
+    const element = scroller.current;
+    if (!element) return;
+    setCanScrollLeft(element.scrollLeft > 2);
+    setCanScrollRight(element.scrollLeft + element.clientWidth < element.scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element) return;
+    updateArrows();
+    const observer = new ResizeObserver(updateArrows);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [products.length, updateArrows]);
+
+  const scroll = (direction: number) => {
+    const element = scroller.current;
+    if (!element) return;
+    const card = element.querySelector<HTMLElement>("[data-product-card]");
+    const distance = card ? (card.offsetWidth + 12) * 3 : element.clientWidth * 0.8;
+    element.scrollBy({ left: direction * distance, behavior: "smooth" });
+  };
+
+  return (
+    <div className="min-w-0">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="min-w-0 truncate text-lg font-extrabold text-on-surface sm:text-xl">
+          {title}
+        </h2>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            to="/shop"
+            search={{ category: category.slug }}
+            className="text-xs font-bold text-primary hover:underline sm:text-sm"
+          >
+            See all
+          </Link>
+        </div>
+      </div>
+      <div
+        ref={scroller}
+        onScroll={updateArrows}
+        className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 scrollbar-none"
+        style={{ overscrollBehaviorX: "contain" }}
+      >
+        {products.map((product) => (
+          <div
+            data-product-card
+            key={product.id}
+            className="w-[min(44vw,190px)] shrink-0 snap-start sm:w-[190px] lg:w-[204px]"
+          >
+            <ProductCard product={product} className="h-full p-3" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Benefit({ icon, title, detail }: { icon: string; title: string; detail: string }) {
+  return (
+    <div className="group flex min-w-0 items-start gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-2.5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/35 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none sm:items-center sm:gap-3 sm:p-3">
+      <span className="material-symbols-outlined mt-0.5 shrink-0 text-xl text-primary transition-transform duration-200 group-hover:scale-110 sm:mt-0 sm:text-2xl motion-reduce:transform-none motion-reduce:transition-none">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block whitespace-normal break-words text-[10px] font-bold leading-snug text-on-surface sm:text-xs">
+          {title}
+        </span>
+        <span className="mt-1 block whitespace-normal break-words text-[8px] leading-snug text-on-surface-variant sm:text-[11px]">
+          {detail}
+        </span>
+      </span>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   query,
   where,
   runTransaction,
+  serverTimestamp,
   type QueryConstraint,
 } from "firebase/firestore";
 import { getEmulatorFirestore, type EmulatorConfig } from "../lib/firebaseEmulator";
@@ -61,8 +62,6 @@ export const KNOWN_ARRAY_COLLECTIONS = new Set([
   "banners",
   "cart",
   "addresses",
-  "wishlists",
-  "wishlistProducts",
   "orders",
   "coinHistory",
   "referrals",
@@ -89,8 +88,6 @@ export const CUSTOMER_SCOPED_COLLECTIONS = new Set([
   "onlineCustomers",
   "cart",
   "addresses",
-  "wishlists",
-  "wishlistProducts",
   "orders",
   "coinHistory",
   "referrals",
@@ -726,6 +723,10 @@ function stripUndefinedDeep<T>(input: T): T {
   if (input === null || input === undefined || typeof input !== "object") {
     return input;
   }
+  // Preserve Firestore FieldValue instances such as serverTimestamp().
+  if (Object.getPrototypeOf(input) !== Object.prototype && !Array.isArray(input)) {
+    return input;
+  }
   if (Array.isArray(input)) {
     return input.map((item) => stripUndefinedDeep(item)) as unknown as T;
   }
@@ -942,7 +943,11 @@ export class SdkFirestoreDriver implements FirestoreDriver {
     const db = this.getDb();
     const ref = doc(db, collectionName, docId);
     const cleanData = stripUndefinedDeep({ ...data });
-    if (collectionName !== "storeInfo" && !cleanData["id"]) {
+    if (
+      collectionName !== "storeInfo" &&
+      !collectionName.endsWith("/wishlistProducts") &&
+      !cleanData["id"]
+    ) {
       cleanData["id"] = docId;
     }
 
@@ -1748,9 +1753,6 @@ function buildFirestoreEqualityFilters(
   if (resource === "orders" && params["orderId"] !== undefined) {
     filters["orderId"] = params["orderId"];
   }
-  if (resource === "wishlistProducts" && params["wishlistId"] !== undefined) {
-    filters["wishlistId"] = params["wishlistId"];
-  }
   if ((resource === "promoCodes" || resource === "promos") && params["code"] !== undefined) {
     filters["code"] = params["code"];
   }
@@ -1828,6 +1830,49 @@ export class FirestoreAdapter {
 
   public getDriver(): FirestoreDriver {
     return this.driver;
+  }
+
+  private customerWishlistCollectionPath(customerId: string): string {
+    const id = customerId.trim();
+    if (!/^ONCUS\d{6,7}$/i.test(id)) {
+      throw new StorageAdapterError("Wishlist access requires a resolved online customer identity.", {
+        status: 403, code: "permission-denied", category: "permission",
+      });
+    }
+    return `onlineCustomers/${id}/wishlistProducts`;
+  }
+
+  public async getCustomerWishlistProducts(customerId: string): Promise<Record<string, unknown>[]> {
+    return this.driver.queryCollection(this.customerWishlistCollectionPath(customerId), {});
+  }
+
+  public async saveCustomerWishlistProduct(
+    customerId: string,
+    productId: string,
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const cleanId = productId.trim();
+    if (!cleanId || payload["productId"] !== cleanId) {
+      throw new StorageAdapterError("Wishlist product ID is invalid.", {
+        status: 400, code: "invalid-argument", category: "validation",
+      });
+    }
+    return this.driver.setDoc(
+      this.customerWishlistCollectionPath(customerId),
+      cleanId,
+      { ...payload, productId: cleanId, addedAt: serverTimestamp() },
+      false,
+    );
+  }
+
+  public async deleteCustomerWishlistProduct(customerId: string, productId: string): Promise<void> {
+    const cleanId = productId.trim();
+    if (!cleanId) {
+      throw new StorageAdapterError("Wishlist product ID is invalid.", {
+        status: 400, code: "invalid-argument", category: "validation",
+      });
+    }
+    return this.driver.deleteDoc(this.customerWishlistCollectionPath(customerId), cleanId);
   }
 
   private async resolveUserIdForAddressId(

@@ -3,7 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
-import { wishlistService } from "../services/wishlistService";
+import { OrderProductImage } from "../components/product/OrderProductImage";
+import { WishlistHeartButton } from "../components/product/WishlistHeartButton";
 import { productService } from "../services/productService";
 import type { Wishlist, WishlistProduct, Product } from "../types";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +30,17 @@ export const Route = createFileRoute("/wishlist")({
 
 type SortOption = "recent" | "price_asc" | "price_desc" | "savings" | "name";
 
+function wishlistEntryTime(value: unknown): number {
+  if (value && typeof value === "object" && "toMillis" in value && typeof value.toMillis === "function") {
+    return value.toMillis();
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
 export function WishlistPage() {
   const { user, isLoading: authLoading, isResolvingIdentity } = useAuth();
   const { addToCart } = useCart();
@@ -42,6 +54,7 @@ export function WishlistPage() {
     isWishlisted,
     toggleWishlist,
     removeWishlistItem,
+    moveAllInStockToCart,
     createCollection,
     renameCollection,
     deleteCollection,
@@ -115,9 +128,14 @@ export function WishlistPage() {
   const enrichedItems = useMemo(() => {
     return currentFolderItems.map((item) => {
       const catalogProd = allProducts.find((p) => p.id === item.productId);
-      const opt = catalogProd?.options?.[item.optionIndex] || catalogProd?.options?.[0];
+      const savedVariant = item.variantName?.trim().toLowerCase();
+      const matchingIndex = catalogProd?.options?.findIndex((candidate) =>
+        `${candidate.unitSize} ${candidate.unit}`.trim().toLowerCase() === savedVariant
+      ) ?? -1;
+      const optionIndex = matchingIndex >= 0 ? matchingIndex : 0;
+      const opt = catalogProd?.options?.[optionIndex] || catalogProd?.options?.[0];
       const stock = opt?.stock ?? 0;
-      const inStock = stock > 0 && catalogProd?.isActive !== false;
+      const inStock = stock > 0 && catalogProd?.isActive !== false && item.isActive !== false;
       const mrp = opt?.mrp ?? item.mrp;
       const price = user?.isVIP && opt?.specialPrice && opt.specialPrice > 0
         ? opt.specialPrice
@@ -128,6 +146,12 @@ export function WishlistPage() {
 
       return {
         ...item,
+        id: item.productId,
+        optionIndex,
+        name: catalogProd?.name || item.name,
+        image: catalogProd?.imageUrl || item.image,
+        unit: opt?.unit || item.unit,
+        unitSize: opt?.unitSize || item.unitSize,
         catalogProd,
         stock,
         inStock,
@@ -166,7 +190,7 @@ export function WishlistPage() {
         return list.sort((a, b) => a.name.localeCompare(b.name));
       case "recent":
       default:
-        return list; // Preserves recent insertion order
+        return list.sort((a, b) => wishlistEntryTime(b.addedAt) - wishlistEntryTime(a.addedAt));
     }
   }, [filteredItems, sortBy]);
 
@@ -243,13 +267,7 @@ export function WishlistPage() {
       return;
     }
     try {
-      const isVIP = !!user?.isVIP;
-      const result = await wishlistService.moveAllInStockToCart(
-        activeWishlistId,
-        allProducts,
-        user?.id,
-        isVIP
-      );
+      const result = await moveAllInStockToCart(activeWishlistId, allProducts);
       if (result.addedCount > 0) {
         if (result.skippedCount > 0) {
           toast.success(
@@ -322,12 +340,14 @@ export function WishlistPage() {
     }
   };
 
-  const handleRemoveItem = async (id: string, name: string) => {
+  const handleRemoveItem = async (id: string, name: string): Promise<boolean> => {
     try {
       await removeWishlistItem(id);
       toast.info(`Removed ${name} from saved staples`);
+      return false;
     } catch (err: any) {
       toast.error(err.message || "Failed to remove item");
+      return false;
     }
   };
 
@@ -336,7 +356,7 @@ export function WishlistPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1000px] mx-auto px-margin-desktop py-20 text-center">
+        <main className="w-full pt-20 max-w-[1000px] mx-auto px-margin-desktop py-20 text-center">
           <div className="w-9 h-9 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">
             Loading your wishlist...
@@ -353,7 +373,7 @@ export function WishlistPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1000px] mx-auto px-margin-desktop py-16 text-center">
+        <main className="w-full pt-20 max-w-[1000px] mx-auto px-margin-desktop py-16 text-center">
           <div className="w-20 h-20 rounded-full bg-surface-container flex items-center justify-center text-4xl mx-auto mb-4">
             ❤️
           </div>
@@ -383,7 +403,7 @@ export function WishlistPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-[172px] bg-surface min-h-[calc(100vh-172px)]">
+      <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
           {/* Breadcrumb Navigation */}
           <nav className="flex items-center gap-2 text-xs text-on-surface-variant mb-4">
@@ -409,7 +429,7 @@ export function WishlistPage() {
                 </div>
               </div>
               <h1 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-on-surface tracking-tight">
-                Wishlist & Curated Collections
+                My Wishlist
               </h1>
               <p className="text-xs md:text-sm text-on-surface-variant mt-1 max-w-2xl">
                 Save your favorite farm-pressed staples and seasonal produce for frictionless replenishment and rapid 60-min delivery.
@@ -434,7 +454,7 @@ export function WishlistPage() {
             </div>
           </div>
 
-          {/* Collection Tabs Row */}
+          {/* Customer wishlist has one saved-products list. */}
           <div className="flex items-center justify-between gap-3 overflow-x-auto pb-3 mb-6 scrollbar-none border-b border-outline-variant/15">
             <div className="flex items-center gap-2 shrink-0">
               {/* All Saved Staples Tab */}
@@ -491,15 +511,6 @@ export function WishlistPage() {
               ))}
             </div>
 
-            {/* Create New Collection Button */}
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 rounded-full font-headline-sm text-xs font-bold shrink-0 bg-surface-container-lowest border border-dashed border-primary/40 text-primary hover:bg-primary/5 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>Create New Collection</span>
-            </button>
           </div>
 
           {/* Active Custom Collection Controls (Rename / Delete) */}
@@ -673,11 +684,18 @@ export function WishlistPage() {
                   <div>
                     {/* Card Top: Image + Badges + Heart Button */}
                     <div className="relative aspect-square rounded-2xl overflow-hidden bg-surface-container-low mb-3 flex items-center justify-center p-3.5 border border-outline-variant/10">
-                      <img
-                        src={item.image}
-                        alt={item.name}
+                      <OrderProductImage
+                        item={{
+                          productId: item.productId,
+                          name: item.name,
+                          unit: item.unit,
+                          unitSize: item.unitSize,
+                          price: item.price,
+                          quantity: 1,
+                          image: item.catalogProd?.imageUrl || item.image,
+                          ...(item.catalogProd?.images ? { imageCandidates: item.catalogProd.images } : {}),
+                        }}
                         className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-sm select-none"
-                        loading="lazy"
                       />
 
                       {/* Top Left Badges */}
@@ -699,16 +717,12 @@ export function WishlistPage() {
                       </div>
 
                       {/* Top Right Heart Wishlist Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItem(item.id, item.name)}
-                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-surface-container-lowest/95 text-rose-600 flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer z-10"
-                        title="Remove from saved staples"
-                      >
-                        <span className="material-symbols-outlined text-[19px] fill-current" style={{ fontVariationSettings: "'FILL' 1" }}>
-                          favorite
-                        </span>
-                      </button>
+                      <WishlistHeartButton
+                        active
+                        onToggle={() => handleRemoveItem(item.id, item.name)}
+                        className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-surface-container-lowest/95 text-rose-600 shadow-md hover:scale-110 transition-transform"
+                        size="sm"
+                      />
                     </div>
 
                     {/* Product Metadata */}
@@ -716,9 +730,14 @@ export function WishlistPage() {
                       <span className="text-[10px] uppercase font-bold text-primary tracking-wider block mb-1">
                         {item.tag}
                       </span>
-                      <h4 className="font-headline-sm text-sm font-bold text-on-surface line-clamp-2 leading-snug mb-1">
+                      <h4 className="whitespace-normal break-words font-headline-sm text-sm font-bold text-on-surface leading-snug mb-1">
                         {item.name}
                       </h4>
+                      {(item.catalogProd?.brand || item.brandName) && (
+                        <span className="text-xs text-on-surface-variant block mb-1">
+                          {item.catalogProd?.brand || item.brandName}
+                        </span>
+                      )}
                       <span className="text-xs text-on-surface-variant block">
                         Pack: {item.unitSize} {item.unit}
                       </span>
@@ -870,25 +889,22 @@ export function WishlistPage() {
                             className="max-w-full max-h-full object-contain hover:scale-105 transition-transform duration-300 drop-shadow-sm select-none"
                             loading="lazy"
                           />
-                          <button
-                            type="button"
-                            onClick={async () => {
+                          <WishlistHeartButton
+                            active={wish}
+                            onToggle={async () => {
                               try {
-                                await toggleWishlist(prod, 0);
+                                const added = await toggleWishlist(prod, 0);
+                                if (added) toast.success("Saved to your wishlist");
+                                else toast.info("Removed from wishlist");
+                                return added;
                               } catch (err: any) {
                                 toast.error(err.message || "Could not update wishlist");
+                                return false;
                               }
                             }}
-                            className="absolute top-2 right-2 w-8 h-8 rounded-full bg-surface-container-lowest/95 text-rose-600 flex items-center justify-center shadow-md hover:scale-110 transition-transform cursor-pointer"
-                            title={wish ? "Remove from wishlist" : "Add to wishlist"}
-                          >
-                            <span
-                              className="material-symbols-outlined text-[18px]"
-                              style={{ fontVariationSettings: wish ? "'FILL' 1" : "'FILL' 0" }}
-                            >
-                              favorite
-                            </span>
-                          </button>
+                            className={`absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-surface-container-lowest/95 shadow-md hover:scale-110 transition-transform ${wish ? "text-rose-600" : "text-on-surface-variant hover:text-rose-600"}`}
+                            size="sm"
+                          />
                         </div>
 
                         {/* Attribute Badge */}
@@ -897,7 +913,7 @@ export function WishlistPage() {
                         </span>
 
                         {/* Title */}
-                        <h4 className="font-headline-sm text-sm font-bold text-on-surface line-clamp-1 mb-1">
+                        <h4 className="whitespace-normal break-words font-headline-sm text-sm font-bold text-on-surface mb-1">
                           {prod.name}
                         </h4>
 

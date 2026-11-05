@@ -1002,7 +1002,12 @@ export const customerIdentityService = {
   async resolveCurrentFirebaseUserProfile(
     options?: ResolveCustomerIdentityOptions,
   ): Promise<CustomerIdentityResolutionResult> {
-    const currentFirebaseUser = emailLinkAuthService.getCurrentFirebaseAuthUser();
+    // Production uses authManager's isolated named Firebase Auth instance. The
+    // email-link service owns the auxiliary/emulator Auth instance and is empty
+    // for production sessions, so always read from the active auth provider.
+    const currentFirebaseUser = authManager.getMode() === "production"
+      ? authManager.getCurrentUser()
+      : emailLinkAuthService.getCurrentFirebaseAuthUser();
     return this.resolveCustomerProfile(currentFirebaseUser, options);
   },
 

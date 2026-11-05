@@ -57,7 +57,7 @@ describe("Login UI: restored app-shell layout", () => {
     authManager.resetMode();
   });
 
-  it("renders a clean modern sign-in card without the legacy storefront banners", async () => {
+  it("renders a unified sign-in card with both Mobile OTP and Email/Password simultaneously without tabs", async () => {
     await act(async () => {
       render(
         <AuthProvider>
@@ -67,14 +67,19 @@ describe("Login UI: restored app-shell layout", () => {
     });
 
     expect(screen.getByText("Sign in to Sri Amman")).toBeDefined();
-    expect(screen.getByRole("tab", { name: /Mobile OTP/i })).toBeDefined();
-    expect(screen.getByRole("tab", { name: /Email & Password/i })).toBeDefined();
+    expect(screen.getByText("Choose your preferred sign-in method.")).toBeDefined();
+    // Tabs must be completely removed
+    expect(screen.queryByRole("tab")).toBeNull();
+    // Both methods must be visible simultaneously
+    expect(screen.getByRole("button", { name: /Get OTP Passcode/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Sign in with email/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Continue with Google/i })).toBeDefined();
     expect(screen.queryByText(/Existing Customer Production Login/i)).toBeNull();
     expect(screen.queryByText(/SMS OTP Disabled in Production Mode/i)).toBeNull();
     expect(screen.queryByText(/Safe Read-Only Verification/i)).toBeNull();
   });
 
-  it("keeps production mode available without showing the old production notice copy", async () => {
+  it("keeps production mode available with unified layout without showing old production notices", async () => {
     mockSearchParams = { authMode: "production" };
 
     await act(async () => {
@@ -88,7 +93,8 @@ describe("Login UI: restored app-shell layout", () => {
     expect(screen.getByText("Sign in to Sri Amman")).toBeDefined();
     expect(screen.queryByText(/Existing Customer Production Login/i)).toBeNull();
     expect(screen.queryByText(/Safe Read-Only Verification/i)).toBeNull();
-    fireEvent.click(screen.getByRole("tab", { name: /Email/i }));
+    // Both authentication buttons visible simultaneously without switching tabs
+    expect(screen.getByRole("button", { name: /Get OTP Passcode/i })).toBeDefined();
     expect(screen.getByRole("button", { name: /Sign in with email/i })).toBeDefined();
   });
 });

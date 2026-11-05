@@ -23,7 +23,7 @@ function PoliciesPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-[172px] bg-surface min-h-[calc(100vh-172px)]">
+      <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1000px] mx-auto px-margin-desktop py-space-xl">
           {/* Header */}
           <div className="mb-8">

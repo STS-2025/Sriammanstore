@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { createFileRoute, useSearch, Link } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
+import { WishlistHeartButton } from "../components/product/WishlistHeartButton";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { productService } from "../services/productService";
 import type { Product } from "../types";
@@ -95,7 +96,7 @@ function ProductDetailsPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1320px] mx-auto px-margin-desktop py-12">
+        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-12">
           <div className="animate-pulse flex flex-col md:flex-row gap-8">
             <div className="md:w-1/2 aspect-square bg-surface-container-low rounded-3xl"></div>
             <div className="md:w-1/2 space-y-4">
@@ -115,7 +116,7 @@ function ProductDetailsPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1320px] mx-auto px-margin-desktop py-16 text-center">
+        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-16 text-center">
           <div className="w-16 h-16 rounded-full bg-error/10 text-error flex items-center justify-center text-3xl mx-auto mb-4">
             <span className="material-symbols-outlined text-[32px]">error</span>
           </div>
@@ -147,7 +148,7 @@ function ProductDetailsPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1320px] mx-auto px-margin-desktop py-16 text-center">
+        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-16 text-center">
           <h2 className="text-2xl font-bold mb-4">Product Not Found</h2>
           <p className="text-on-surface-variant mb-6 text-sm">
             We couldn't locate the requested product in our harvest database.
@@ -201,8 +202,10 @@ function ProductDetailsPage() {
       } else {
         toast.info("Removed from wishlist");
       }
+      return added;
     } catch (err: any) {
       toast.error(err.message || "Could not update wishlist");
+      return false;
     }
   };
 
@@ -210,11 +213,11 @@ function ProductDetailsPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-[172px] bg-surface min-h-[calc(100vh-172px)]">
+      <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         {/* Breadcrumb Bar */}
         <div className="w-full bg-surface-container-low border-b border-outline-variant/15">
           <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-sm flex flex-wrap items-center justify-between gap-space-sm text-xs">
-            <nav className="flex items-center space-x-2 text-on-surface-variant">
+            <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-on-surface-variant">
               <Link to="/" className="hover:text-primary transition-colors flex items-center gap-1">
                 <span className="material-symbols-outlined text-[16px]">home</span>
                 <span>Home</span>
@@ -238,7 +241,7 @@ function ProductDetailsPage() {
                 </>
               )}
               <span className="text-outline-variant font-bold">/</span>
-              <span className="text-on-surface font-headline-sm font-semibold truncate max-w-[240px] md:max-w-none">
+              <span className="whitespace-normal break-words text-on-surface font-headline-sm font-semibold">
                 {product.name}
               </span>
             </nav>
@@ -347,25 +350,15 @@ function ProductDetailsPage() {
 
               {/* Quick Actions (Wishlist & Share) */}
               <div className="flex items-center justify-between pt-space-xs gap-3">
-                <button
-                  type="button"
-                  onClick={handleToggleWishlist}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl shadow-sm transition-all cursor-pointer border border-outline-variant/20 ${
-                    wishlisted
-                      ? "bg-tertiary-fixed text-on-tertiary-fixed font-bold"
-                      : "bg-surface-container-lowest hover:bg-surface-container-high text-on-surface"
-                  }`}
-                >
-                  <span
-                    className="material-symbols-outlined text-[20px] text-tertiary"
-                    style={wishlisted ? { fontVariationSettings: "'FILL' 1" } : {}}
-                  >
-                    favorite
-                  </span>
-                  <span className="font-headline-sm text-xs font-bold">
-                    {wishlisted ? "Saved in Wishlist" : "Save to Wishlist"}
-                  </span>
-                </button>
+                <WishlistHeartButton
+                  active={wishlisted}
+                  onToggle={handleToggleWishlist}
+                  size="md"
+                  label="Save to Wishlist"
+                  activeLabel="Saved in Wishlist"
+                  activeAriaLabel="Remove from wishlist"
+                  className={`flex-1 py-3 px-4 rounded-2xl shadow-sm transition-all border border-outline-variant/20 font-headline-sm text-xs font-bold ${wishlisted ? "bg-rose-50 text-rose-600" : "bg-surface-container-lowest hover:bg-surface-container-high text-on-surface"}`}
+                />
 
                 <a
                   href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
@@ -616,14 +609,14 @@ function ProductDetailsPage() {
         </section>
 
         {/* Deep Details Tabs (Specs, Reviews) */}
-        <section className="w-full bg-surface-container-lowest py-16 border-t border-outline-variant/15 mt-12">
+        <section className="w-full bg-surface-container-lowest py-4 border-t border-outline-variant/15 mt-2">
           <div className="max-w-[1320px] mx-auto px-margin-desktop">
             {/* Tab Pills */}
-            <div className="flex items-center space-x-2 pb-8 overflow-x-auto whitespace-nowrap scrollbar-none">
+            <div className="flex items-center space-x-2 pb-4 overflow-x-auto whitespace-nowrap scrollbar-none">
               <button
                 type="button"
                 onClick={() => setActiveTab("specs")}
-                className={`px-5 py-2.5 rounded-full font-headline-sm text-xs font-bold transition-all cursor-pointer ${
+                className={`px-4 py-2 rounded-full font-headline-sm text-[11px] font-bold transition-all cursor-pointer ${
                   activeTab === "specs"
                     ? "bg-primary text-white shadow-sm"
                     : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
@@ -636,7 +629,7 @@ function ProductDetailsPage() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("reviews")}
-                    className={`px-5 py-2.5 rounded-full font-headline-sm text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-4 py-2 rounded-full font-headline-sm text-[11px] font-bold transition-all cursor-pointer ${
                       activeTab === "reviews"
                         ? "bg-primary text-white shadow-sm"
                         : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
@@ -649,65 +642,59 @@ function ProductDetailsPage() {
 
             {/* Specifications & Nutrition Content */}
             {activeTab === "specs" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-surface-container-low p-6 rounded-3xl border border-outline-variant/20">
-                  <h4 className="font-headline-sm text-sm font-bold text-on-surface mb-4">
-                    Item Specifications
-                  </h4>
-                  <div className="space-y-3 text-xs">
+              <div className="space-y-4">
+                <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/20">
+                  <div className="space-y-2 text-[11px]">
                     {product.subCategory && (
-                      <div className="flex justify-between py-2 border-b border-outline-variant/20">
+                      <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                         <span className="text-on-surface-variant">Subcategory</span>
-                        <span className="font-bold text-on-surface">{product.subCategory}</span>
+                        <span className="font-bold text-on-surface text-right">{product.subCategory}</span>
                       </div>
                     )}
-                    <div className="flex justify-between py-2 border-b border-outline-variant/20">
+                    <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Extraction / Method</span>
-                      <span className="font-bold text-on-surface">
+                      <span className="font-bold text-on-surface text-right">
                         {product.extraction || "Traditional Cold Process"}
                       </span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-outline-variant/20">
+                    <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Origin Basin</span>
-                      <span className="font-bold text-on-surface">
+                      <span className="font-bold text-on-surface text-right">
                         {product.origin || "Western Tamil Nadu Delta"}
                       </span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-outline-variant/20">
+                    <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Shelf Life</span>
-                      <span className="font-bold text-on-surface">6 Months from Press Date</span>
+                      <span className="font-bold text-on-surface text-right">6 Months from Press Date</span>
                     </div>
-                    <div className="flex justify-between py-2">
+                    <div className="flex items-center justify-between gap-3 py-1.5">
                       <span className="text-on-surface-variant">FSSAI Certified</span>
-                      <span className="font-bold text-primary font-mono">#12421008000412</span>
+                      <span className="font-bold text-primary font-mono text-right">#12421008000412</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-surface-container-low p-6 rounded-3xl border border-outline-variant/20">
-                  <h4 className="font-headline-sm text-sm font-bold text-on-surface mb-4">
-                    Nutritional Facts (Per 100g)
-                  </h4>
-                  <div className="space-y-3 text-xs">
-                    <div className="flex justify-between py-2 border-b border-outline-variant/20">
+                <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/20">
+                  <div className="space-y-2 text-[11px]">
+                    <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Energy</span>
-                      <span className="font-bold text-on-surface">
+                      <span className="font-bold text-on-surface text-right">
                         {product.nutrition?.energy || "900 kcal"}
                       </span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-outline-variant/20">
-                      <span className="text-on-surface-variant">Monounsaturated Fats (MUFA)</span>
-                      <span className="font-bold text-primary">
+                    <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
+                      <span className="text-on-surface-variant">MUFA</span>
+                      <span className="font-bold text-primary text-right">
                         {product.nutrition?.mufa || "48.2 g (Heart Healthy)"}
                       </span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-outline-variant/20">
+                    <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Trans Fats & Cholesterol</span>
-                      <span className="font-bold text-primary">0.00 mg (Zero)</span>
+                      <span className="font-bold text-primary text-right">0.00 mg (Zero)</span>
                     </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-on-surface-variant">Natural Vitamin E</span>
-                      <span className="font-bold text-on-surface">
+                    <div className="flex items-center justify-between gap-3 py-1.5">
+                      <span className="text-on-surface-variant">Vitamin E</span>
+                      <span className="font-bold text-on-surface text-right">
                         {product.nutrition?.vitaminE || "15.7 mg"}
                       </span>
                     </div>
@@ -720,52 +707,52 @@ function ProductDetailsPage() {
             {activeTab === "reviews" &&
               typeof product.reviewCount === "number" &&
               product.reviewCount > 0 && (
-              <div className="space-y-4 max-w-3xl">
-                <div className="p-6 rounded-3xl bg-surface-container-low border border-outline-variant/20">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-primary text-white font-bold flex items-center justify-center text-xs">
-                        SK
+                <div className="space-y-4 max-w-3xl">
+                  <div className="p-4 rounded-2xl bg-surface-container-low border border-outline-variant/20">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary text-white font-bold flex items-center justify-center text-xs">
+                          SK
+                        </div>
+                        <div>
+                          <span className="font-headline-sm text-xs font-bold block">
+                            S. Kalyanasundaram
+                          </span>
+                          <span className="text-[11px] text-primary flex items-center gap-1 font-semibold">
+                            <span className="material-symbols-outlined text-[13px]">verified</span>
+                            Verified Buyer • Gobichettipalayam
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-headline-sm text-xs font-bold block">
-                          S. Kalyanasundaram
-                        </span>
-                        <span className="text-[11px] text-primary flex items-center gap-1 font-semibold">
-                          <span className="material-symbols-outlined text-[13px]">verified</span>
-                          Verified Buyer • Gobichettipalayam
-                        </span>
-                      </div>
+                      <span className="text-[11px] text-on-surface-variant">2 days ago</span>
                     </div>
-                    <span className="text-[11px] text-on-surface-variant">2 days ago</span>
+                    <div className="flex text-[#fea619] mb-2">
+                      {[...Array(5)].map((_, i) => (
+                        <span
+                          key={i}
+                          className="material-symbols-outlined text-[16px]"
+                          style={{ fontVariationSettings: "'FILL' 1" }}
+                        >
+                          star
+                        </span>
+                      ))}
+                    </div>
+                    <h5 className="font-headline-sm text-sm font-bold text-on-surface mb-1">
+                      Unbeatable natural aroma for dosas & sambar!
+                    </h5>
+                    <p className="text-xs text-on-surface-variant leading-relaxed">
+                      Been ordering regularly from Sri Amman Smart Store. When you temper mustard seeds, the entire kitchen fills with the nostalgic aroma of old village cooking. Authentic unrefined taste with pure sedimentation at the bottom.
+                    </p>
                   </div>
-                  <div className="flex text-[#fea619] mb-2">
-                    {[...Array(5)].map((_, i) => (
-                      <span
-                        key={i}
-                        className="material-symbols-outlined text-[16px]"
-                        style={{ fontVariationSettings: "'FILL' 1" }}
-                      >
-                        star
-                      </span>
-                    ))}
-                  </div>
-                  <h5 className="font-headline-sm text-sm font-bold text-on-surface mb-1">
-                    Unbeatable natural aroma for dosas & sambar!
-                  </h5>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
-                    Been ordering regularly from Sri Amman Smart Store. When you temper mustard seeds, the entire kitchen fills with the nostalgic aroma of old village cooking. Authentic unrefined taste with pure sedimentation at the bottom.
-                  </p>
                 </div>
-              </div>
-            )}
+              )}
           </div>
         </section>
 
         {/* Section 1: Similar Products (Traditional Alternatives) */}
         {similarProducts.length > 0 && (
-          <section className="max-w-[1320px] w-full mx-auto px-margin-desktop py-space-2xl border-t border-outline-variant/15">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm mb-space-lg">
+          <section className="max-w-[1320px] w-full mx-auto px-margin-desktop py-4 mt-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm mb-4">
               <div className="flex flex-col">
                 <span className="font-label-badge uppercase tracking-wider text-secondary font-bold text-xs">
                   Traditional Alternatives
@@ -783,7 +770,7 @@ function ProductDetailsPage() {
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </Link>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {similarProducts.map((p) => (
                 <ProductCard key={p.id} product={p} readOnly={false} />
               ))}

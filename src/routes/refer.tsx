@@ -208,7 +208,7 @@ export function ReferPage() {
     return (
       <div className="bg-[#f8f9fc] font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1000px] mx-auto px-margin-desktop py-20 text-center">
+        <main className="w-full pt-20 max-w-[1000px] mx-auto px-margin-desktop py-20 text-center">
           <div className="w-9 h-9 border-3 border-[#005F3F] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">
             Loading referral dashboard...
@@ -225,7 +225,7 @@ export function ReferPage() {
     return (
       <div className="bg-[#f8f9fc] font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1000px] mx-auto px-margin-desktop py-16 text-center">
+        <main className="w-full pt-20 max-w-[1000px] mx-auto px-margin-desktop py-16 text-center">
           <div className="bg-white rounded-3xl border border-outline-variant/20 p-8 md:p-12 shadow-xs max-w-lg mx-auto">
             <div className="w-16 h-16 rounded-2xl bg-[#e3f5ec] text-[#005F3F] flex items-center justify-center mx-auto mb-4">
               <span className="material-symbols-outlined text-3xl">
@@ -262,7 +262,7 @@ export function ReferPage() {
     <div className="bg-[#f8f9fc] font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-[172px] min-h-[calc(100vh-172px)] pb-16">
+      <main className="w-full pt-20 min-h-[calc(100vh-80px)] pb-16">
         <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-8">
           {/* Breadcrumb Navigation */}
           <nav

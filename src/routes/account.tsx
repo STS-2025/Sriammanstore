@@ -398,7 +398,7 @@ export function AccountPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[800px] mx-auto px-4 py-20 text-center">
+        <main className="w-full pt-20 max-w-[800px] mx-auto px-4 py-20 text-center">
           <div className="w-10 h-10 border-4 border-[#005f3f] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">
             Loading your customer account...
@@ -415,7 +415,7 @@ export function AccountPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[800px] mx-auto px-4 py-20 text-center">
+        <main className="w-full pt-20 max-w-[800px] mx-auto px-4 py-20 text-center">
           <div className="w-20 h-20 rounded-3xl bg-surface-container flex items-center justify-center text-4xl mx-auto mb-5 shadow-inner">
             👤
           </div>
@@ -445,7 +445,7 @@ export function AccountPage() {
     <div className="bg-[#f8faf8] font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-[172px] min-h-[calc(100vh-172px)] pb-20">
+      <main className="w-full pt-20 min-h-[calc(100vh-80px)] pb-20">
         <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Breadcrumbs & Store Sync Status Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">

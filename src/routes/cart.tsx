@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
+import { WishlistHeartButton } from "../components/product/WishlistHeartButton";
 import { CheckoutProgressBar } from "../components/checkout/CheckoutProgressBar";
 import { OrderBillSummary } from "../components/checkout/OrderBillSummary";
 import { useCart } from "../context/CartContext";
@@ -57,7 +58,7 @@ export function CartPage() {
     refreshCart,
   } = useCart();
   const { user } = useAuth();
-  const { items: wishlistItems, addToWishlist } = useWishlist();
+  const { addToWishlist, isWishlisted } = useWishlist();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -123,16 +124,20 @@ export function CartPage() {
     toast.info("Coupon removed");
   };
 
-  const handleSaveToWishlist = async (item: (typeof items)[0]) => {
+  const handleSaveToWishlist = async (item: (typeof items)[0]): Promise<boolean> => {
     try {
       // Find underlying product and save to wishlist
       const p = await productService.getProductById(item.productId);
       if (p) {
-        await addToWishlist(p, item.optionIndex || 0);
-        toast.success(`Saved ${item.name} to your wishlist`);
+        const added = await addToWishlist(p, item.optionIndex || 0);
+        if (added) toast.success(`Saved ${item.name} to your wishlist`);
+        else toast.info(`Removed ${item.name} from your wishlist`);
+        return added;
       }
-    } catch {
-      toast.info("Saved item for later");
+      return false;
+    } catch (err: any) {
+      toast.error(err.message || "Could not update wishlist");
+      return false;
     }
   };
 
@@ -181,7 +186,7 @@ export function CartPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-[172px] max-w-[1320px] mx-auto px-margin-desktop py-12">
+        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-12">
           <div className="animate-pulse space-y-6">
             <div className="h-10 bg-surface-container-low rounded-2xl w-1/4"></div>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -203,7 +208,7 @@ export function CartPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-[172px] bg-surface min-h-[calc(100vh-172px)]">
+      <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
           {deliverySettingsError && (
             <div role="status" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900">
@@ -543,19 +548,10 @@ export function CartPage() {
                             </Link>
 
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-primary/10 text-primary">
-                                  ORGANIC HARVEST
-                                </span>
-                                <span className="text-[11px] text-outline font-semibold">
-                                  Sri Amman Naturals
-                                </span>
-                              </div>
-
                               <Link
                                 to="/product"
                                 search={{ id: item.productId } as any}
-                                className="font-headline-sm text-sm font-bold text-on-surface hover:text-primary transition-colors block line-clamp-1"
+                                className="block whitespace-normal break-words font-headline-sm text-sm font-bold text-on-surface hover:text-primary transition-colors"
                               >
                                 {item.name}
                               </Link>
@@ -616,16 +612,14 @@ export function CartPage() {
 
                             {/* Secondary Actions: Save & Remove */}
                             <div className="flex items-center gap-3 text-xs font-semibold text-outline">
-                              <button
-                                type="button"
-                                onClick={() => handleSaveToWishlist(item)}
-                                className="flex items-center gap-0.5 hover:text-primary transition-colors cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined text-[14px]">
-                                  bookmark
-                                </span>
-                                <span>Save</span>
-                              </button>
+                              <WishlistHeartButton
+                                active={isWishlisted(item.productId)}
+                                onToggle={() => handleSaveToWishlist(item)}
+                                size="sm"
+                                label="Save"
+                                activeLabel="Remove"
+                                className="gap-1 text-xs font-semibold text-outline hover:text-primary transition-colors"
+                              />
                               <span>•</span>
                               <button
                                 type="button"
@@ -702,7 +696,7 @@ export function CartPage() {
                                 />
                               </div>
                               <div>
-                                <h4 className="font-headline-sm text-xs font-bold text-on-surface line-clamp-1">
+                                <h4 className="whitespace-normal break-words font-headline-sm text-xs font-bold text-on-surface">
                                   {p.name}
                                 </h4>
                                 <span className="text-[11px] text-on-surface-variant">

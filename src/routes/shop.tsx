@@ -781,30 +781,7 @@ function ShopPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-[172px] bg-surface min-h-[calc(100vh-172px)]">
-        {/* Express Dispatch Quality Callout Bar */}
-        <section className="w-full bg-surface-container-high py-2 px-margin-desktop text-on-surface border-b border-outline-variant/15">
-          <div className="max-w-[1320px] mx-auto flex flex-wrap items-center justify-between text-xs gap-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-              <span className="font-headline-sm text-xs font-bold text-primary">
-                Express Dispatch Active:
-              </span>
-              <span className="text-on-surface-variant">
-                Same-day batch delivery for cold-pressed extractions across local neighborhoods.
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-headline-sm text-[10px] bg-surface-container-lowest px-2 py-0.5 rounded text-primary font-bold shadow-sm">
-                100% MARA CHEKKU VERIFIED
-              </span>
-              <span className="text-on-surface-variant hidden sm:inline">
-                Lab Purity Reports Included
-              </span>
-            </div>
-          </div>
-        </section>
-
+      <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-md">
           {/* 1. Breadcrumbs */}
           <nav
@@ -838,23 +815,9 @@ function ShopPage() {
             {/* Developer Catalogue Source Switcher */}
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-on-surface-variant">
-                    {loading ? "Loading..." : "Verified Quality"}
-                  </span>
-                </div>
                 <h1 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-on-surface tracking-tight mt-1">
                   {activeCategoryTitle}
                 </h1>
-                <p className="font-body-sm text-xs text-on-surface-variant mt-0.5">
-                  Showing{" "}
-                  <strong className="text-on-surface font-bold">
-                    {filteredProducts.length} {catalogMode === "production-readonly" ? "production" : "authenticated"} items
-                  </strong>{" "}
-                  {catalogMode === "production-readonly"
-                    ? "from the live production Firestore catalogue (sri-amman-smart-store)."
-                    : "sourced directly from regional South Indian heritage producers."}
-                </p>
               </div>
 
               {/* Sorting & Mobile Filter Trigger */}

@@ -126,6 +126,27 @@ describe("Milestone: Read-Only Legacy Order Integration", () => {
   // SUITE 1: Normalization Helpers
   // ==========================================================================
   describe("1. Legacy Order Normalization Helpers", () => {
+    it("preserves all available item image fields and leaves missing images empty", () => {
+      const [withImages, withoutImages] = normalizeLegacyItems([
+        {
+          image: "https://cdn.example/primary.jpg",
+          imageUrl: "https://cdn.example/primary.jpg",
+          frontImageUrl: "https://cdn.example/front.jpg",
+          imageUrls: ["https://cdn.example/gallery.jpg"],
+        },
+        { productId: "product-without-image" },
+      ]);
+
+      expect(withImages?.image).toBe("https://cdn.example/primary.jpg");
+      expect(withImages?.imageCandidates).toEqual([
+        "https://cdn.example/primary.jpg",
+        "https://cdn.example/front.jpg",
+        "https://cdn.example/gallery.jpg",
+      ]);
+      expect(withoutImages?.image).toBe("");
+      expect(withoutImages?.imageCandidates).toEqual([]);
+    });
+
     it("normalizes diverse legacy status values correctly", () => {
       // Pending variants
       expect(normalizeLegacyOrderStatus("Pending").status).toBe("pending");

@@ -3,7 +3,7 @@ import logo from "../../assests/logo.png"
 
 export function StoreFooter() {
   return (
-    <footer className="bg-surface-container-low text-on-surface border-t border-outline-variant/20 pt-12 pb-24 md:pb-12 mt-16">
+    <footer className="bg-surface-container-low text-on-surface border-t border-outline-variant/20 pt-8 pb-24 md:pb-8">
       <div className="max-w-[1320px] mx-auto px-margin-desktop">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
           {/* Brand Info */}

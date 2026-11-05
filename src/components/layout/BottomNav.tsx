@@ -1,10 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useRef } from "react";
 import { useCart } from "../../context/CartContext";
-import { useWishlist } from "../../context/WishlistContext";
+import { useCartFlyAnimation } from "../../hooks/useCartFlyAnimation";
 
 export function BottomNav() {
   const { cartCount, cartSubtotal } = useCart();
-  const { wishlistCount } = useWishlist();
+  const mobileCartTargetRef = useRef<HTMLSpanElement>(null);
+  const showMobileCartAdded = useCartFlyAnimation(mobileCartTargetRef, "mobile");
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
 
@@ -72,23 +74,30 @@ export function BottomNav() {
           </Link>
 
           <Link
-            to="/wishlist"
+            to="/cart"
             className={`relative flex min-h-11 flex-col items-center py-1 transition-colors ${
-              isActive("/wishlist") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
+              isActive("/cart") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
             }`}
           >
-            <span
-              className="material-symbols-outlined text-[22px]"
-              style={isActive("/wishlist") ? { fontVariationSettings: "'FILL' 1" } : {}}
-            >
-              favorite
+            <span ref={mobileCartTargetRef} className="relative inline-flex">
+              <span
+                className="material-symbols-outlined text-[22px]"
+                style={isActive("/cart") ? { fontVariationSettings: "'FILL' 1" } : {}}
+              >
+                shopping_bag
+              </span>
+              {showMobileCartAdded && (
+                <span className="absolute -top-4 left-1/2 -translate-x-1/2 animate-fade-in text-[10px] font-black text-primary">
+                  +1
+                </span>
+              )}
             </span>
-            {wishlistCount > 0 && (
-              <span className="absolute top-1 right-3 bg-tertiary text-on-tertiary text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">
-                {wishlistCount}
+            {cartCount > 0 && (
+              <span className="absolute top-1 right-3 bg-primary text-on-primary text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">
+                {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
-            <span className="text-[10px] font-medium mt-0.5">Wishlist</span>
+            <span className="text-[10px] font-medium mt-0.5">Cart</span>
           </Link>
 
           <Link

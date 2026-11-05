@@ -99,6 +99,10 @@ export interface Category {
   slug: string;
   itemCount: string;
   image: string;
+  description?: string | undefined;
+  displayOrder?: number | undefined;
+  isActive?: boolean | undefined;
+  showOnHomepage?: boolean | undefined;
   subcategories?: string[] | undefined;
   source?: ("firestore-document" | "product-fallback" | "local") | undefined;
 }
@@ -111,6 +115,51 @@ export interface Banner {
   promoDiscount: string;
   buttonText: string;
   imageUrl: string;
+  tamilTitle?: string;
+  tamilSubheading?: string;
+  tamilShortDescription?: string;
+  shortDescription?: string;
+  subheading?: string;
+  desktopImageUrl?: string;
+  mobileImageUrl?: string;
+  videoUrl?: string;
+  redirectUrl?: string;
+  placement?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  priority?: number | undefined;
+  contentMaxWidth?: number | undefined;
+  textPosition?: string;
+  textAlignment?: string;
+  verticalAlignment?: string;
+  headingFontSize?: number | undefined;
+  subheadingFontSize?: number | undefined;
+  headingColor?: string;
+  subheadingColor?: string;
+  buttonTextColor?: string;
+  buttonBackgroundColor?: string;
+  bannerBackgroundColor?: string;
+  overlayColor?: string;
+  customOverlayColor?: string;
+  overlayOpacity?: number | undefined;
+  imageOverlayEnabled?: boolean | undefined;
+  showTitle?: boolean | undefined;
+  showSubheading?: boolean | undefined;
+  showDescription?: boolean | undefined;
+  showButton?: boolean | undefined;
+  showPromoCode?: boolean | undefined;
+  showPromoDiscount?: boolean | undefined;
+  categorySlug?: string;
+}
+
+export interface Announcement {
+  id: string;
+  text: string;
+  bgColor?: string;
+  textColor?: string;
+  displayOrder?: number;
+  isActive?: boolean;
 }
 
 export interface CartItem {
@@ -154,6 +203,8 @@ export interface OrderItem {
   price: number;
   quantity: number;
   image: string;
+  /** Additional image fields preserved from historical order snapshots for fallback resolution. */
+  imageCandidates?: string[];
 }
 
 export type OrderStatus =
@@ -277,6 +328,11 @@ export interface WishlistProduct {
   mrp: number;
   specialPrice?: number;
   image: string;
+  /** Current customer-specific subcollection entry status and saved snapshots. */
+  isActive?: boolean;
+  brandName?: string;
+  variantName?: string;
+  addedAt?: unknown;
 }
 
 export interface CoinTransaction {
