@@ -48,25 +48,18 @@ describe("Login & Authentication Service (Mock Mode)", () => {
       expect(user.coins).toBeGreaterThanOrEqual(620);
     });
 
-    it("creates a new customer record when verifying an unregistered phone", async () => {
+    it("rejects an unregistered phone without creating a customer record", async () => {
       const newPhone = "9876543210";
-      const newUser = await authService.verifyOtp(newPhone, TEST_CREDENTIALS.otp);
-      expect(newUser).toBeDefined();
-      expect(newUser.id).toMatch(/^SASS/);
-      expect(newUser.phone.replace(/\D/g, "")).toContain(newPhone);
-      expect(newUser.coins).toBeGreaterThanOrEqual(50);
+      await expect(authService.verifyOtp(newPhone, TEST_CREDENTIALS.otp)).rejects.toThrow(
+        "No account registered with this mobile number",
+      );
     });
 
-    it("attributes referral bonus when referral code is provided during registration", async () => {
+    it("does not request a mock OTP for an unregistered phone", async () => {
       const newPhone = "9123456789";
-      const newUser = await authService.verifyOtp(
-        newPhone,
-        TEST_CREDENTIALS.otp,
-        "AMMAN100"
+      await expect(authService.requestOtp(newPhone)).rejects.toThrow(
+        "No account registered with this mobile number",
       );
-      expect(newUser).toBeDefined();
-      expect(newUser.referredBy).toBe("AMMAN100");
-      expect(newUser.coins).toBe(150); // 50 base + 100 referral bonus
     });
   });
 

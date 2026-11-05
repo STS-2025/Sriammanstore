@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { useState, useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
@@ -14,7 +15,11 @@ export const Route = createFileRoute("/notifications")({
   head: () => ({
     meta: [
       { title: "Notifications & Store Updates — Sri Amman Smart Store" },
-      { name: "description", content: "Live alerts for your harvest deliveries, exclusive seasonal stock arrivals, and coin credits." },
+      {
+        name: "description",
+        content:
+          "Live alerts for your harvest deliveries, exclusive seasonal stock arrivals, and coin credits.",
+      },
     ],
   }),
   component: NotificationsPage,
@@ -56,15 +61,15 @@ export function NotificationsPage() {
   // Category counts
   const ordersCount = useMemo(
     () => notifications.filter((n) => isOrderCategory(n.category)).length,
-    [notifications]
+    [notifications],
   );
   const rewardsCount = useMemo(
     () => notifications.filter((n) => isRewardCategory(n.category)).length,
-    [notifications]
+    [notifications],
   );
   const harvestCount = useMemo(
     () => notifications.filter((n) => isHarvestCategory(n.category)).length,
-    [notifications]
+    [notifications],
   );
 
   const filteredNotifications = useMemo(() => {

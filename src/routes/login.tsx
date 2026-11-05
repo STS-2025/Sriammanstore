@@ -10,7 +10,9 @@ import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { useAuth, describeIdentityResolutionState } from "../context/AuthContext";
 import { authManager } from "../services/authAdapter";
-import { authService } from "../services/authService";
+import { authService, NO_PHONE_ACCOUNT_MESSAGE } from "../services/authService";
+import { formatToE164, mapPhoneAuthError } from "../services/phoneVerificationService";
+import { checkCustomerPhoneEligibility, mapPhoneEligibilityError } from "../services/phoneEligibilityService";
 import { emailLinkAuthService, EmailLinkAuthError } from "../services/emailLinkAuthService";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -98,6 +100,7 @@ export function LoginPage() {
   const [otpError, setOtpError] = useState("");
   const phoneConfirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+  const otpRequestInFlightRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -162,6 +165,43 @@ export function LoginPage() {
     }
   };
 
+  const requestEligibleFirebaseOtp = async (): Promise<boolean> => {
+    const e164PhoneNumber = formatToE164(countryCode, cleanPhoneDigits);
+    let eligible: boolean;
+    try {
+      eligible = await checkCustomerPhoneEligibility(e164PhoneNumber);
+    } catch (error: unknown) {
+      const message = mapPhoneEligibilityError(error);
+      setOtpSent(false);
+      setOtpDigits(["", "", "", "", "", ""]);
+      phoneConfirmationRef.current = null;
+      setOtpError(message);
+      toast.error(message);
+      return false;
+    }
+    if (!eligible) {
+      setOtpSent(false);
+      setOtpDigits(["", "", "", "", "", ""]);
+      phoneConfirmationRef.current = null;
+      setOtpError(NO_PHONE_ACCOUNT_MESSAGE);
+      toast.error(NO_PHONE_ACCOUNT_MESSAGE);
+      return false;
+    }
+
+    const { auth } = authManager.getProductionAdapter().getAuthInstance();
+    if (!recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "login-recaptcha-container", {
+        size: "invisible",
+      });
+    }
+    phoneConfirmationRef.current = await signInWithPhoneNumber(
+      auth,
+      e164PhoneNumber,
+      recaptchaVerifierRef.current,
+    );
+    return true;
+  };
+
   useEffect(() => {
     const targetMode = searchParams.authMode;
     if (targetMode === "production" || targetMode === "emulator" || targetMode === "mock") {
@@ -172,11 +212,13 @@ export function LoginPage() {
   // 1. Send OTP Action
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (otpRequestInFlightRef.current) return;
     if (!isPhoneValid) {
       setOtpError("Please enter a valid 10-digit mobile number.");
       return;
     }
     setOtpError("");
+    otpRequestInFlightRef.current = true;
     setIsSubmitting(true);
 
     if (authMode === "mock") {
@@ -196,22 +238,14 @@ export function LoginPage() {
         toast.error(message);
         return;
       } finally {
+        otpRequestInFlightRef.current = false;
         setIsSubmitting(false);
       }
     }
 
     try {
-      const { auth } = authManager.getProductionAdapter().getAuthInstance();
-      if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "login-recaptcha-container", {
-          size: "invisible",
-        });
-      }
-      phoneConfirmationRef.current = await signInWithPhoneNumber(
-        auth,
-        `${countryCode}${cleanPhoneDigits}`,
-        recaptchaVerifierRef.current,
-      );
+      const sent = await requestEligibleFirebaseOtp();
+      if (!sent) return;
       toast.success("Verification code requested from Firebase Auth.");
       setOtpSent(true);
       setResendTimer(30);
@@ -220,18 +254,21 @@ export function LoginPage() {
         inputRefs.current[0]?.focus();
       }, 100);
     } catch (err: unknown) {
-      const message = getErrorMessage(err, "Failed to send OTP");
+      const message = mapPhoneAuthError(err);
       setOtpError(message);
       toast.error(message);
     } finally {
+      otpRequestInFlightRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   // 2. Resend OTP Action
   const handleResendOtp = async () => {
-    if (resendTimer > 0) return;
+    if (resendTimer > 0 || otpRequestInFlightRef.current) return;
     setOtpError("");
+    otpRequestInFlightRef.current = true;
+    setIsSubmitting(true);
 
     if (authMode === "mock") {
       try {
@@ -241,31 +278,34 @@ export function LoginPage() {
         setOtpDigits(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       } catch (err: unknown) {
-        toast.error(getErrorMessage(err, "Failed to resend OTP"));
+        const message = getErrorMessage(err, "Failed to resend OTP");
+        setOtpError(message);
+        toast.error(message);
+      } finally {
+        otpRequestInFlightRef.current = false;
+        setIsSubmitting(false);
       }
       return;
     }
 
     try {
-      const { auth } = authManager.getProductionAdapter().getAuthInstance();
       if (recaptchaVerifierRef.current) {
         recaptchaVerifierRef.current.clear();
         recaptchaVerifierRef.current = null;
       }
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "login-recaptcha-container", {
-        size: "invisible",
-      });
-      phoneConfirmationRef.current = await signInWithPhoneNumber(
-        auth,
-        `${countryCode}${cleanPhoneDigits}`,
-        recaptchaVerifierRef.current,
-      );
+      const sent = await requestEligibleFirebaseOtp();
+      if (!sent) return;
       toast.success("A new Firebase verification code was requested.");
       setResendTimer(30);
       setOtpDigits(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
     } catch (err: unknown) {
-      toast.error(getErrorMessage(err, "Failed to resend OTP"));
+      const message = mapPhoneAuthError(err);
+      setOtpError(message);
+      toast.error(message);
+    } finally {
+      otpRequestInFlightRef.current = false;
+      setIsSubmitting(false);
     }
   };
 

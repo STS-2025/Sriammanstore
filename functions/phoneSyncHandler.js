@@ -44,6 +44,20 @@ function normalizeCountryCode(value) {
   return digits ? `+${digits}` : "";
 }
 
+function normalizeStoredPhone(profile) {
+  if (!profile || typeof profile !== "object") return null;
+  const rawPhone = typeof profile.phone === "string" ? profile.phone.trim() : "";
+  if (rawPhone) {
+    const digits = rawPhone.replace(/\D/g, "");
+    const normalized = rawPhone.startsWith("+") ? `+${digits}` : "";
+    if (E164_RE.test(normalized)) return normalized;
+  }
+  const countryCode = normalizeCountryCode(profile.countryCode);
+  const number = typeof profile.number === "string" ? profile.number.replace(/\D/g, "") : "";
+  const candidate = countryCode && number ? `${countryCode}${number}` : "";
+  return E164_RE.test(candidate) ? candidate : null;
+}
+
 function createUpdateCustomerVerifiedPhoneHandler({ db, auth, HttpsError, FieldValue }) {
   return async function updateCustomerVerifiedPhone(request) {
     if (!request.auth || typeof request.auth.uid !== "string" || !request.auth.uid) {
@@ -183,11 +197,16 @@ function createUpdateCustomerVerifiedPhoneHandler({ db, auth, HttpsError, FieldV
 
         if (indexSnapshot.exists) {
           const index = indexSnapshot.data();
-          if (index.uid !== uid || index.userDocId !== customerId) {
+          if (
+            index.uid !== uid ||
+            index.userDocId !== customerId ||
+            index.collection !== "onlineCustomers" ||
+            normalizeStoredPhone({ phone: index.phone }) !== phone
+          ) {
             throw makeError(
               HttpsError,
               "already-exists",
-              "This phone number is associated with another customer.",
+              "This phone number has an inconsistent ownership record.",
             );
           }
         }
@@ -218,8 +237,7 @@ function createUpdateCustomerVerifiedPhoneHandler({ db, auth, HttpsError, FieldV
           }
         }
 
-        const previousPhone =
-          typeof profile.phone === "string" && E164_RE.test(profile.phone) ? profile.phone : null;
+        const previousPhone = normalizeStoredPhone(profile);
         let previousIndexSnapshot = null;
         let previousIndexRef = null;
         if (previousPhone && previousPhone !== phone) {
@@ -251,7 +269,12 @@ function createUpdateCustomerVerifiedPhoneHandler({ db, auth, HttpsError, FieldV
 
         if (previousIndexSnapshot && previousIndexSnapshot.exists) {
           const previousIndex = previousIndexSnapshot.data();
-          if (previousIndex.uid === uid && previousIndex.userDocId === customerId) {
+          if (
+            previousIndex.uid === uid &&
+            previousIndex.userDocId === customerId &&
+            previousIndex.collection === "onlineCustomers" &&
+            normalizeStoredPhone({ phone: previousIndex.phone }) === previousPhone
+          ) {
             transaction.delete(previousIndexRef);
           }
         }

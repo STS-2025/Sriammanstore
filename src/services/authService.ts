@@ -4,6 +4,7 @@ import type { User } from "../types";
 import { normalizeDobString } from "../lib/dateUtils";
 
 export const AUTH_STORAGE_KEY = "sass_customer_session";
+export const NO_PHONE_ACCOUNT_MESSAGE = "No account registered with this phone number";
 
 export const TEST_CREDENTIALS = {
   phone: "+91 99999 99999",
@@ -31,14 +32,16 @@ export const authService = {
     if (cleanNumber.length !== 10) {
       throw new Error("Please enter a valid 10-digit mobile number.");
     }
-    // In mock mode, allow any 10-digit number; test credentials are noted.
+    if (![TEST_CREDENTIALS.cleanPhone, TEST_CREDENTIALS.vipCleanPhone].includes(cleanNumber)) {
+      throw new Error(NO_PHONE_ACCOUNT_MESSAGE);
+    }
     return {
       success: true,
       message: `OTP sent to +91 ${cleanNumber}. (Test OTP: ${TEST_CREDENTIALS.otp})`,
     };
   },
 
-  async verifyOtp(phone: string, otp: string, referralCode?: string): Promise<User> {
+  async verifyOtp(phone: string, otp: string, _referralCode?: string): Promise<User> {
     const cleanNumber = phone.replace(/\D/g, "").slice(-10);
     if (cleanNumber.length !== 10) {
       throw new Error("Please enter a valid 10-digit mobile number.");
@@ -46,36 +49,19 @@ export const authService = {
     if (otp !== TEST_CREDENTIALS.otp && otp !== "000000") {
       throw new Error(`Invalid OTP. For test login, please use ${TEST_CREDENTIALS.otp}`);
     }
+    if (![TEST_CREDENTIALS.cleanPhone, TEST_CREDENTIALS.vipCleanPhone].includes(cleanNumber)) {
+      throw new Error(NO_PHONE_ACCOUNT_MESSAGE);
+    }
 
     try {
-      // Find matching user or register new customer
+      // Mock login may resolve existing fixtures only; registration is a separate flow.
       const users = await apiClient.get<User[]>("/users");
-      let user = users
+      const user = users
         ? users.find((u) => u.phone.replace(/\D/g, "").endsWith(cleanNumber))
         : null;
 
       if (!user) {
-        // Create new registered customer
-        const nextNum = (users?.length || 0) + 105;
-        const newId = `SASS${String(nextNum).padStart(7, "0")}`;
-        const hasReferral = referralCode && referralCode.trim().length > 0;
-        const initialCoins = hasReferral ? 150 : 50;
-
-        const newUser: User = {
-          id: newId,
-          userId: newId,
-          name: `Customer ${cleanNumber.slice(-4)}`,
-          phone: `+91 ${cleanNumber.slice(0, 5)} ${cleanNumber.slice(5)}`,
-          email: `user_${cleanNumber}@sriammanstore.com`,
-          smartCoins: initialCoins,
-          coins: initialCoins,
-          isVIP: false,
-          referralCode: newId,
-          ...(hasReferral ? { referredBy: referralCode.trim().toUpperCase() } : {}),
-          createdAt: new Date().toISOString(),
-        };
-
-        user = await apiClient.post<User>("/users", newUser);
+        throw new Error(NO_PHONE_ACCOUNT_MESSAGE);
       }
 
       const mockUser = stripFirebaseUidFromMockUser(user);

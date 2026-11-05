@@ -61,7 +61,7 @@ describe("Phone Verification & Checkout Enforcement Test Suite", () => {
         /SMS quota exceeded/i
       );
       expect(mapPhoneAuthError({ code: "auth/too-many-requests" })).toMatch(
-        /too many OTP requests/i
+        /temporarily blocked OTP requests.*wait before trying again/i
       );
       expect(mapPhoneAuthError({ code: "auth/credential-already-in-use" })).toMatch(
         /already associated with an account/i
@@ -93,7 +93,7 @@ describe("Phone Verification & Checkout Enforcement Test Suite", () => {
       const invalidAppCredMsg =
         "Security verification failed (invalid app credential). Please complete the reCAPTCHA challenge below and try again.";
       const tooManyRequestsMsg =
-        "Too many OTP requests from this device. Please wait a few moments before trying again.";
+        "Firebase temporarily blocked OTP requests. Please wait before trying again. Repeated attempts may remain blocked for a while.";
       const quotaExceededMsg =
         "SMS quota exceeded for today. Please try again later or contact customer support.";
       const captchaFailedMsg =

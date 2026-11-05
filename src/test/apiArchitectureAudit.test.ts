@@ -134,6 +134,20 @@ describe("API-Only Data Access Architecture Audit", () => {
 
       expect(violations).toEqual([]);
     });
+
+    it("routes verified customer phone synchronization through the trusted callable", () => {
+      const identityServicePath = path.join(srcDir, "services", "customerIdentityService.ts");
+      const content = fs.readFileSync(identityServicePath, "utf-8");
+      const methodStart = content.indexOf("async updateVerifiedPhoneNumber(");
+      expect(methodStart).toBeGreaterThanOrEqual(0);
+      const methodEnd = content.indexOf("\n  },", methodStart);
+      expect(methodEnd).toBeGreaterThan(methodStart);
+      const method = content.slice(methodStart, methodEnd);
+
+      expect(method).toContain('"updateCustomerVerifiedPhone"');
+      expect(method).not.toMatch(/\b(?:setDoc|updateDoc|deleteDoc|runTransaction)\s*\(/);
+      expect(method).not.toContain('"customerPhoneIndex"');
+    });
   });
 
   describe("2. Configurable API Client & Base URL Resolution", () => {
@@ -212,15 +226,16 @@ describe("API-Only Data Access Architecture Audit", () => {
       await expect(cartService.getCart("TEST_USER")).rejects.toThrow("ECONNREFUSED");
     });
 
-    it("authService.verifyOtp refuses to report success if new user server persistence fails", async () => {
+    it("authService.verifyOtp refuses unknown numbers without trying to create a user", async () => {
       // Mock /users lookup returning empty array (unregistered user)
       apiClient.get = vi.fn().mockResolvedValue([]);
-      // Mock /users POST failing with network failure
-      apiClient.post = vi.fn().mockRejectedValue(new Error("HTTP Error 500: Database write failed"));
+      const postSpy = vi.fn();
+      apiClient.post = postSpy;
 
       await expect(
         authService.verifyOtp("9888877777", "123456")
-      ).rejects.toThrow("Database write failed");
+      ).rejects.toThrow("No account registered with this mobile number");
+      expect(postSpy).not.toHaveBeenCalled();
     });
 
     it("productService.getProductById distinguishes between catalog 404 (null) and 500 server crash (throw)", async () => {

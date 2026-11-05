@@ -234,3 +234,76 @@ test("repeated synchronization is idempotent", async () => {
   assert.equal(fake.docs.get(`onlineCustomers/${CUSTOMER_ID}`).phoneVerified, true);
   assert.equal(fake.docs.get(`onlineCustomers/${CUSTOMER_ID}`).smartCoins, 81);
 });
+
+test("replaces the old phone and deletes only its matching owned index atomically", async () => {
+  const oldPhone = "+919811122233";
+  const fake = makeDb(
+    initialDocs({
+      [`onlineCustomers/${CUSTOMER_ID}`]: {
+        ...initialDocs()[`onlineCustomers/${CUSTOMER_ID}`],
+        phone: oldPhone,
+        number: "9811122233",
+        countryCode: "+91",
+      },
+      [`customerPhoneIndex/${oldPhone}`]: {
+        uid: UID,
+        userDocId: CUSTOMER_ID,
+        collection: "onlineCustomers",
+        phone: oldPhone,
+      },
+    }),
+  );
+
+  await createHandler(fake)();
+
+  assert.equal(fake.docs.get(`onlineCustomers/${CUSTOMER_ID}`).phone, PHONE);
+  assert.equal(fake.docs.has(`customerPhoneIndex/${oldPhone}`), false);
+  assert.equal(fake.docs.get(`customerPhoneIndex/${PHONE}`).uid, UID);
+});
+
+test("preserves an old phone index that does not belong to this customer", async () => {
+  const oldPhone = "+919811122233";
+  const fake = makeDb(
+    initialDocs({
+      [`onlineCustomers/${CUSTOMER_ID}`]: {
+        ...initialDocs()[`onlineCustomers/${CUSTOMER_ID}`],
+        phone: oldPhone,
+      },
+      [`customerPhoneIndex/${oldPhone}`]: {
+        uid: "another-uid",
+        userDocId: "ONCUS0000999",
+        collection: "onlineCustomers",
+        phone: oldPhone,
+      },
+    }),
+  );
+
+  await createHandler(fake)();
+
+  assert.equal(fake.docs.get(`customerPhoneIndex/${oldPhone}`).uid, "another-uid");
+  assert.equal(fake.docs.get(`onlineCustomers/${CUSTOMER_ID}`).phone, PHONE);
+});
+
+test("synchronizes when the prior Firestore phone differs from Firebase's confirmed phone", async () => {
+  const oldPhone = "+919811122233";
+  const fake = makeDb(
+    initialDocs({
+      [`onlineCustomers/${CUSTOMER_ID}`]: {
+        ...initialDocs()[`onlineCustomers/${CUSTOMER_ID}`],
+        phone: oldPhone,
+      },
+      [`customerPhoneIndex/${oldPhone}`]: {
+        uid: UID,
+        userDocId: CUSTOMER_ID,
+        collection: "onlineCustomers",
+        phone: oldPhone,
+      },
+    }),
+  );
+
+  await createHandler(fake)();
+
+  assert.equal(fake.docs.get(`onlineCustomers/${CUSTOMER_ID}`).phone, PHONE);
+  assert.equal(fake.docs.has(`customerPhoneIndex/${oldPhone}`), false);
+  assert.equal(fake.docs.get(`customerPhoneIndex/${PHONE}`).phone, PHONE);
+});

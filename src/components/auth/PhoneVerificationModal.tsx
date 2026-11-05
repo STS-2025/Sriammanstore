@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Loader2, AlertCircle, CheckCircle2, ShieldCheck, RefreshCw, X, ArrowLeft } from "lucide-react";
-import type { ConfirmationResult } from "firebase/auth";
 import { useAuth } from "../../context/AuthContext";
 import {
   phoneVerificationService,
   formatToE164,
   validatePhoneNumber,
   mapPhoneAuthError,
+  type PhoneVerificationSession,
 } from "../../services/phoneVerificationService";
 import { notificationService } from "../../services/notificationService";
 import { toast } from "sonner";
@@ -58,12 +58,13 @@ export function PhoneVerificationModal({
   const [resendCooldown, setResendCooldown] = useState<number>(0);
 
   // Active Firebase confirmation state
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [confirmationResult, setConfirmationResult] = useState<PhoneVerificationSession | null>(null);
   const [verifiedE164Phone, setVerifiedE164Phone] = useState<string>("");
   const [isRecaptchaSolved, setIsRecaptchaSolved] = useState<boolean>(false);
 
   const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const otpRequestInFlightRef = useRef(false);
 
   // Cooldown countdown effect
   useEffect(() => {
@@ -151,6 +152,7 @@ export function PhoneVerificationModal({
 
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (otpRequestInFlightRef.current) return;
     setErrorMessage("");
 
     const validation = validatePhoneNumber(nationalNumber, countryCode);
@@ -171,6 +173,7 @@ export function PhoneVerificationModal({
     }
 
     const e164 = formatToE164(countryCode, nationalNumber);
+    otpRequestInFlightRef.current = true;
     setIsLoading(true);
 
     try {
@@ -202,12 +205,14 @@ export function PhoneVerificationModal({
           .catch(() => {});
       }
     } finally {
+      otpRequestInFlightRef.current = false;
       setIsLoading(false);
     }
   };
 
   const handleVerifyOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isLoading) return;
     if (!confirmationResult) {
       setErrorMessage("Missing verification session. Please request a new OTP.");
       setStep("phone_input");
@@ -236,7 +241,7 @@ export function PhoneVerificationModal({
         setVerifiedE164Phone(result.phoneNumber);
       }
     } catch (err: unknown) {
-      console.error("[PhoneVerificationModal] confirmOtp error:", err);
+      console.warn("[PhoneVerificationModal] Firebase phone verification failed.");
       setIsLoading(false);
       setErrorMessage(mapPhoneAuthError(err));
       return;
@@ -265,8 +270,8 @@ export function PhoneVerificationModal({
             phone: confirmedPhone,
           });
         }
-      } catch (notifErr) {
-        console.warn("[PhoneVerificationModal] Failed to trigger phone verified notification:", notifErr);
+      } catch {
+        console.warn("[PhoneVerificationModal] Phone verification notification failed.");
       }
 
       setStep("success");
@@ -277,7 +282,7 @@ export function PhoneVerificationModal({
         onClose();
       }, 1000);
     } catch (syncErr: unknown) {
-      console.error("[PhoneVerificationModal] Firestore sync error:", syncErr);
+      console.warn("[PhoneVerificationModal] Trusted profile synchronization failed.");
       // Phone is verified in Firebase Auth, but Firestore sync had an issue: offer safe retry
       setStep("sync_error");
       setErrorMessage(
@@ -291,6 +296,7 @@ export function PhoneVerificationModal({
   };
 
   const handleRetrySync = async () => {
+    if (isLoading) return;
     setIsLoading(true);
     setErrorMessage("");
     try {

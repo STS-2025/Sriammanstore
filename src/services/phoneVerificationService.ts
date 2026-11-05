@@ -1,18 +1,46 @@
 import {
   RecaptchaVerifier,
-  signInWithPhoneNumber,
   linkWithPhoneNumber,
+  PhoneAuthProvider,
+  updatePhoneNumber,
   type ConfirmationResult,
   type ApplicationVerifier,
+  type Auth,
+  type User as FirebaseUser,
 } from "firebase/auth";
-import { auth as firebaseAuth } from "../firebase-config.jsx";
 import { authManager } from "./authAdapter";
 import { customerIdentityService } from "./customerIdentityService";
-import { apiClient } from "./apiClient";
-import { getCustomerProfileEndpoint } from "./customerDataSourceResolver";
 import type { User } from "../types";
 
 let activeRecaptchaVerifier: RecaptchaVerifier | null = null;
+
+function isVerifierDestroyed(verifier: RecaptchaVerifier): boolean {
+  return Boolean((verifier as unknown as { destroyed?: boolean }).destroyed);
+}
+
+export type PhoneVerificationSession =
+  | {
+      kind: "link";
+      uid: string;
+      phoneNumber: string;
+      auth: Auth;
+      confirmation: ConfirmationResult;
+    }
+  | {
+      kind: "update";
+      uid: string;
+      phoneNumber: string;
+      verificationId: string;
+      user: FirebaseUser;
+      auth: Auth;
+    };
+
+function getPhoneVerificationAuth(): Auth {
+  const mode = authManager.getMode();
+  if (mode === "production") return authManager.getProductionAdapter().getAuthInstance().auth;
+  if (mode === "emulator") return authManager.getEmulatorAdapter().getAuthInstance().auth;
+  throw new Error("Phone verification requires a signed-in Firebase customer account.");
+}
 
 /**
  * Normalizes a country code and national number into standard E.164 format.
@@ -23,7 +51,8 @@ export function formatToE164(countryCode: string, nationalNumber: string): strin
   const codeDigits = (countryCode || "+91").replace(/\D/g, "");
   let digits = input.replace(/\D/g, "");
   if (input.startsWith("+")) return `+${digits}`;
-  if (digits.startsWith(codeDigits) && digits.length > codeDigits.length + 5) digits = digits.slice(codeDigits.length);
+  if (digits.startsWith(codeDigits) && digits.length > codeDigits.length + 5)
+    digits = digits.slice(codeDigits.length);
   return `+${codeDigits}${digits}`;
 }
 
@@ -32,7 +61,7 @@ export function formatToE164(countryCode: string, nationalNumber: string): strin
  */
 export function validatePhoneNumber(
   nationalNumber: string,
-  countryCode: string = "+91"
+  countryCode: string = "+91",
 ): { valid: boolean; error?: string } {
   const digits = nationalNumber.replace(/\D/g, "");
   if (!digits) {
@@ -126,7 +155,7 @@ export function mapPhoneAuthError(error: unknown): string {
     case "auth/quota-exceeded":
       return "SMS quota exceeded for today. Please try again later or contact customer support.";
     case "auth/too-many-requests":
-      return "Too many OTP requests from this device. Please wait a few moments before trying again.";
+      return "Firebase temporarily blocked OTP requests. Please wait before trying again. Repeated attempts may remain blocked for a while.";
     case "auth/invalid-verification-code":
       return "Invalid verification code. Please enter the correct 6-digit OTP sent to your phone.";
     case "auth/code-expired":
@@ -160,7 +189,7 @@ export const phoneVerificationService = {
       onSolved?: (token: string) => void;
       onExpired?: () => void;
       onError?: (error?: unknown) => void;
-    } = {}
+    } = {},
   ): Promise<RecaptchaVerifier> {
     if (typeof window === "undefined") {
       throw new Error("RecaptchaVerifier requires a browser window environment.");
@@ -168,16 +197,15 @@ export const phoneVerificationService = {
 
     this.clearRecaptcha();
 
-    const targetEl =
-      typeof container === "string" ? document.getElementById(container) : container;
+    const targetEl = typeof container === "string" ? document.getElementById(container) : container;
 
     if (!targetEl) {
       throw new Error(
-        `reCAPTCHA target container "${typeof container === "string" ? container : "element"}" was not found in the DOM.`
+        `reCAPTCHA target container "${typeof container === "string" ? container : "element"}" was not found in the DOM.`,
       );
     }
 
-    const authInstance = firebaseAuth;
+    const authInstance = getPhoneVerificationAuth();
     const verifier = new RecaptchaVerifier(authInstance, targetEl, {
       size: "normal",
       callback: (token: string) => {
@@ -205,7 +233,7 @@ export const phoneVerificationService = {
    * Returns the currently active RecaptchaVerifier if already initialized and not destroyed.
    */
   getActiveVerifier(): RecaptchaVerifier | null {
-    if (activeRecaptchaVerifier && !(activeRecaptchaVerifier as any).destroyed) {
+    if (activeRecaptchaVerifier && !isVerifierDestroyed(activeRecaptchaVerifier)) {
       return activeRecaptchaVerifier;
     }
     return null;
@@ -218,7 +246,7 @@ export const phoneVerificationService = {
   clearRecaptcha(): void {
     if (activeRecaptchaVerifier) {
       try {
-        if (!(activeRecaptchaVerifier as any).destroyed) {
+        if (!isVerifierDestroyed(activeRecaptchaVerifier)) {
           activeRecaptchaVerifier.clear();
         }
       } catch {
@@ -229,47 +257,103 @@ export const phoneVerificationService = {
   },
 
   /**
-   * Sends a real SMS OTP via Firebase Phone Authentication.
-   * Uses linkWithPhoneNumber if the user is already authenticated with email/Google,
-   * An authenticated user must link to their current account. Conflicts never switch sessions.
+   * Sends an OTP for the signed-in customer. New phone providers are linked;
+   * accounts with an existing phone provider use updatePhoneNumber after OTP.
+   * Neither path signs in to another account.
    */
   async sendVerificationOtp(
     e164PhoneNumber: string,
-    appVerifier: ApplicationVerifier
-  ): Promise<ConfirmationResult> {
+    appVerifier: ApplicationVerifier,
+  ): Promise<PhoneVerificationSession> {
     if (!/^\+[1-9]\d{6,14}$/.test(e164PhoneNumber)) {
       throw new Error("Invalid phone number format. Must be E.164 (e.g. +919840012345).");
     }
 
-    const authInstance = firebaseAuth;
+    const authInstance = getPhoneVerificationAuth();
     const currentUser = authInstance.currentUser;
+    if (!currentUser)
+      throw new Error("Sign in to your customer account before verifying a mobile number.");
 
-    if (currentUser && !currentUser.phoneNumber) return await linkWithPhoneNumber(currentUser, e164PhoneNumber, appVerifier);
-    if (currentUser?.phoneNumber) throw new Error("Your account already has a verified mobile number. Contact support to change it safely.");
+    const hasPhoneProvider = currentUser.providerData.some(
+      (provider) => provider.providerId === "phone",
+    );
+    if (hasPhoneProvider && !currentUser.phoneNumber) {
+      throw new Error(
+        "Your Firebase phone provider is inconsistent. Sign in again or contact support.",
+      );
+    }
 
-    return await signInWithPhoneNumber(authInstance, e164PhoneNumber, appVerifier);
+    if (hasPhoneProvider) {
+      const verificationId = await new PhoneAuthProvider(authInstance).verifyPhoneNumber(
+        e164PhoneNumber,
+        appVerifier,
+      );
+      return {
+        kind: "update",
+        uid: currentUser.uid,
+        phoneNumber: e164PhoneNumber,
+        verificationId,
+        user: currentUser,
+        auth: authInstance,
+      };
+    }
+
+    return {
+      kind: "link",
+      uid: currentUser.uid,
+      phoneNumber: e164PhoneNumber,
+      auth: authInstance,
+      confirmation: await linkWithPhoneNumber(currentUser, e164PhoneNumber, appVerifier),
+    };
   },
 
   /**
    * Verifies the 6-digit OTP code against the Firebase ConfirmationResult.
    */
   async confirmVerificationOtp(
-    confirmationResult: ConfirmationResult,
-    otpCode: string
+    session: PhoneVerificationSession,
+    otpCode: string,
   ): Promise<{ success: boolean; phoneNumber: string }> {
     const cleanCode = (otpCode || "").trim().replace(/\D/g, "");
     if (cleanCode.length !== 6) {
       throw new Error("Please enter a valid 6-digit verification code.");
     }
 
-    const authInstance = firebaseAuth;
-    const intendedUid = authInstance.currentUser?.uid ?? null;
-    const credentialResult = await confirmationResult.confirm(cleanCode);
-    const currentUser = authInstance.currentUser;
-    if (intendedUid && credentialResult.user.uid !== intendedUid) throw new Error("Phone verification resolved to a different account. The signed-in account was not changed; sign in to the account that owns this number.");
-    if (intendedUid && currentUser?.uid !== intendedUid) throw new Error("Your signed-in account changed during phone verification. Please sign in again.");
-    const verifiedPhone = credentialResult.user.phoneNumber || "";
-    if (!verifiedPhone) throw new Error("Firebase did not return a verified phone number.");
+    let verifiedPhone = "";
+    if (session.kind === "update") {
+      if (session.auth.currentUser?.uid !== session.uid) {
+        throw new Error(
+          "Your signed-in account changed during phone verification. Please sign in again.",
+        );
+      }
+      const credential = PhoneAuthProvider.credential(session.verificationId, cleanCode);
+      await updatePhoneNumber(session.user, credential);
+      if (session.auth.currentUser?.uid !== session.uid) {
+        throw new Error(
+          "Your signed-in account changed during phone verification. Please sign in again.",
+        );
+      }
+      verifiedPhone = session.user.phoneNumber || "";
+    } else {
+      if (session.auth.currentUser?.uid !== session.uid) {
+        throw new Error(
+          "Your signed-in account changed during phone verification. Please sign in again.",
+        );
+      }
+      const credentialResult = await session.confirmation.confirm(cleanCode);
+      if (
+        credentialResult.user.uid !== session.uid ||
+        session.auth.currentUser?.uid !== session.uid
+      ) {
+        throw new Error(
+          "Phone verification resolved to a different account. Sign in to the account that owns this number.",
+        );
+      }
+      verifiedPhone = credentialResult.user.phoneNumber || "";
+    }
+    if (!verifiedPhone || verifiedPhone !== session.phoneNumber) {
+      throw new Error("Firebase did not confirm the requested phone number.");
+    }
 
     return {
       success: true,
@@ -292,55 +376,22 @@ export const phoneVerificationService = {
       throw new Error("Invalid verified phone number format.");
     }
 
-    const detectedCountryCode =
-      ["+971", "+61", "+44", "+91", "+1"].find((code) => cleanPhone.startsWith(code)) || "+91";
-    const nationalNumber = cleanPhone.slice(detectedCountryCode.length).replace(/\D/g, "");
-
     const mode = authManager.getMode();
-    const activeUid = uid || firebaseAuth.currentUser?.uid;
-
-    if (mode === "production") {
-      if (!activeUid) {
-        throw new Error("The authenticated customer identity is unavailable. Sign in again, then retry synchronization without requesting another OTP.");
-      }
-      // In production mode, persist through customerIdentityService to onlineCustomers
-      return await customerIdentityService.updateVerifiedPhoneNumber({
-        uid: activeUid,
-        customerId: userId,
-        verifiedE164Phone: cleanPhone,
-      });
+    if (mode !== "production") {
+      throw new Error(
+        "Trusted phone synchronization is available only for the configured customer account. Sign in again and retry without requesting another OTP.",
+      );
     }
-
-    // In emulator or mock mode, update profile via apiClient / users endpoint
-    const endpoint = getCustomerProfileEndpoint(userId);
-    const payload = {
-      phoneVerified: true,
-      phone: cleanPhone,
-      number: nationalNumber,
-      countryCode: detectedCountryCode,
-      updatedAt: new Date().toISOString(),
-      lastUpdated: new Date().toISOString(),
-    };
-
-    try {
-      const patched = await apiClient.patch<User>(endpoint, payload);
-      if (patched) return patched;
-    } catch {
-      // Fallback
+    const activeUid = authManager.getProductionAdapter().getCurrentUser()?.uid;
+    if (!activeUid || (uid && activeUid !== uid)) {
+      throw new Error(
+        "The authenticated customer identity is unavailable. Sign in again, then retry synchronization without requesting another OTP.",
+      );
     }
-
-    return {
-      id: userId,
-      userId: userId,
-      name: "Customer",
-      phone: cleanPhone,
-      countryCode: detectedCountryCode,
-      phoneVerified: true,
-      email: "",
-      isVIP: false,
-      referralCode: userId,
-      createdAt: new Date().toISOString(),
-    };
+    return await customerIdentityService.updateVerifiedPhoneNumber({
+      uid: activeUid,
+      customerId: userId,
+      verifiedE164Phone: cleanPhone,
+    });
   },
 };
-

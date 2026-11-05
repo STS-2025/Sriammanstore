@@ -7,6 +7,7 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 const { createRegisterCustomerHandler } = require("./registrationHandler");
 const { createUpdateCustomerVerifiedPhoneHandler } = require("./phoneSyncHandler");
+const { createPhoneEligibilityHandler } = require("./phoneEligibilityHandler");
 
 if (getApps().length === 0) initializeApp();
 const db = getFirestore();
@@ -19,4 +20,16 @@ exports.registerCustomer = onCall(
 exports.updateCustomerVerifiedPhone = onCall(
   { maxInstances: 5, timeoutSeconds: 30 },
   createUpdateCustomerVerifiedPhoneHandler({ db, auth: getAuth(), HttpsError, FieldValue })
+);
+
+exports.checkCustomerPhoneEligibility = onCall(
+  {
+    maxInstances: 5,
+    timeoutSeconds: 15,
+  },
+  createPhoneEligibilityHandler({
+    db,
+    auth: getAuth(),
+    HttpsError,
+  }),
 );

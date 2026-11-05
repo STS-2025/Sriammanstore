@@ -40,6 +40,16 @@ with the Admin SDK, validates the canonical `usersByUid/{uid}` mapping and
 and canonical phone fields. It updates the profile and phone index in one Admin
 Firestore transaction. Client writes to those protected documents remain denied.
 
+## OTP login eligibility lookup
+
+`checkCustomerPhoneEligibility` accepts `{ phoneNumber }` and returns only
+`{ eligible: boolean }`. It requires a unique verified canonical customer profile,
+a matching UID mapping, and Firebase Auth ownership of the submitted E.164 number.
+The callable rate-limits by SHA-256 hashes of the caller IP and normalized phone
+number and stores only short-lived counters in `phoneLookupRateLimits`; configure Firestore TTL on its
+`expiresAt` field so expired counters are removed. Unknown and ineligible numbers receive
+the same response shape. The client requests no OTP unless `eligible` is true.
+
 ## Customer ID sequence prerequisite
 
 The function creates `onlineCustomers/{ONCUSxxxxxxx}`, `usersByUid/{uid}` with
