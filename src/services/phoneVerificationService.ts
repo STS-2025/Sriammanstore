@@ -2,8 +2,6 @@ import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
   linkWithPhoneNumber,
-  updatePhoneNumber,
-  PhoneAuthProvider,
   type ConfirmationResult,
   type ApplicationVerifier,
 } from "firebase/auth";
@@ -21,10 +19,12 @@ let activeRecaptchaVerifier: RecaptchaVerifier | null = null;
  * Example: ("+91", "98400 12345") -> "+919840012345"
  */
 export function formatToE164(countryCode: string, nationalNumber: string): string {
-  const cleanCode = (countryCode || "+91").trim();
-  const digits = nationalNumber.replace(/\D/g, "");
-  const codePrefix = cleanCode.startsWith("+") ? cleanCode : `+${cleanCode}`;
-  return `${codePrefix}${digits}`;
+  const input = (nationalNumber || "").trim();
+  const codeDigits = (countryCode || "+91").replace(/\D/g, "");
+  let digits = input.replace(/\D/g, "");
+  if (input.startsWith("+")) return `+${digits}`;
+  if (digits.startsWith(codeDigits) && digits.length > codeDigits.length + 5) digits = digits.slice(codeDigits.length);
+  return `+${codeDigits}${digits}`;
 }
 
 /**
@@ -132,7 +132,7 @@ export function mapPhoneAuthError(error: unknown): string {
     case "auth/code-expired":
       return "The verification code has expired. Please request a new OTP.";
     case "auth/credential-already-in-use":
-      return "This mobile number is already linked to another Sri Amman account. Please use your registered account or contact support.";
+      return "This mobile number is already associated with an account. Sign in to the account that owns it or contact support for safe account recovery.";
     case "auth/provider-already-linked":
       return "A mobile number is already linked to this account.";
     case "auth/requires-recent-login":
@@ -231,7 +231,7 @@ export const phoneVerificationService = {
   /**
    * Sends a real SMS OTP via Firebase Phone Authentication.
    * Uses linkWithPhoneNumber if the user is already authenticated with email/Google,
-   * falling back to signInWithPhoneNumber if already linked or unauthenticated.
+   * An authenticated user must link to their current account. Conflicts never switch sessions.
    */
   async sendVerificationOtp(
     e164PhoneNumber: string,
@@ -244,22 +244,8 @@ export const phoneVerificationService = {
     const authInstance = firebaseAuth;
     const currentUser = authInstance.currentUser;
 
-    if (currentUser && !currentUser.phoneNumber) {
-      try {
-        return await linkWithPhoneNumber(currentUser, e164PhoneNumber, appVerifier);
-      } catch (linkError: any) {
-        const code = linkError?.code;
-        // If already linked with another number or credential in use, fall back to signInWithPhoneNumber
-        if (
-          code === "auth/provider-already-linked" ||
-          code === "auth/credential-already-in-use" ||
-          code === "auth/email-already-in-use"
-        ) {
-          return await signInWithPhoneNumber(authInstance, e164PhoneNumber, appVerifier);
-        }
-        throw linkError;
-      }
-    }
+    if (currentUser && !currentUser.phoneNumber) return await linkWithPhoneNumber(currentUser, e164PhoneNumber, appVerifier);
+    if (currentUser?.phoneNumber) throw new Error("Your account already has a verified mobile number. Contact support to change it safely.");
 
     return await signInWithPhoneNumber(authInstance, e164PhoneNumber, appVerifier);
   },
@@ -276,31 +262,14 @@ export const phoneVerificationService = {
       throw new Error("Please enter a valid 6-digit verification code.");
     }
 
-    const credentialResult = await confirmationResult.confirm(cleanCode);
     const authInstance = firebaseAuth;
+    const intendedUid = authInstance.currentUser?.uid ?? null;
+    const credentialResult = await confirmationResult.confirm(cleanCode);
     const currentUser = authInstance.currentUser;
-
-    // If currentUser is different from credentialResult user, link the phone credential
-    if (
-      currentUser &&
-      credentialResult.user.uid !== currentUser.uid &&
-      credentialResult.user.phoneNumber
-    ) {
-      try {
-        const phoneAuthCred = PhoneAuthProvider.credential(
-          confirmationResult.verificationId,
-          cleanCode
-        );
-        await updatePhoneNumber(currentUser, phoneAuthCred);
-      } catch (updateErr: any) {
-        console.warn("[PhoneVerification] updatePhoneNumber warning:", updateErr?.message);
-      }
-    }
-
-    const verifiedPhone =
-      currentUser?.phoneNumber ||
-      credentialResult.user.phoneNumber ||
-      "";
+    if (intendedUid && credentialResult.user.uid !== intendedUid) throw new Error("Phone verification resolved to a different account. The signed-in account was not changed; sign in to the account that owns this number.");
+    if (intendedUid && currentUser?.uid !== intendedUid) throw new Error("Your signed-in account changed during phone verification. Please sign in again.");
+    const verifiedPhone = credentialResult.user.phoneNumber || "";
+    if (!verifiedPhone) throw new Error("Firebase did not return a verified phone number.");
 
     return {
       success: true,
@@ -330,7 +299,10 @@ export const phoneVerificationService = {
     const mode = authManager.getMode();
     const activeUid = uid || firebaseAuth.currentUser?.uid;
 
-    if (mode === "production" && activeUid) {
+    if (mode === "production") {
+      if (!activeUid) {
+        throw new Error("The authenticated customer identity is unavailable. Sign in again, then retry synchronization without requesting another OTP.");
+      }
       // In production mode, persist through customerIdentityService to onlineCustomers
       return await customerIdentityService.updateVerifiedPhoneNumber({
         uid: activeUid,

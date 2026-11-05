@@ -17,6 +17,7 @@ describe("Phone Verification & Checkout Enforcement Test Suite", () => {
       expect(formatToE164("91", "98400-12345")).toBe("+919840012345");
       expect(formatToE164("+1", "(555) 234-5678")).toBe("+15552345678");
       expect(formatToE164("+971", "50 123 4567")).toBe("+971501234567");
+      expect(formatToE164("+91", "+91 98400 12345")).toBe("+919840012345");
     });
 
     it("validates Indian 10-digit mobile numbers with correct prefixes", () => {
@@ -63,7 +64,10 @@ describe("Phone Verification & Checkout Enforcement Test Suite", () => {
         /too many OTP requests/i
       );
       expect(mapPhoneAuthError({ code: "auth/credential-already-in-use" })).toMatch(
-        /already linked to another Sri Amman account/i
+        /already associated with an account/i
+      );
+      expect(mapPhoneAuthError({ code: "auth/credential-already-in-use" })).toMatch(
+        /sign in to the account that owns it|contact support/i
       );
     });
 

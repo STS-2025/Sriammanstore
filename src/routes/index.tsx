@@ -12,7 +12,7 @@ import { useLanguage } from "../context/LanguageContext";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Sri Amman Smart Store — Farm Fresh Groceries in 60 Mins" },
+      { title: "Sri Amman Smart Store" },
       {
         name: "description",
         content:
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/")({
 
 const INITIAL_CATEGORY_COUNT = 10;
 const BANNER_INTERVAL_MS = 6000;
-const BANNER_DATA_REFRESH_MS = 3_000;
+const BANNER_DATA_REFRESH_MS = 15_000;
 
 function HomePage() {
   const { t } = useLanguage();
@@ -164,7 +164,7 @@ function HomePage() {
                   {showAllCategories ? "Show less" : "See all"}
                 </button>
               )}
-              {categories.length > 4 && (
+              {/* {categories.length > 4 && (
                 <button
                   type="button"
                   onClick={() => categoryScroller.current?.scrollBy({ left: 240, behavior: "smooth" })}
@@ -173,7 +173,7 @@ function HomePage() {
                 >
                   <ChevronRight size={18} />
                 </button>
-              )}
+              )} */}
               </div>
             </div>
             {loading ? (

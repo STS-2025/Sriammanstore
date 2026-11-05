@@ -1110,6 +1110,18 @@ describe("Production Firestore Security Rules Proposal (onlineCustomers Migratio
           createdDocumentPaths
         );
 
+        const protectedPhone = "+919000000001";
+        await createEmulatorDocument(
+          `customerPhoneIndex/${protectedPhone}`,
+          {
+            uid: { stringValue: "another-owner-uid" },
+            userDocId: { stringValue: "ONCUS0000999" },
+            collection: { stringValue: "onlineCustomers" },
+            phone: { stringValue: protectedPhone },
+          },
+          createdDocumentPaths
+        );
+
         // 3. Owner CAN read onlineCustomers/{testOncusId}
         const profileRef = doc(db, "onlineCustomers", testOncusId);
         const snap = await getDoc(profileRef);
@@ -1131,6 +1143,20 @@ describe("Production Firestore Security Rules Proposal (onlineCustomers Migratio
         ).rejects.toMatchObject({
           code: "permission-denied",
         });
+
+        // Phone ownership index is server-managed: owner clients cannot create, overwrite, or delete it.
+        const phoneIndexRef = doc(db, "customerPhoneIndex", protectedPhone);
+        const unclaimedPhoneIndexRef = doc(db, "customerPhoneIndex", "+919000000002");
+        await expect(
+          setDoc(unclaimedPhoneIndexRef, { uid: ownerUid, userDocId: testOncusId, phone: "+919000000002" })
+        ).rejects.toMatchObject({ code: "permission-denied" });
+        await expect(
+          setDoc(phoneIndexRef, { uid: ownerUid, userDocId: testOncusId, phone: protectedPhone })
+        ).rejects.toMatchObject({ code: "permission-denied" });
+        await expect(
+          updateDoc(phoneIndexRef, { uid: ownerUid, userDocId: testOncusId })
+        ).rejects.toMatchObject({ code: "permission-denied" });
+        await expect(deleteDoc(phoneIndexRef)).rejects.toMatchObject({ code: "permission-denied" });
 
         // 6. Owner CANNOT write to orders subcollection (write denied)
         await expect(

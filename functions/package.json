@@ -1,9 +1,9 @@
 {
   "name": "sri-amman-customer-registration-functions",
   "private": true,
-  "description": "Isolated Cloud Functions codebase for Sri Amman Smart Store customer registration only.",
+  "description": "Isolated Cloud Functions codebase for Sri Amman Smart Store customer registration and verified phone synchronization.",
   "main": "index.js",
   "engines": { "node": "22" },
-  "scripts": { "lint": "node --check index.js && node --check registrationHandler.js", "test": "node --test index.test.js" },
+  "scripts": { "lint": "node --check index.js && node --check registrationHandler.js && node --check phoneSyncHandler.js", "test": "node --test index.test.js phoneSyncHandler.test.js" },
   "dependencies": { "firebase-admin": "^13.0.0", "firebase-functions": "^6.0.0" }
 }

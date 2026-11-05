@@ -1,7 +1,8 @@
 # Isolated Customer Registration Function
 
-This separate Firebase Functions codebase exports `registerCustomer`. It does not
-replace or edit any other Functions source.
+This separate Firebase Functions codebase exports customer registration and
+verified-phone synchronization callables. It does not replace or edit any other
+Functions source.
 
 ## Current registration flow
 
@@ -29,6 +30,15 @@ Auth, Firestore, and Functions together and imports `.firebase-emulator-data` wh
 an export snapshot is present. The launcher does not start a second emulator set
 when it detects any of those services already listening. In that case, use the
 existing session or coordinate an intentional full-suite restart before testing.
+
+## Existing customer phone synchronization
+
+`updateCustomerVerifiedPhone` accepts only `{ verifiedE164Phone }`. It derives
+the UID from callable authentication, verifies the phone against Firebase Auth
+with the Admin SDK, validates the canonical `usersByUid/{uid}` mapping and
+`onlineCustomers/{customerId}` ownership, and checks phone indexes plus legacy
+and canonical phone fields. It updates the profile and phone index in one Admin
+Firestore transaction. Client writes to those protected documents remain denied.
 
 ## Customer ID sequence prerequisite
 

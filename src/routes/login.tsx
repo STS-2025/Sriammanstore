@@ -158,7 +158,7 @@ export function LoginPage() {
     if (searchParams.redirect) {
       navigate({ to: searchParams.redirect as never });
     } else {
-      navigate({ to: "/account" });
+      navigate({ to: "/" });
     }
   };
 

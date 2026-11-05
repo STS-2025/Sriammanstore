@@ -1,5 +1,6 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore, doc, getDoc, runTransaction, setDoc } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { getProductionFirestoreInstance } from "./productionOrderReader";
 import { apiClient } from "./apiClient";
 import {
@@ -1183,38 +1184,38 @@ export const customerIdentityService = {
       throw new Error("Invalid verified phone number format. Must be E.164 (e.g. +919840012345).");
     }
 
-    const detectedCountryCode =
-      ["+971", "+61", "+44", "+91", "+1"].find((code) => cleanPhone.startsWith(code)) || "+91";
-    const nationalNumber = cleanPhone.slice(detectedCountryCode.length).replace(/\D/g, "");
+    const activeUid = authManager.getProductionAdapter().getCurrentUser()?.uid;
+    if (!activeUid || activeUid !== uid) {
+      throw new Error("The authenticated customer identity changed. Sign in again, then retry without requesting another OTP.");
+    }
 
     const db = getProductionFirestoreInstance();
     const mapRef = doc(db, "usersByUid", uid);
-    const mapSnap = await getDoc(mapRef);
-
-    let profileCollection: "onlineCustomers" | "users" = "onlineCustomers";
-    let targetDocId = customerId;
-
-    if (mapSnap.exists()) {
-      const mapData = mapSnap.data();
-      if (
-        mapData &&
-        mapData["userDocId"] &&
-        mapData["userDocId"] !== customerId &&
-        mapData["legacySassId"] !== customerId
-      ) {
-        throw new Error("Access denied: Authenticated UID does not match customer profile.");
-      }
-      if (mapData && mapData["collection"] === "users") {
-        profileCollection = "users";
-      }
+    let mapSnap;
+    try {
+      mapSnap = await getDoc(mapRef);
+    } catch {
+      throw new Error("Customer identity could not be verified. Retry synchronization without requesting another OTP.");
     }
 
-    const nowIso = new Date().toISOString();
-    const docRef = doc(db, profileCollection, targetDocId);
+    if (!mapSnap.exists()) {
+      throw new Error("Customer account link is missing. Contact support to recover the account before updating its phone.");
+    }
+    const mapData = mapSnap.data();
+    if (
+      (mapData?.["uid"] && mapData["uid"] !== uid) ||
+      (mapData?.["collection"] && mapData["collection"] !== "onlineCustomers") ||
+      (mapData?.["accountType"] && mapData["accountType"] !== "customer") ||
+      (mapData?.["userDocId"] ?? mapData?.["customerId"]) !== customerId
+    ) {
+      throw new Error("Access denied: Authenticated UID does not match customer profile.");
+    }
+
+    const docRef = doc(db, "onlineCustomers", customerId);
     const docSnap = await getDoc(docRef);
 
     if (!docSnap.exists()) {
-      throw new Error(`Customer profile "${targetDocId}" not found in ${profileCollection}.`);
+      throw new Error(`Customer profile "${customerId}" not found in onlineCustomers.`);
     }
 
     const existingData = docSnap.data();
@@ -1225,36 +1226,21 @@ export const customerIdentityService = {
       throw new Error("Access denied: You cannot modify another customer's phone number.");
     }
 
-    const payload = {
-      phoneVerified: true,
-      phone: cleanPhone,
-      number: nationalNumber,
-      countryCode: detectedCountryCode,
-      updatedAt: nowIso,
-      lastUpdated: nowIso,
-    };
-
-    await setDoc(docRef, payload, { merge: true });
-
-    // Best-effort write to customerPhoneIndex if onlineCustomers
-    try {
-      const phoneIndexRef = doc(db, "customerPhoneIndex", cleanPhone);
-      await setDoc(
-        phoneIndexRef,
-        {
-          uid,
-          userDocId: targetDocId,
-          collection: profileCollection,
-          phone: cleanPhone,
-          createdAt: nowIso,
-        },
-        { merge: true }
-      );
-    } catch {
-      // Best-effort index update
+    const functions = getFunctions(authManager.getProductionAdapter().getAuthInstance().app);
+    const updatePhone = httpsCallable<
+      { verifiedE164Phone: string },
+      { ok: true }
+    >(functions, "updateCustomerVerifiedPhone");
+    const result = await updatePhone({ verifiedE164Phone: cleanPhone });
+    if (result.data?.ok !== true) {
+      throw new Error("Phone verification succeeded, but the customer profile could not be synchronized. Retry without requesting another OTP.");
     }
 
-    const mergedRaw = { ...existingData, ...payload };
+    const updatedSnapshot = await getDoc(docRef);
+    if (!updatedSnapshot.exists()) {
+      throw new Error("Phone verification succeeded, but the customer profile could not be reloaded. Retry synchronization without requesting another OTP.");
+    }
+    const mergedRaw = updatedSnapshot.data();
     const normalized = normalizeLegacyUser(mergedRaw);
     if (!normalized) {
       throw new Error("Failed to normalize updated customer profile.");

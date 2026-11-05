@@ -7,7 +7,6 @@ import {
   formatToE164,
   validatePhoneNumber,
   mapPhoneAuthError,
-  extractPhoneAuthErrorCode,
 } from "../../services/phoneVerificationService";
 import { notificationService } from "../../services/notificationService";
 import { toast } from "sonner";
@@ -183,14 +182,6 @@ export function PhoneVerificationModal({
       setResendCooldown(30);
       toast.success(`Verification OTP sent to ${countryCode} ${nationalNumber}`);
     } catch (err: unknown) {
-      const rawCode = extractPhoneAuthErrorCode(err);
-      const maskedPhone = nationalNumber ? `${countryCode}******${nationalNumber.slice(-4)}` : "";
-      console.warn("[PhoneVerificationModal] sendOtp error:", {
-        code: rawCode,
-        phone: maskedPhone,
-        rawError: err,
-      });
-
       const friendlyError = mapPhoneAuthError(err);
       setErrorMessage(friendlyError);
       setIsRecaptchaSolved(false);
@@ -242,6 +233,7 @@ export function PhoneVerificationModal({
       );
       if (result.phoneNumber) {
         confirmedPhone = result.phoneNumber;
+        setVerifiedE164Phone(result.phoneNumber);
       }
     } catch (err: unknown) {
       console.error("[PhoneVerificationModal] confirmOtp error:", err);
@@ -253,13 +245,14 @@ export function PhoneVerificationModal({
     // 2. Persist verified state to onlineCustomers profile
     try {
       const activeCustomerId = user?.id || user?.userId || "";
-      if (activeCustomerId) {
-        await phoneVerificationService.persistVerifiedPhone({
-          userId: activeCustomerId,
-          verifiedPhone: confirmedPhone,
-          ...(user?.uid ? { uid: user.uid } : {}),
-        });
+      if (!activeCustomerId) {
+        throw new Error("Your customer profile is unavailable. Sign in again, then retry synchronization without requesting another OTP.");
       }
+      await phoneVerificationService.persistVerifiedPhone({
+        userId: activeCustomerId,
+        verifiedPhone: confirmedPhone,
+        ...(user?.uid ? { uid: user.uid } : {}),
+      });
 
       // 3. Refresh user in AuthContext so whole app reflects phoneVerified: true immediately
       await refreshUser();
@@ -302,6 +295,9 @@ export function PhoneVerificationModal({
     setErrorMessage("");
     try {
       const activeCustomerId = user?.id || user?.userId || "";
+      if (!activeCustomerId) {
+        throw new Error("Your customer profile is unavailable. Sign in again, then retry synchronization without requesting another OTP.");
+      }
       await phoneVerificationService.persistVerifiedPhone({
         userId: activeCustomerId,
         verifiedPhone: verifiedE164Phone,
