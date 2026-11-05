@@ -31,6 +31,21 @@ an export snapshot is present. The launcher does not start a second emulator set
 when it detects any of those services already listening. In that case, use the
 existing session or coordinate an intentional full-suite restart before testing.
 
+## Production function deployment
+
+The default Firebase project in `.firebaserc` is `demo-sri-amman-store` for local
+emulator work. The `production` alias points to `sri-amman-smart-store`; passing
+`--project production` selects production explicitly and does not fall back to the
+default. To deploy only the phone eligibility callable, include the configured
+Functions codebase name in the filter:
+
+```powershell
+firebase deploy --only functions:customer-registration:checkCustomerPhoneEligibility --project production
+```
+
+The `customer-registration` segment is required because `firebase.json` assigns
+the Functions source to that codebase.
+
 ## Existing customer phone synchronization
 
 `updateCustomerVerifiedPhone` accepts only `{ verifiedE164Phone }`. It derives

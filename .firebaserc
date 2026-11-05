@@ -1,6 +1,7 @@
 {
   "projects": {
-    "default": "demo-sri-amman-store"
+    "default": "demo-sri-amman-store",
+    "production": "sri-amman-smart-store"
   }
 }
 

@@ -47,7 +47,7 @@ vi.mock("sonner", () => ({
 vi.mock("../services/phoneEligibilityService", () => ({
   checkCustomerPhoneEligibility: otpMocks.checkEligibility,
   mapPhoneEligibilityError: () =>
-    "Unable to check this mobile number right now. Please try again shortly.",
+    "Unable to check this mobile number right now / number is not registered. Please try again shortly.",
 }));
 
 vi.mock("firebase/auth", async (importOriginal) => {
