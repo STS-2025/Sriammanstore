@@ -211,6 +211,15 @@ function createUpdateCustomerVerifiedPhoneHandler({ db, auth, HttpsError, FieldV
           }
         }
 
+        const currentProfileAndIndexConfirmOwner =
+          profile.phoneVerified === true &&
+          normalizeStoredPhone(profile) === phone &&
+          indexSnapshot.exists &&
+          indexSnapshot.data().uid === uid &&
+          indexSnapshot.data().userDocId === customerId &&
+          indexSnapshot.data().collection === "onlineCustomers" &&
+          normalizeStoredPhone({ phone: indexSnapshot.data().phone }) === phone;
+
         const matchingRecords = [
           ...snapshotDocs(legacyPhoneQuery),
           ...snapshotDocs(legacyNumberQuery).filter(
@@ -228,7 +237,16 @@ function createUpdateCustomerVerifiedPhoneHandler({ db, auth, HttpsError, FieldV
         for (const record of matchingRecords) {
           const sameOnlineProfile =
             record.ref && record.ref.path === `onlineCustomers/${customerId}`;
-          if (!sameOnlineProfile && !profileBelongsToCustomer(record.data(), uid)) {
+          const isUnverifiedOnlineDuplicate =
+            record.ref &&
+            record.ref.path.startsWith("onlineCustomers/") &&
+            record.data().phoneVerified === false &&
+            currentProfileAndIndexConfirmOwner;
+          if (
+            !sameOnlineProfile &&
+            !profileBelongsToCustomer(record.data(), uid) &&
+            !isUnverifiedOnlineDuplicate
+          ) {
             throw makeError(
               HttpsError,
               "already-exists",

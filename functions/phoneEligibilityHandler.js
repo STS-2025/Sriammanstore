@@ -254,7 +254,12 @@ function createPhoneEligibilityHandler({
         const profileData = profile.data();
         if (matchesPhone(profileData, phone, countryCode, number)) byId.set(profile.id, profile);
       }
-      matchingProfiles = [...byId.values()];
+      // The canonical verified profile and phone index identify the owner.
+      // Ignore stale, explicitly unverified duplicates; a verified duplicate
+      // remains ambiguous and is rejected below.
+      matchingProfiles = [...byId.values()].filter(
+        (profile) => profile.data().phoneVerified === true,
+      );
       const legacyById = new Map();
       for (const legacyProfile of [
         ...getDocuments(legacyPhoneQuery),

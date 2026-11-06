@@ -7,6 +7,7 @@ interface WishlistHeartButtonProps {
   size?: "sm" | "md" | "lg";
   label?: string;
   activeLabel?: string;
+  labelClassName?: string;
   ariaLabel?: string;
   activeAriaLabel?: string;
   disabled?: boolean;
@@ -21,6 +22,7 @@ export function WishlistHeartButton({
   size = "md",
   label,
   activeLabel,
+  labelClassName = "",
   ariaLabel,
   activeAriaLabel,
   disabled = false,
@@ -80,7 +82,7 @@ export function WishlistHeartButton({
           </span>
         )}
       </span>
-      {label && <span>{active ? (activeLabel || label) : label}</span>}
+      {label && <span className={labelClassName}>{active ? (activeLabel || label) : label}</span>}
     </button>
   );
 }

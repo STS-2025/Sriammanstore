@@ -68,7 +68,7 @@ function ProductDetailsPage() {
 
       if (item) {
         const all = await productService.getProducts();
-        const similar = getSimilarProducts(item, all, { limit: 4 });
+        const similar = getSimilarProducts(item, all, { limit: 6 });
         const similarIds = similar.map((p) => p.id);
         const complementary = getComplementaryProducts(item, all, {
           limit: 4,
@@ -245,15 +245,11 @@ function ProductDetailsPage() {
                 {product.name}
               </span>
             </nav>
-            <div className="hidden sm:flex items-center gap-2 text-secondary font-headline-sm text-xs font-semibold bg-secondary-fixed/40 px-3 py-1 rounded-full">
-              <span className="material-symbols-outlined text-[16px]">verified</span>
-              <span>100% Single-Store Authenticity • Pressed Locally</span>
-            </div>
           </div>
         </div>
 
         {/* Product Showcase Section */}
-        <section className="max-w-[1320px] w-full mx-auto px-margin-desktop py-space-xl">
+        <section className="max-w-[1240px] w-full mx-auto px-margin-desktop py-space-xl">
 
           {/* Anomaly Notice for prod-munn8cp3 */}
           {isProductionMode && product.id === "prod-munn8cp3" && (
@@ -274,6 +270,14 @@ function ProductDetailsPage() {
             {/* Gallery Column */}
             <div className="lg:col-span-6 flex flex-col gap-space-md">
               <div className="relative bg-surface-container-lowest rounded-3xl shadow-sm overflow-hidden group border border-outline-variant/20">
+                <WishlistHeartButton
+                  active={wishlisted}
+                  onToggle={handleToggleWishlist}
+                  size="md"
+                  ariaLabel="Add to wishlist"
+                  activeAriaLabel="Remove from wishlist"
+                  className="absolute right-3 top-3 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface shadow-md transition-colors hover:bg-surface-container-low sm:right-4 sm:top-4"
+                />
                 {/* Badges */}
                 <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
                   {discountPercent > 0 && (
@@ -309,16 +313,6 @@ function ProductDetailsPage() {
                     </div>
                   )}
                 </div>
-
-                <div className="bg-surface-container px-space-md py-2.5 flex items-center justify-between text-on-surface-variant text-xs">
-                  <span className="flex items-center gap-1.5 text-primary font-semibold">
-                    <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                    Single-Store Authenticity Guarantee
-                  </span>
-                  <span className="bg-surface-container-lowest px-2 py-0.5 rounded text-on-surface font-mono">
-                    Batch #TN-2026
-                  </span>
-                </div>
               </div>
 
               {/* Thumbnails Row */}
@@ -347,31 +341,6 @@ function ProductDetailsPage() {
                   ))}
                 </div>
               )}
-
-              {/* Quick Actions (Wishlist & Share) */}
-              <div className="flex items-center justify-between pt-space-xs gap-3">
-                <WishlistHeartButton
-                  active={wishlisted}
-                  onToggle={handleToggleWishlist}
-                  size="md"
-                  label="Save to Wishlist"
-                  activeLabel="Saved in Wishlist"
-                  activeAriaLabel="Remove from wishlist"
-                  className={`flex-1 py-3 px-4 rounded-2xl shadow-sm transition-all border border-outline-variant/20 font-headline-sm text-xs font-bold ${wishlisted ? "bg-rose-50 text-rose-600" : "bg-surface-container-lowest hover:bg-surface-container-high text-on-surface"}`}
-                />
-
-                <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                    `Check out ${product.name} at Sri Amman Smart Store: https://sriammanstore.com/product?id=${product.id}`
-                  )}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-12 h-12 rounded-2xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#128C7E] flex items-center justify-center transition-all shadow-sm shrink-0"
-                  title="Share on WhatsApp"
-                >
-                  <span className="material-symbols-outlined text-[22px]">chat</span>
-                </a>
-              </div>
             </div>
 
             {/* Product Meta Column */}
@@ -395,7 +364,7 @@ function ProductDetailsPage() {
                   )}
                 </div>
 
-                <h1 className="font-headline-lg text-2xl md:text-3xl text-on-surface font-extrabold tracking-tight leading-tight">
+                <h1 className="font-headline-lg text-xl md:text-2xl text-on-surface font-extrabold tracking-tight leading-tight">
                   {t(product.name, product.tamilName)}
                 </h1>
                 <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
@@ -432,7 +401,7 @@ function ProductDetailsPage() {
               {/* Price Card */}
               <div className="bg-surface-container-lowest p-space-lg rounded-3xl shadow-sm flex flex-col gap-3 border border-outline-variant/20">
                 <div className="flex flex-wrap items-baseline gap-space-sm">
-                  <span className="font-price-hero text-3xl font-extrabold text-on-surface tracking-tight">
+                  <span className="font-price-hero text-2xl font-extrabold text-on-surface tracking-tight">
                     ₹{currentPrice}
                   </span>
                   {currentOption.mrp > currentOption.offerPrice && (
@@ -447,7 +416,7 @@ function ProductDetailsPage() {
                   )}
                 </div>
                 <p className="text-[11px] text-on-surface-variant font-medium">
-                  Inclusive of all taxes • Harvested directly from native farms
+                  Inclusive of all taxes
                 </p>
 
                 {/* VIP Price Highlight Box */}
@@ -608,6 +577,60 @@ function ProductDetailsPage() {
           </div>
         </section>
 
+        {/* Section 1: Similar Products (Traditional Alternatives) */}
+        {similarProducts.length > 0 && (
+          <section className="max-w-[1320px] w-full mx-auto px-margin-desktop py-4 mt-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm mb-4">
+              <div className="flex flex-col">
+                <h3 className="font-headline-lg text-2xl font-extrabold text-on-surface tracking-tight">
+                  Similar Products
+                </h3>
+              </div>
+              <Link
+                to="/shop"
+                search={{ category: product.categorySlug } as any}
+                className="font-label-button text-primary hover:underline font-bold flex items-center gap-1 text-sm"
+              >
+                <span>View all {product.category}</span>
+                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+              {similarProducts.map((p) => (
+                <ProductCard key={p.id} product={p} readOnly={false} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Section 2: Frequently Bundled / Complete Your Traditional Kitchen Basket */}
+        {complementaryProducts.length > 0 && (
+          <section className="max-w-[1320px] w-full mx-auto px-margin-desktop py-space-2xl border-t border-outline-variant/15">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm mb-space-lg">
+              <div className="flex flex-col">
+                <span className="font-label-badge uppercase tracking-wider text-secondary font-bold text-xs">
+                  Frequently Bundled
+                </span>
+                <h3 className="font-headline-lg text-2xl font-extrabold text-on-surface tracking-tight">
+                  Complete Your Kitchen Basket
+                </h3>
+              </div>
+              <Link
+                to="/shop"
+                className="font-label-button text-primary hover:underline font-bold flex items-center gap-1 text-sm"
+              >
+                <span>View all Staples</span>
+                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+              {complementaryProducts.map((p) => (
+                <ProductCard key={p.id} product={p} readOnly={false} />
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Deep Details Tabs (Specs, Reviews) */}
         <section className="w-full bg-surface-container-lowest py-4 border-t border-outline-variant/15 mt-2">
           <div className="max-w-[1320px] mx-auto px-margin-desktop">
@@ -749,62 +772,6 @@ function ProductDetailsPage() {
           </div>
         </section>
 
-        {/* Section 1: Similar Products (Traditional Alternatives) */}
-        {similarProducts.length > 0 && (
-          <section className="max-w-[1320px] w-full mx-auto px-margin-desktop py-4 mt-0">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm mb-4">
-              <div className="flex flex-col">
-                <span className="font-label-badge uppercase tracking-wider text-secondary font-bold text-xs">
-                  Traditional Alternatives
-                </span>
-                <h3 className="font-headline-lg text-2xl font-extrabold text-on-surface tracking-tight">
-                  Similar Products
-                </h3>
-              </div>
-              <Link
-                to="/shop"
-                search={{ category: product.categorySlug } as any}
-                className="font-label-button text-primary hover:underline font-bold flex items-center gap-1 text-sm"
-              >
-                <span>View all {product.category}</span>
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {similarProducts.map((p) => (
-                <ProductCard key={p.id} product={p} readOnly={false} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Section 2: Frequently Bundled / Complete Your Traditional Kitchen Basket */}
-        {complementaryProducts.length > 0 && (
-          <section className="max-w-[1320px] w-full mx-auto px-margin-desktop py-space-2xl border-t border-outline-variant/15">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-sm mb-space-lg">
-              <div className="flex flex-col">
-                <span className="font-label-badge uppercase tracking-wider text-secondary font-bold text-xs">
-                  Frequently Bundled
-                </span>
-                <h3 className="font-headline-lg text-2xl font-extrabold text-on-surface tracking-tight">
-                  Complete Your Traditional Kitchen Basket
-                </h3>
-              </div>
-              <Link
-                to="/shop"
-                className="font-label-button text-primary hover:underline font-bold flex items-center gap-1 text-sm"
-              >
-                <span>View all Organic Staples</span>
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
-              {complementaryProducts.map((p) => (
-                <ProductCard key={p.id} product={p} readOnly={false} />
-              ))}
-            </div>
-          </section>
-        )}
       </main>
 
       <StoreFooter />

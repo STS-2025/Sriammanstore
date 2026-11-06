@@ -539,7 +539,7 @@ function CategoryTile({ category, label }: { category: Category; label: string }
       className="group flex w-[82px] shrink-0 snap-start flex-col items-center text-center sm:w-[92px]"
       aria-label={`Shop ${label}`}
     >
-      <span className="relative flex shrink-0 items-center justify-center transition-all duration-300 ease-out group-hover:scale-[1.03] group-hover:shadow-[0_10px_26px_rgba(24,92,54,0.18)] motion-reduce:transform-none motion-reduce:transition-none">
+      <span className="relative flex shrink-0 items-center justify-center rounded-full transition-all duration-300 ease-out group-hover:scale-[1.03] motion-reduce:transform-none motion-reduce:transition-none">
         <span className="block h-[72px] w-[72px] overflow-hidden rounded-full border border-primary/20 bg-surface-container-lowest shadow-sm transition-all duration-300 ease-out group-hover:border-primary group-hover:shadow-[0_10px_22px_rgba(24,92,54,0.18)] sm:h-[82px] sm:w-[82px] md:h-[88px] md:w-[88px] lg:h-[96px] lg:w-[96px] motion-reduce:transition-none">
           {!imageFailed ? (
             <img

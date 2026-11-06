@@ -42,13 +42,6 @@ export function ProductCard({
   const quantity = getItemQuantity(cartKey);
   const wishlisted = isWishlisted(product.id);
 
-  const discountPercent =
-    currentOption.mrp > currentOption.offerPrice
-      ? Math.round(
-          ((currentOption.mrp - currentOption.offerPrice) / currentOption.mrp) * 100
-        )
-      : 0;
-
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -167,17 +160,12 @@ export function ProductCard({
             </div>
           )}
 
-          {/* Read-Only Preview Badge */}
-          {readOnly && (
-            <span className="absolute top-2 left-2 bg-amber-600 text-white font-label-badge text-label-badge px-2 py-0.5 rounded-full font-bold shadow-sm text-[10px] tracking-wide uppercase">
-              Preview
-            </span>
-          )}
-
-          {/* Discount Badge */}
-          {discountPercent > 0 && !readOnly && (
-            <span className="absolute top-2 left-2 bg-tertiary text-on-tertiary font-label-badge text-label-badge px-2 py-0.5 rounded-full font-bold shadow-sm text-xs">
-              {discountPercent}% OFF
+          {product.isOffer === true && (
+            <span
+              aria-label="Offer"
+              className="absolute -left-5 top-2 z-10 w-20 -rotate-45 bg-emerald-700 py-0.5 text-center text-[8px] font-black uppercase tracking-wide text-white shadow-md sm:-left-7 sm:top-3 sm:w-28 sm:py-1 sm:text-[10px]"
+            >
+              Offer
             </span>
           )}
 
@@ -191,6 +179,31 @@ export function ProductCard({
             />
           )}
         </div>
+
+        {(readOnly || product.isNew === true || product.isBestSeller === true || product.isFeatured === true) && (
+          <div className="mb-2 flex flex-wrap gap-1">
+            {readOnly && (
+              <span className="whitespace-nowrap rounded-full bg-amber-600 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm sm:px-2 sm:text-[10px]">
+                Preview
+              </span>
+            )}
+            {product.isNew === true && (
+              <span className="whitespace-nowrap rounded-full bg-sky-600 px-1.5 py-0.5 text-[8px] font-bold uppercase text-white shadow-sm sm:px-2 sm:text-[10px]">
+                New
+              </span>
+            )}
+            {product.isBestSeller === true && (
+              <span className="whitespace-nowrap rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-bold uppercase text-white shadow-sm sm:px-2 sm:text-[10px]">
+                Best Seller
+              </span>
+            )}
+            {product.isFeatured === true && (
+              <span className="whitespace-nowrap rounded-full bg-violet-600 px-1.5 py-0.5 text-[8px] font-bold uppercase text-white shadow-sm sm:px-2 sm:text-[10px]">
+                Featured
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Rating (Hidden when genuine rating data is unavailable) */}
         {hasGenuineRating && (
@@ -265,7 +278,7 @@ export function ProductCard({
         )}
 
         {/* Prices & Savings */}
-        <div className="flex items-baseline gap-space-xs mb-space-md">
+        <div className="flex flex-wrap items-baseline gap-x-space-xs gap-y-1 mb-space-md">
           <span className="font-price-card text-price-card text-on-surface font-black text-base">
             ₹
             {isVipCustomer && currentOption.specialPrice

@@ -978,6 +978,10 @@ export function normalizeLegacyProduct(
       : typeof rawDoc["isBestseller"] === "boolean"
       ? rawDoc["isBestseller"]
       : undefined;
+  const isFeatured =
+    typeof rawDoc["isFeatured"] === "boolean" ? rawDoc["isFeatured"] : undefined;
+  const isOffer =
+    typeof rawDoc["isOffer"] === "boolean" ? rawDoc["isOffer"] : undefined;
 
   const product: Product = {
     id,
@@ -1006,6 +1010,8 @@ export function normalizeLegacyProduct(
     ...(hsnCode !== null ? { hsnCode } : {}),
     ...(isNew !== undefined ? { isNew } : {}),
     ...(isBestSeller !== undefined ? { isBestSeller } : {}),
+    ...(isFeatured !== undefined ? { isFeatured } : {}),
+    ...(isOffer !== undefined ? { isOffer } : {}),
   };
 
   return product;

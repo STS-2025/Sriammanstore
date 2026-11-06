@@ -90,6 +90,10 @@ export interface Product {
   isNew?: boolean;
   /** Bestseller promotional indicator */
   isBestSeller?: boolean;
+  /** Featured product indicator */
+  isFeatured?: boolean;
+  /** Promotional offer indicator */
+  isOffer?: boolean;
 }
 
 export interface Category {

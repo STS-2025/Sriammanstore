@@ -497,7 +497,7 @@ export function CartPage() {
                 </div>
 
                 {/* 3. Items in Your Cart Card */}
-                <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm">
+                <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-5 pb-3 border-b border-outline-variant/15">
                     <div>
                       <h2 className="font-headline-sm text-base font-extrabold text-on-surface">
@@ -530,14 +530,14 @@ export function CartPage() {
                         <div
                           key={item.id}
                           data-testid={`cart-item-${item.id}`}
-                          className="py-5 first:pt-0 last:pb-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                          className="py-4 sm:py-5 first:pt-0 last:pb-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4"
                         >
                           {/* Item Info */}
-                          <div className="flex items-start gap-4 flex-1">
+                          <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
                             <Link
                               to="/product"
                               search={{ id: item.productId } as any}
-                              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-surface-container-low overflow-hidden shrink-0 flex items-center justify-center p-2 border border-outline-variant/15 group"
+                              className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl bg-surface-container-low overflow-hidden shrink-0 flex items-center justify-center p-2 border border-outline-variant/15 group"
                             >
                               <img
                                 src={item.image}
@@ -547,7 +547,7 @@ export function CartPage() {
                               />
                             </Link>
 
-                            <div className="flex-1">
+                            <div className="min-w-0 flex-1">
                               <Link
                                 to="/product"
                                 search={{ id: item.productId } as any}
@@ -579,14 +579,14 @@ export function CartPage() {
                           </div>
 
                           {/* Right Controls: Stepper, Line Total & Actions */}
-                          <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3">
+                          <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end sm:gap-3">
                             <div className="flex items-center gap-3">
                               {/* Quantity Stepper */}
-                              <div className="flex items-center bg-surface-container-low rounded-xl p-1 border border-outline-variant/20">
+                              <div className="flex shrink-0 items-center bg-surface-container-low rounded-xl p-1 border border-outline-variant/20">
                                 <button
                                   type="button"
                                   onClick={() => updateQty(item.id, item.quantity - 1)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors hover:bg-surface text-on-surface cursor-pointer"
+                                  className="h-9 w-9 sm:h-7 sm:w-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors hover:bg-surface text-on-surface cursor-pointer"
                                   title="Decrease quantity"
                                 >
                                   −
@@ -597,7 +597,7 @@ export function CartPage() {
                                 <button
                                   type="button"
                                   onClick={() => updateQty(item.id, item.quantity + 1)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors bg-primary text-white hover:bg-primary-container cursor-pointer shadow-sm"
+                                  className="h-9 w-9 sm:h-7 sm:w-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors bg-primary text-white hover:bg-primary-container cursor-pointer shadow-sm"
                                   title="Increase quantity"
                                 >
                                   +
@@ -611,25 +611,28 @@ export function CartPage() {
                             </div>
 
                             {/* Secondary Actions: Save & Remove */}
-                            <div className="flex items-center gap-3 text-xs font-semibold text-outline">
+                            <div className="flex items-center gap-1 sm:gap-3 text-xs font-semibold text-outline">
                               <WishlistHeartButton
                                 active={isWishlisted(item.productId)}
                                 onToggle={() => handleSaveToWishlist(item)}
                                 size="sm"
                                 label="Save"
                                 activeLabel="Remove"
-                                className="gap-1 text-xs font-semibold text-outline hover:text-primary transition-colors"
+                                labelClassName="hidden sm:inline"
+                                className="min-h-10 min-w-10 justify-center rounded-lg p-2 gap-1 text-xs font-semibold text-outline hover:text-primary transition-colors sm:min-h-0 sm:min-w-0 sm:rounded-none sm:p-0"
                               />
-                              <span>•</span>
+                              <span className="hidden sm:inline">•</span>
                               <button
                                 type="button"
                                 onClick={() => removeFromCart(item.id)}
-                                className="flex items-center gap-0.5 hover:text-error transition-colors cursor-pointer"
+                                aria-label={`Remove ${item.name} from cart`}
+                                title={`Remove ${item.name} from cart`}
+                                className="min-h-10 min-w-10 rounded-lg p-2 flex items-center justify-center gap-0.5 hover:text-error transition-colors cursor-pointer sm:min-h-0 sm:min-w-0 sm:rounded-none sm:p-0 sm:justify-start"
                               >
-                                <span className="material-symbols-outlined text-[14px]">
+                                <span className="material-symbols-outlined text-[18px] sm:text-[14px]">
                                   delete
                                 </span>
-                                <span>Remove</span>
+                                <span className="hidden sm:inline">Remove</span>
                               </button>
                             </div>
                           </div>
@@ -639,7 +642,7 @@ export function CartPage() {
                   </div>
 
                   {/* Subtotal Banner inside Cart Card */}
-                  <div className="mt-6 pt-4 border-t border-outline-variant/15 flex items-center justify-between text-xs bg-surface-container-low/50 p-3.5 rounded-2xl">
+                  <div className="mt-6 pt-4 border-t border-outline-variant/15 flex flex-col items-start justify-between gap-2 text-xs bg-surface-container-low/50 p-3.5 rounded-2xl sm:flex-row sm:items-center">
                     <span className="font-headline-sm font-bold text-on-surface flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-primary text-[18px]">
                         shopping_bag

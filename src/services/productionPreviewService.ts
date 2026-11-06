@@ -864,6 +864,31 @@ export interface ProductionCatalogueResult {
   sourceProject: string;
 }
 
+function mergeProductTagFlags(
+  target: Record<string, unknown>,
+  sources: Record<string, unknown>[]
+): void {
+  const flags: Array<{ field: string; aliases?: string[] }> = [
+    { field: "isOffer" },
+    { field: "isFeatured" },
+    { field: "isNew" },
+    { field: "isBestSeller", aliases: ["isBestseller"] },
+  ];
+
+  for (const { field, aliases = [] } of flags) {
+    const values = sources.flatMap((source) =>
+      [field, ...aliases]
+        .map((key) => source[key])
+        .filter((value): value is boolean => typeof value === "boolean")
+    );
+    if (values.length > 0) {
+      // A flag manually enabled in either Firestore representation should remain
+      // visible after duplicate product documents are combined.
+      target[field] = values.some(Boolean);
+    }
+  }
+}
+
 /**
  * Reads the full production catalogue using verified Firestore query patterns:
  * 1. Top-level collection "products" (Admin Panel schema)
@@ -1090,6 +1115,7 @@ export async function fetchFullProductionCatalogue(
         ...sortedNested[i]!.data,
       };
     }
+    mergeProductTagFlags(mergedNestedData, sortedNested.map((entry) => entry.data));
     const primaryNestedDoc = sortedNested[0];
 
     if (topEntry && sortedNested.length > 0) {
@@ -1105,6 +1131,7 @@ export async function fetchFullProductionCatalogue(
         ...mergedNestedData,
         ...topEntry.data,
       };
+      mergeProductTagFlags(mergedData, [topEntry.data, ...sortedNested.map((entry) => entry.data)]);
 
       const resolvedName =
         topEntry.data["name"] ||
@@ -1510,6 +1537,7 @@ export async function fetchProductionProductById(
             categoryName: topData["categoryName"] || nestedDoc.data["categoryName"] || nestedDoc.data["category"],
           }
         : nestedDoc.data;
+      if (topData) mergeProductTagFlags(mergedData, [topData, nestedDoc.data]);
 
       const parentCat = nestedDoc.parentCategory;
       const catMapping = resolveProductCategoryMapping(mergedData, categoryDocsMap, parentCat);

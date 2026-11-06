@@ -52,14 +52,20 @@ the Functions source to that codebase.
 the UID from callable authentication, verifies the phone against Firebase Auth
 with the Admin SDK, validates the canonical `usersByUid/{uid}` mapping and
 `onlineCustomers/{customerId}` ownership, and checks phone indexes plus legacy
-and canonical phone fields. It updates the profile and phone index in one Admin
-Firestore transaction. Client writes to those protected documents remain denied.
+and canonical phone fields. If the mapped profile and phone index already both
+confirm the signed-in UID as owner, a duplicate `onlineCustomers` record marked
+`phoneVerified: false` does not block synchronization; the duplicate profile is
+left untouched. Verified or ambiguous conflicts still fail closed. The callable
+updates the profile and phone index in one Admin Firestore transaction. Client
+writes to those protected documents remain denied.
 
 ## OTP login eligibility lookup
 
 `checkCustomerPhoneEligibility` accepts `{ phoneNumber }` and returns only
-`{ eligible: boolean }`. It requires a unique verified canonical customer profile,
+`{ eligible: boolean }`. It requires one verified canonical customer profile,
 a matching UID mapping, and Firebase Auth ownership of the submitted E.164 number.
+Explicitly unverified duplicate canonical profiles are ignored once the verified
+profile and phone index agree on the same owner; verified duplicates remain ineligible.
 The callable rate-limits by SHA-256 hashes of the caller IP and normalized phone
 number and stores only short-lived counters in `phoneLookupRateLimits`; configure Firestore TTL on its
 `expiresAt` field so expired counters are removed. Unknown and ineligible numbers receive
