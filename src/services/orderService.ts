@@ -463,6 +463,7 @@ export const orderService = {
     const nowIso = new Date().toISOString();
     const patchPayload: Partial<Order> = {
       status: newStatus,
+      updatedAt: nowIso,
     };
 
     if (newStatus === "delivered") {

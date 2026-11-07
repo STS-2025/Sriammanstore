@@ -2609,6 +2609,26 @@ export class FirestoreAdapter {
       docId,
       validPatch
     );
+
+    // Keep the customer-facing order snapshot in sync with the authoritative
+    // top-level order. Customer order history reads this subcollection directly.
+    if (parsed.resource === "orders") {
+      const rawCustomerId = String(
+        updated["customerId"] || updated["userId"] || updated["buyerId"] || ""
+      ).trim();
+      const normalizedCustomerId = rawCustomerId.toUpperCase().startsWith("SASS")
+        ? `ONCUS${rawCustomerId.slice(4)}`
+        : rawCustomerId;
+
+      if (normalizedCustomerId.toUpperCase().startsWith("ONCUS")) {
+        await this.driver.setDoc(
+          `onlineCustomers/${normalizedCustomerId}/orders`,
+          docId,
+          { ...updated, id: docId, orderId: String(updated["orderId"] || docId) },
+          true
+        );
+      }
+    }
     return updated as unknown as T;
   }
 

@@ -234,7 +234,7 @@ export function AddressesPage() {
               </h1>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <p className="text-xs text-on-surface-variant">
-                  Store Hub: Gobichettipalayam • Service Radius: 6.0 KM
+                  Store Hub: Gobichettipalayam • Service Radius: 50.0 KM
                 </p>
               </div>
             </div>
@@ -344,7 +344,7 @@ export function AddressesPage() {
                           <span className="material-symbols-outlined text-[16px]">
                             {geo.eligible ? "verified" : "error"}
                           </span>
-                          {geo.eligible ? "Eligible (Within 6km)" : "Ineligible (Exceeds 6km)"}
+                          {geo.eligible ? "Eligible (Within 50km)" : "Ineligible (Exceeds 50km)"}
                         </span>
                         <span className="text-on-surface-variant font-mono text-[11px]">
                           {geo.distanceKm} km

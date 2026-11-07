@@ -249,7 +249,7 @@ export function NotificationsPage() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="font-headline-lg text-2xl sm:text-3xl font-black text-on-surface">
-                  Notifications & Store Updates
+                  Notifications & Updates
                 </h1>
                 {unreadCount > 0 && (
                   <span className="bg-rose-100 text-rose-800 text-xs font-black px-2.5 py-0.5 rounded-full">
@@ -257,9 +257,6 @@ export function NotificationsPage() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-on-surface-variant mt-1">
-                Live alerts for your harvest deliveries, exclusive seasonal stock arrivals, and coin credits.
-              </p>
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
@@ -368,7 +365,7 @@ export function NotificationsPage() {
               }`}
             >
               <span className="material-symbols-outlined text-[16px]">spa</span>
-              <span>Harvest & Stock Alerts</span>
+              <span>New Stock Updates</span>
               <span
                 className={`text-[11px] px-1.5 py-0.2 rounded-full font-black ${
                   activeTab === "harvest" ? "bg-white/20 text-white" : "bg-surface-container text-on-surface-variant"
@@ -652,12 +649,12 @@ export function NotificationsPage() {
                   />
                 </div>
 
-                {/* Fresh Harvest Influx */}
+                {/* New Stock Influx */}
                 <div className="p-3.5 rounded-2xl bg-surface-container-low/70 border border-outline-variant/15 flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-xs font-bold text-on-surface">Fresh Harvest Influx</div>
+                    <div className="text-xs font-bold text-on-surface">New Stock Influx</div>
                     <div className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
-                      Alerts when wood-pressed oil & organic farm veggies arrive
+                      Alerts when new products and items arrive.
                     </div>
                   </div>
                   <input
@@ -710,7 +707,7 @@ export function NotificationsPage() {
                 </div>
 
                 <p className="text-xs text-on-surface-variant mt-3 leading-relaxed">
-                  Earn 1 Coin for every ₹10 spent on Organic Vegetables, Mara Chekku Oils & Spices.
+                  Earn 1 Coin for every ₹10 spent on out grocery products.
                 </p>
 
                 <div className="mt-4 pt-3 border-t border-amber-200/50">
@@ -741,7 +738,7 @@ export function NotificationsPage() {
                 </div>
 
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  Connect directly with Store Supervisor Saravanan regarding fresh batch delivery times or PIN verifications.
+                  Connect directly with Store Supervisor regarding batch delivery times or PIN verifications.
                 </p>
 
                 <div className="space-y-2 pt-1">

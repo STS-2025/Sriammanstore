@@ -246,7 +246,7 @@ export function CartPage() {
                   )}
                 </div>
                 <p className="text-xs text-on-surface-variant mt-0.5">
-                  Carefully packed from Gobichettipalayam Hub with temperature-controlled handling
+                  Carefully packed from Gobichettipalayam Hub
                 </p>
               </div>
             </div>
@@ -317,8 +317,7 @@ export function CartPage() {
                 Your Shopping Cart is Empty
               </h2>
               <p className="text-xs text-on-surface-variant mb-6 leading-relaxed">
-                Explore our pure wood-churned cold-pressed oils, single-origin heirloom
-                grains, and traditional South Indian kitchen staples.
+                Explore our wide range of daily essentials, fresh kitchen staples, and favorite household items.
               </p>
               <Link
                 to="/shop"
@@ -732,7 +731,7 @@ export function CartPage() {
                 )}
 
                 {/* 5. Trust Guarantee Badges */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                {/* <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                   <div className="p-3 rounded-2xl bg-surface-container-low text-center">
                     <span className="material-symbols-outlined text-primary text-[22px] mb-1">
                       verified
@@ -769,7 +768,7 @@ export function CartPage() {
                     </h5>
                     <p className="text-[10px] text-on-surface-variant">PCI-DSS encrypted</p>
                   </div>
-                </div>
+                </div> */}
               </div>
 
               {/* RIGHT COLUMN: Coupon, Smart Coins, Bill Summary, Quality Promise */}
@@ -900,21 +899,6 @@ export function CartPage() {
                   onCtaClick={handleProceedToCheckout}
                 />
 
-                {/* 4. Quality Promise Card */}
-                <div className="p-4 rounded-3xl bg-surface-container-low/60 border border-outline-variant/15 flex items-start gap-3 text-xs text-on-surface-variant">
-                  <span className="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">
-                    verified_user
-                  </span>
-                  <div>
-                    <h5 className="font-headline-sm text-xs font-bold text-on-surface mb-0.5">
-                      Sri Amman Quality Promise
-                    </h5>
-                    <p className="text-[11px] leading-relaxed">
-                      Cold pressed oils & farm-picked produce are double-checked for weight
-                      and quality seal before dispatch.
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
           )}

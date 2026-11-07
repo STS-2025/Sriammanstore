@@ -119,22 +119,38 @@ export function StoreFooter() {
             </h4>
             <ul className="space-y-2 font-body-sm text-xs text-on-surface-variant">
               <li>
-                <Link to="/policies" className="hover:text-primary transition-colors">
+                <Link
+                  to="/policies"
+                  search={{ tab: "privacy" }}
+                  className="hover:text-primary transition-colors"
+                >
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link to="/policies" className="hover:text-primary transition-colors">
+                <Link
+                  to="/policies"
+                  search={{ tab: "terms" }}
+                  className="hover:text-primary transition-colors"
+                >
                   Terms & Conditions
                 </Link>
               </li>
               <li>
-                <Link to="/policies" className="hover:text-primary transition-colors">
+                <Link
+                  to="/policies"
+                  search={{ tab: "shipping" }}
+                  className="hover:text-primary transition-colors"
+                >
                   Shipping & Geofence
                 </Link>
               </li>
               <li>
-                <Link to="/policies" className="hover:text-primary transition-colors">
+                <Link
+                  to="/policies"
+                  search={{ tab: "refund" }}
+                  className="hover:text-primary transition-colors"
+                >
                   Refund & Return SLA
                 </Link>
               </li>

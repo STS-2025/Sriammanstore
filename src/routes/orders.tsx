@@ -522,7 +522,7 @@ function OrderCard({ order, onOpen, onReorder, isReordering }: { order: Order; o
   const itemCount = order.items.reduce((count, item) => count + item.quantity, 0);
   const placedAt = formatDate(order.createdAt, true);
   const productsToShow = order.items.slice(0, 2);
-  const imageLimit = order.items.length === 1 ? 1 : 4;
+  const imageLimit = order.items.length > 4 ? 3 : 4;
   const moreImages = Math.max(order.items.length - imageLimit, 0);
   return <article data-testid={`order-history-card-${order.orderId}`} tabIndex={0} onClick={onOpen} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onOpen(); } }} className="cursor-pointer overflow-hidden rounded-2xl border border-outline-variant/20 bg-white shadow-sm transition-colors hover:border-primary/40 hover:shadow-md">
     <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-outline-variant/15 bg-surface-container-lowest px-4 py-3 sm:px-5">
@@ -530,14 +530,14 @@ function OrderCard({ order, onOpen, onReorder, isReordering }: { order: Order; o
       <time className="text-xs text-on-surface-variant">{placedAt || "Date unavailable"}</time>
     </header>
     <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_210px] lg:items-center">
-      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start">
-        <div className={`flex shrink-0 items-center gap-2 ${order.items.length === 1 ? "" : "flex-wrap"}`} aria-label={`${order.items.length} products in this order`}>
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,296px)_minmax(0,1fr)] sm:items-start">
+        <div className="grid grid-cols-4 gap-2 sm:w-[296px] sm:shrink-0" aria-label={`${order.items.length} products in this order`}>
           {order.items.slice(0, imageLimit).map((item, index) => {
-            return <div key={`${item.productId}-${item.unitSize}-${index}`} className={`${order.items.length === 1 ? "h-28 w-28" : "h-[68px] w-[68px]"} flex items-center justify-center overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-low p-1.5`}>
+            return <div key={`${item.productId}-${item.unitSize}-${index}`} className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-low p-1.5 sm:h-[68px] sm:w-[68px]">
               <OrderProductImage item={item} className="h-full w-full object-contain" />
             </div>;
           })}
-          {moreImages > 0 && <span className="flex h-[68px] min-w-[68px] items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container-low px-2 text-xs font-extrabold text-on-surface-variant">+{moreImages} more</span>}
+          {moreImages > 0 && <span className="flex aspect-square w-full items-center justify-center rounded-xl border border-outline-variant/15 bg-surface-container-low px-1 text-center text-xs font-extrabold text-on-surface-variant sm:h-[68px] sm:w-[68px]">+{moreImages} more</span>}
         </div>
         <div className="min-w-0 flex-1">
           <ul className="space-y-2">

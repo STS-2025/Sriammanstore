@@ -2,6 +2,7 @@ import { apiClient } from "./apiClient";
 import { authService } from "./authService";
 import { authManager } from "./authAdapter";
 import { productionNotificationReader } from "./productionNotificationReader";
+import { productionOrderReader } from "./productionOrderReader";
 import { resolveCustomerDataSource } from "./customerDataSourceResolver";
 import type {
   NotificationItem,
@@ -467,10 +468,6 @@ export const notificationService = {
     newStatus: OrderStatus,
     changeTimestamp?: string
   ): Promise<NotificationItem | null> {
-    if (authManager.getMode() === "production") {
-      return null;
-    }
-
     if (!order || !order.orderId || !order.userId) {
       throw new Error("Invalid order provided for status notification.");
     }
@@ -528,34 +525,32 @@ export const notificationService = {
     const cleanUserId = this.resolveCustomerId(userId);
     if (!cleanUserId) return [];
 
-    if (authManager.getMode() === "production") {
-      const orders =
-        providedOrders ??
-        (await apiClient.get<Order[]>("/orders", { userId: cleanUserId }).catch(() => []));
-      const customerOrders = (orders || []).filter(
-        (o) => o && o.userId === cleanUserId
+    let orders: Order[];
+    if (providedOrders) {
+      orders = providedOrders;
+    } else if (authManager.getMode() === "production") {
+      const activeAdapter = authManager.getActiveAdapter();
+      const authUser = activeAdapter.getCurrentUser();
+      const currentUser = authService.getCurrentUser();
+      let canonicalCustomerId = cleanUserId;
+      let legacySassId = currentUser?.legacySassId;
+      try {
+        const dataSource = resolveCustomerDataSource(cleanUserId);
+        canonicalCustomerId = dataSource.canonicalCustomerId;
+        legacySassId = legacySassId || dataSource.legacySassId;
+      } catch {
+        // Keep the authenticated customer ID when no migration mapping exists.
+      }
+      orders = await productionOrderReader.getCustomerOrders(
+        canonicalCustomerId,
+        authUser?.uid,
+        undefined,
+        legacySassId
       );
-      const observedMap = loadObservedStatusMap(cleanUserId);
-      let mapChanged = false;
-      for (const order of customerOrders) {
-        const orderId = order.orderId || order.id;
-        const currentStatus = order.status;
-        if (orderId && SUPPORTED_ORDER_STATUSES.includes(currentStatus)) {
-          if (observedMap[orderId] !== currentStatus) {
-            observedMap[orderId] = currentStatus;
-            mapChanged = true;
-          }
-        }
-      }
-      if (mapChanged) {
-        saveObservedStatusMap(cleanUserId, observedMap);
-      }
-      return [];
+    } else {
+      orders = await apiClient.get<Order[]>("/orders", { userId: cleanUserId });
     }
 
-    const orders =
-      providedOrders ??
-      (await apiClient.get<Order[]>("/orders", { userId: cleanUserId }));
     const customerOrders = (orders || []).filter(
       (o) => o && o.userId === cleanUserId
     );

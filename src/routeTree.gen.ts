@@ -21,8 +21,10 @@ import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PoliciesRouteImport } from './routes/policies'
 import { Route as ProdPreviewRouteImport } from './routes/prod-preview'
 import { Route as ProductRouteImport } from './routes/product'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ReferRouteImport } from './routes/refer'
 import { Route as RewardsRouteImport } from './routes/rewards'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as WishlistRouteImport } from './routes/wishlist'
@@ -87,6 +89,11 @@ const ProductRoute = ProductRouteImport.update({
   path: '/product',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReferRoute = ReferRouteImport.update({
   id: '/refer',
   path: '/refer',
@@ -95,6 +102,11 @@ const ReferRoute = ReferRouteImport.update({
 const RewardsRoute = RewardsRouteImport.update({
   id: '/rewards',
   path: '/rewards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -126,8 +138,10 @@ export interface FileRoutesByFullPath {
   '/policies': typeof PoliciesRoute
   '/prod-preview': typeof ProdPreviewRoute
   '/product': typeof ProductRoute
+  '/profile': typeof ProfileRoute
   '/refer': typeof ReferRoute
   '/rewards': typeof RewardsRoute
+  '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sign-up': typeof SignUpRoute
   '/wishlist': typeof WishlistRoute
@@ -145,8 +159,10 @@ export interface FileRoutesByTo {
   '/policies': typeof PoliciesRoute
   '/prod-preview': typeof ProdPreviewRoute
   '/product': typeof ProductRoute
+  '/profile': typeof ProfileRoute
   '/refer': typeof ReferRoute
   '/rewards': typeof RewardsRoute
+  '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sign-up': typeof SignUpRoute
   '/wishlist': typeof WishlistRoute
@@ -165,8 +181,10 @@ export interface FileRoutesById {
   '/policies': typeof PoliciesRoute
   '/prod-preview': typeof ProdPreviewRoute
   '/product': typeof ProductRoute
+  '/profile': typeof ProfileRoute
   '/refer': typeof ReferRoute
   '/rewards': typeof RewardsRoute
+  '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sign-up': typeof SignUpRoute
   '/wishlist': typeof WishlistRoute
@@ -186,8 +204,10 @@ export interface FileRouteTypes {
     | '/policies'
     | '/prod-preview'
     | '/product'
+    | '/profile'
     | '/refer'
     | '/rewards'
+    | '/settings'
     | '/shop'
     | '/sign-up'
     | '/wishlist'
@@ -205,8 +225,10 @@ export interface FileRouteTypes {
     | '/policies'
     | '/prod-preview'
     | '/product'
+    | '/profile'
     | '/refer'
     | '/rewards'
+    | '/settings'
     | '/shop'
     | '/sign-up'
     | '/wishlist'
@@ -224,8 +246,10 @@ export interface FileRouteTypes {
     | '/policies'
     | '/prod-preview'
     | '/product'
+    | '/profile'
     | '/refer'
     | '/rewards'
+    | '/settings'
     | '/shop'
     | '/sign-up'
     | '/wishlist'
@@ -244,8 +268,10 @@ export interface RootRouteChildren {
   PoliciesRoute: typeof PoliciesRoute
   ProdPreviewRoute: typeof ProdPreviewRoute
   ProductRoute: typeof ProductRoute
+  ProfileRoute: typeof ProfileRoute
   ReferRoute: typeof ReferRoute
   RewardsRoute: typeof RewardsRoute
+  SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
   SignUpRoute: typeof SignUpRoute
   WishlistRoute: typeof WishlistRoute
@@ -337,6 +363,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProductRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/refer': {
       id: '/refer'
       path: '/refer'
@@ -349,6 +382,13 @@ declare module '@tanstack/react-router' {
       path: '/rewards'
       fullPath: '/rewards'
       preLoaderRoute: typeof RewardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -388,8 +428,10 @@ const rootRouteChildren: RootRouteChildren = {
   PoliciesRoute: PoliciesRoute,
   ProdPreviewRoute: ProdPreviewRoute,
   ProductRoute: ProductRoute,
+  ProfileRoute: ProfileRoute,
   ReferRoute: ReferRoute,
   RewardsRoute: RewardsRoute,
+  SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,
   SignUpRoute: SignUpRoute,
   WishlistRoute: WishlistRoute,

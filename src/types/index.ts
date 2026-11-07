@@ -238,6 +238,7 @@ export interface Order {
   phone: string;
   status: OrderStatus;
   createdAt: string;
+  updatedAt?: string;
   deliveredAt?: string;
   cancelledAt?: string;
   deliveryAddress: {
