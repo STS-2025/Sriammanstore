@@ -65,6 +65,8 @@ export function validateDeliveryServiceability(
     lng?: number;
     city?: string;
     district?: string;
+    street?: string;
+    landmark?: string;
     state?: string;
     pincode?: string;
   },
@@ -76,6 +78,7 @@ export function validateDeliveryServiceability(
     storeAddress?: string;
     serviceAreaDistrict?: string;
     serviceAreaState?: string;
+    deliveryZones?: string[];
   } = {}
 ): DeliveryServiceabilityResult {
   const maxRadiusKm = options.maxRadiusKm ?? STORE_COORDINATES.deliveryRadiusKm;
@@ -84,6 +87,42 @@ export function validateDeliveryServiceability(
   const storeName = options.storeName ?? STORE_COORDINATES.storeName;
   const storeAddress = options.storeAddress ?? STORE_COORDINATES.storeAddress;
   const targetDistrict = options.serviceAreaDistrict ?? STORE_COORDINATES.serviceAreaDistrict;
+
+  // Admin-managed delivery zones are neighborhoods, so match them against
+  // customer-entered address text before consulting any legacy GPS defaults.
+  const deliveryZones = options.deliveryZones?.filter(Boolean) ?? [];
+  if (deliveryZones.length > 0) {
+    const normalizedAddress = [
+      address.city,
+      address.district,
+      address.street,
+      address.landmark,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    const matchedZone = deliveryZones.find((zone) => {
+      const normalizedZone = zone
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+      return normalizedZone && normalizedAddress.includes(normalizedZone);
+    });
+    return {
+      eligible: Boolean(matchedZone),
+      distanceKm: 0,
+      maxRadiusKm,
+      ...(!matchedZone
+        ? {
+            reason: `Delivery is available in ${deliveryZones.join(", ")}. Please include your neighborhood in the address.`,
+          }
+        : {}),
+      storeName,
+      storeAddress,
+    };
+  }
 
   // 1. If coordinates are provided, validate distance via Haversine formula
   if (typeof address.lat === "number" && typeof address.lng === "number" && (address.lat !== 0 || address.lng !== 0)) {

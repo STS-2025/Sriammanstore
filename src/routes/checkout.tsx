@@ -13,6 +13,7 @@ import {
   settingsService,
   DEFAULT_DELIVERY_SETTINGS,
   DEFAULT_PAYMENT_SETTINGS,
+  isOrderCutoffPassed,
   type StoreDeliverySettings,
   type StorePaymentSettings,
 } from "../services/settingsService";
@@ -21,6 +22,7 @@ import { apiClient } from "../services/apiClient";
 import type { Address, DeliverySlot } from "../types";
 import { toast } from "sonner";
 import { PhoneVerificationModal } from "../components/auth/PhoneVerificationModal";
+import { findDeliveryLocation, getDeliveryAreaSuggestions } from "../lib/deliveryLocations";
 
 /**
  * Safely normalizes and humanizes checkout errors so that internal Firestore
@@ -126,10 +128,12 @@ export function CheckoutPage() {
     couponDiscount,
     redeemCoins,
     coinsRedeemed,
+    coinsAvailable,
     coinDiscount,
     deliverySpeed,
     deliveryFee,
     deliverySettingsError,
+    checkoutSettings,
     isExpressDeliveryAvailable,
     standardDeliveryFee,
     expressDeliveryFee,
@@ -159,6 +163,7 @@ export function CheckoutPage() {
   const [deliverySlots, setDeliverySlots] = useState<DeliverySlot[]>([]);
   const [deliveryConfig, setDeliveryConfig] = useState<StoreDeliverySettings>(DEFAULT_DELIVERY_SETTINGS);
   const [paymentConfig, setPaymentConfig] = useState<StorePaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
+  const codAmountLimit = paymentConfig.maxCodAmount ?? DEFAULT_PAYMENT_SETTINGS.maxCodAmount;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -179,8 +184,8 @@ export function CheckoutPage() {
   const [newHouseNo, setNewHouseNo] = useState("");
   const [newStreet, setNewStreet] = useState("");
   const [newLandmark, setNewLandmark] = useState("");
-  const [newCity, setNewCity] = useState("Gobichettipalayam");
-  const [newPincode, setNewPincode] = useState("638454");
+  const [newCity, setNewCity] = useState("");
+  const [newPincode, setNewPincode] = useState("");
 
   useEffect(() => {
     async function loadCheckoutData() {
@@ -198,7 +203,10 @@ export function CheckoutPage() {
           settingsService.getPaymentConfiguration(),
         ]);
         setAddresses(addrList || []);
-        if (dConfig) setDeliveryConfig(dConfig);
+        if (dConfig) {
+          setDeliveryConfig(dConfig);
+          setNewCity(dConfig.serviceAreaDistrict);
+        }
         if (pConfig) setPaymentConfig(pConfig);
 
         // Restore or initialize selected address
@@ -210,7 +218,11 @@ export function CheckoutPage() {
         }
 
         setDeliverySlots(slots || []);
-        if (!selectedSlotId && slots && slots.length > 0 && slots[0]) {
+        if (
+          slots?.length > 0 &&
+          slots[0] &&
+          !slots.some((slot) => slot.id === selectedSlotId)
+        ) {
           setSelectedSlotId(slots[0].id);
         }
       } catch (err) {
@@ -222,20 +234,35 @@ export function CheckoutPage() {
     loadCheckoutData();
   }, [user, authLoading, isResolvingIdentity, selectedAddressId, selectedSlotId, setSelectedAddressId, setSelectedSlotId]);
 
+  useEffect(() => {
+    if (
+      paymentMethod === "cod" &&
+      (!paymentConfig.codEnabled || finalTotal > codAmountLimit)
+    ) {
+      setPaymentMethod("upi");
+    }
+  }, [paymentMethod, paymentConfig.codEnabled, codAmountLimit, finalTotal, setPaymentMethod]);
+
   const selectedAddress = useMemo(() => {
     return addresses.find((a) => a.id === selectedAddressId) || addresses[0] || null;
   }, [addresses, selectedAddressId]);
 
   const selectedSlot = useMemo(() => {
+    if (deliverySpeed === "express") {
+      return {
+        id: "slot_exp",
+        type: "express" as const,
+        title: "Express 60-Min Instant Dispatch",
+        subtitle: "Express delivery",
+        charge: deliveryFee,
+      };
+    }
     return (
       deliverySlots.find((s) => s.id === selectedSlotId) ||
       deliverySlots[0] || {
-        id: "slot_exp",
-        type: deliverySpeed === "express" ? "express" : "standard",
-        title:
-          deliverySpeed === "express"
-            ? "Express 60-Min Instant Dispatch"
-            : "Standard Morning (8:00 AM - 11:00 AM)",
+        id: "slot_std_morning",
+        type: "standard" as const,
+        title: "Standard Morning (8:00 AM - 11:00 AM)",
         charge: deliveryFee,
       }
     );
@@ -263,7 +290,17 @@ export function CheckoutPage() {
   const handleOpenNewAddressModal = () => {
     if (!newName && user?.name) setNewName(user.name);
     if (!newPhone && user?.phone) setNewPhone(user.phone);
+    if (!newCity) setNewCity(deliveryConfig.serviceAreaDistrict);
     setShowAddressModal(true);
+  };
+
+  const handleNewStreetChange = (value: string) => {
+    setNewStreet(value);
+    const location = findDeliveryLocation(value, deliveryConfig.deliveryZones);
+    if (location) {
+      setNewCity(location.city);
+      setNewPincode(location.pincode);
+    }
   };
 
   useEffect(() => {
@@ -311,6 +348,18 @@ export function CheckoutPage() {
       toast.info("Please add a delivery address to proceed.");
       return;
     }
+    if (cartSubtotal < checkoutSettings.minimumOrderAmount) {
+      toast.error(
+        `The minimum order amount is ₹${checkoutSettings.minimumOrderAmount}.`
+      );
+      return;
+    }
+    if (cartCount > checkoutSettings.maxItemsPerOrder) {
+      toast.error(
+        `An order can contain up to ${checkoutSettings.maxItemsPerOrder} items.`
+      );
+      return;
+    }
     if (!geofenceStatus.eligible) {
       toast.error(
         geofenceStatus.reason ||
@@ -344,8 +393,8 @@ export function CheckoutPage() {
         landmark: newLandmark.trim(),
         city: newCity.trim(),
         pincode: newPincode.trim(),
-        lat: 11.4595, // Center coordinate for new mock addresses within Gobichettipalayam
-        lng: 77.3338,
+        lat: 0,
+        lng: 0,
         isDefault: true,
       });
       setAddresses((prev) => [added, ...prev]);
@@ -398,6 +447,35 @@ export function CheckoutPage() {
     if (items.length === 0) {
       toast.error("Your cart is empty");
       navigate({ to: "/shop" });
+      return;
+    }
+
+    if (cartSubtotal < checkoutSettings.minimumOrderAmount) {
+      toast.error(
+        `The minimum order amount is ₹${checkoutSettings.minimumOrderAmount}.`
+      );
+      return;
+    }
+    if (cartCount > checkoutSettings.maxItemsPerOrder) {
+      toast.error(
+        `An order can contain up to ${checkoutSettings.maxItemsPerOrder} items.`
+      );
+      return;
+    }
+    if (isOrderCutoffPassed(checkoutSettings.orderCutoffTime)) {
+      toast.error(
+        `Today's order cutoff time (${checkoutSettings.orderCutoffTime}) has passed.`
+      );
+      return;
+    }
+    if (paymentMethod === "cod" && !paymentConfig.codEnabled) {
+      toast.error("Cash on delivery is currently unavailable.");
+      return;
+    }
+    if (paymentMethod === "cod" && finalTotal > codAmountLimit) {
+      toast.error(
+        `Cash on delivery is available for orders up to ₹${codAmountLimit}.`
+      );
       return;
     }
 
@@ -745,14 +823,14 @@ export function CheckoutPage() {
                           <p className="text-[11px] text-on-surface-variant">
                             {selectedAddress ? (
                               <>
-                                Delivering from Gobichettipalayam Store Hub (
-                                {geofenceStatus.distanceKm > 0
-                                  ? `${geofenceStatus.distanceKm} km`
-                                  : "0.8 km"}
-                                )
+                                {deliveryConfig.deliveryZones.length > 0
+                                  ? `${deliveryConfig.storeName} · ${geofenceStatus.eligible ? "inside service area" : "outside service area"}`
+                                  : `Delivering from ${deliveryConfig.storeName} (${geofenceStatus.distanceKm} km)`}
                               </>
                             ) : (
-                              "Store Hub: Gobichettipalayam • Service Radius: 6.0 KM"
+                              deliveryConfig.deliveryZones.length > 0
+                                ? `Service zones: ${deliveryConfig.deliveryZones.join(", ")}`
+                                : `${deliveryConfig.storeName} · Service Radius: ${deliveryConfig.deliveryRadiusKm} KM`
                             )}
                           </p>
                         </div>
@@ -904,7 +982,9 @@ export function CheckoutPage() {
                             <h4 className="font-headline-sm text-xs font-bold">Address Not Deliverable</h4>
                             <p className="text-[11px] mt-0.5 leading-relaxed text-error/90">
                               {geofenceStatus.reason ||
-                                `Delivery is not available for this address. We deliver up to ${deliveryConfig.deliveryRadiusKm} km from our store in Gobichettipalayam, Erode. (Your location is approximately ${geofenceStatus.distanceKm} km away).`}
+                                (deliveryConfig.deliveryZones.length > 0
+                                  ? `Delivery is available in ${deliveryConfig.deliveryZones.join(", ")}. Please include your neighborhood in the address.`
+                                  : `Delivery is unavailable outside ${deliveryConfig.deliveryRadiusKm} km of ${deliveryConfig.storeAddress}.`)}
                             </p>
                           </div>
                         </div>
@@ -924,10 +1004,13 @@ export function CheckoutPage() {
                         </h3>
                       </div>
                       <span className="px-2.5 py-0.5 rounded-full bg-secondary/15 text-secondary text-[10px] font-black uppercase tracking-wider">
-                        Chennai Express Hub
+                        {deliveryConfig.storeName}
                       </span>
                     </div>
 
+                    <p className="mb-3 text-[11px] font-semibold text-on-surface-variant">
+                      Orders for today's delivery must be placed by {checkoutSettings.orderCutoffTime}.
+                    </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Express 60-Min */}
                       <div
@@ -982,7 +1065,7 @@ export function CheckoutPage() {
                       <div
                         onClick={() => {
                           setDeliverySpeed("standard");
-                          setSelectedSlotId("slot_std_morning");
+                          setSelectedSlotId(deliverySlots[0]?.id || "slot_std_morning");
                         }}
                         className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
                           deliverySpeed === "standard"
@@ -997,7 +1080,7 @@ export function CheckoutPage() {
                           checked={deliverySpeed === "standard"}
                           onChange={() => {
                             setDeliverySpeed("standard");
-                            setSelectedSlotId("slot_std_morning");
+                            setSelectedSlotId(deliverySlots[0]?.id || "slot_std_morning");
                           }}
                           className="mt-1 accent-primary cursor-pointer"
                         />
@@ -1014,8 +1097,34 @@ export function CheckoutPage() {
                             </span>
                           </div>
                           <p className="text-[11px] font-semibold text-on-surface-variant mt-1">
-                            Tomorrow Morning (8:00 AM – 11:00 AM)
+                            Configured delivery window
                           </p>
+                          {deliverySlots.length > 1 && (
+                            <label className="mt-3 block text-[10px] font-bold text-on-surface-variant">
+                              Delivery time
+                              <select
+                                value={
+                                  deliverySlots.some((slot) => slot.id === selectedSlotId)
+                                    ? selectedSlotId
+                                    : deliverySlots[0]?.id
+                                }
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={(event) => setSelectedSlotId(event.target.value)}
+                                className="mt-1 w-full rounded-lg border border-outline-variant/30 bg-white px-2.5 py-2 text-xs font-semibold text-on-surface"
+                              >
+                                {deliverySlots.map((slot) => (
+                                  <option key={slot.id} value={slot.id}>
+                                    {slot.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
+                          {deliverySlots.length > 0 && (
+                            <p className="mt-2 text-[10px] font-semibold text-primary">
+                              Selected window: {selectedSlot.title}
+                            </p>
+                          )}
                           <div className="flex items-center justify-between mt-2 pt-1 border-t border-outline-variant/15 text-[10px] text-outline">
                             <span>Direct Batch Farm Fulfillment</span>
                             <span className="px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface-variant font-bold">
@@ -1129,9 +1238,7 @@ export function CheckoutPage() {
                         </span>
                         <div>
                           <span className="font-headline-sm text-xs font-bold text-on-surface block">
-                            {deliverySpeed === "express"
-                              ? "Express 60–Min (Today)"
-                              : "Standard Morning (Tomorrow)"}
+                            {selectedSlot.title}
                           </span>
                           <p className="text-[11px] text-on-surface-variant mt-0.5">
                             {deliveryFee > 0 ? `Delivery Fee: ₹${deliveryFee}` : "Free Delivery"}
@@ -1396,7 +1503,7 @@ export function CheckoutPage() {
                             </div>
                             <p className="text-[11px] text-on-surface-variant font-medium mt-0.5">
                               {coinsRedeemed} Smart Coins redeemed for ₹{coinDiscount} instant
-                              checkout saving • {((user?.smartCoins ?? user?.coins) || 0) - coinsRedeemed} Smart Coins
+                              checkout saving • {coinsAvailable - coinsRedeemed} Smart Coins
                               Remaining
                             </p>
                           </div>
@@ -1409,7 +1516,19 @@ export function CheckoutPage() {
 
                     {/* 4. Cash / Pay on Delivery Option */}
                     <div
-                      onClick={() => setPaymentMethod("cod")}
+                      onClick={() => {
+                        if (!paymentConfig.codEnabled) {
+                          toast.error("Cash on delivery is currently unavailable.");
+                          return;
+                        }
+                        if (finalTotal > codAmountLimit) {
+                          toast.error(
+                            `Cash on delivery is available for orders up to ₹${codAmountLimit}.`
+                          );
+                          return;
+                        }
+                        setPaymentMethod("cod");
+                      }}
                       className={`p-4 rounded-2xl border transition-all cursor-pointer ${
                         paymentMethod === "cod"
                           ? "border-primary bg-primary/5 shadow-sm"
@@ -1422,7 +1541,14 @@ export function CheckoutPage() {
                             type="radio"
                             name="payment_method_group"
                             checked={paymentMethod === "cod"}
-                            onChange={() => setPaymentMethod("cod")}
+                            onChange={() => {
+                              if (
+                                paymentConfig.codEnabled &&
+                                finalTotal <= codAmountLimit
+                              ) {
+                                setPaymentMethod("cod");
+                              }
+                            }}
                             className="accent-primary cursor-pointer"
                           />
                           <div>
@@ -1435,7 +1561,9 @@ export function CheckoutPage() {
                           </div>
                         </div>
                         <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-primary/10 text-primary">
-                          Available
+                          {!paymentConfig.codEnabled
+                            ? "Unavailable"
+                            : `Up to ₹${codAmountLimit}`}
                         </span>
                       </div>
                     </div>
@@ -1584,6 +1712,22 @@ export function CheckoutPage() {
 
             {/* RIGHT COLUMN: Order Summary / Bill Summary */}
             <div className="lg:col-span-4 sticky top-[190px]">
+              {cartSubtotal < checkoutSettings.minimumOrderAmount && (
+                <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                  Minimum order: ₹{checkoutSettings.minimumOrderAmount}.
+                  Add ₹{Math.ceil(checkoutSettings.minimumOrderAmount - cartSubtotal)} more to continue.
+                </p>
+              )}
+              {cartCount > checkoutSettings.maxItemsPerOrder && (
+                <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                  Orders are limited to {checkoutSettings.maxItemsPerOrder} items. Remove some items to continue.
+                </p>
+              )}
+              {isOrderCutoffPassed(checkoutSettings.orderCutoffTime) && (
+                <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+                  Today's order cutoff ({checkoutSettings.orderCutoffTime}) has passed.
+                </p>
+              )}
               <OrderBillSummary
                 mode="checkout"
                 ctaText={
@@ -1598,7 +1742,11 @@ export function CheckoutPage() {
                 disabled={
                   currentStep === 2
                     ? items.length === 0 || isSubmitting
-                    : !canGoToPayment || isSubmitting
+                    : !canGoToPayment ||
+                      isSubmitting ||
+                      cartSubtotal < checkoutSettings.minimumOrderAmount ||
+                      cartCount > checkoutSettings.maxItemsPerOrder ||
+                      isOrderCutoffPassed(checkoutSettings.orderCutoffTime)
                 }
               />
             </div>
@@ -1633,15 +1781,23 @@ export function CheckoutPage() {
                     type="button"
                     onClick={() => {
                       setNewHouseNo((prev) => prev || "42/B");
-                      setNewStreet((prev) => prev || "Kasipalayam High Road");
-                      setNewLandmark((prev) => prev || "Near Amman Temple");
-                      setNewCity("Gobichettipalayam");
-                      setNewPincode("638454");
-                      toast.info("Auto-filled within 6km delivery zone");
+                      const firstZone = deliveryConfig.deliveryZones[0];
+                      setNewStreet((prev) => prev || firstZone || "");
+                      setNewLandmark((prev) => prev || "");
+                      const location = firstZone
+                        ? findDeliveryLocation(firstZone, deliveryConfig.deliveryZones)
+                        : undefined;
+                      setNewCity(location?.city || deliveryConfig.serviceAreaDistrict);
+                      setNewPincode(location?.pincode || "");
+                      toast.info(
+                        firstZone
+                          ? `Auto-filled inside the ${firstZone} delivery zone.`
+                          : "Enter an address inside the service area."
+                      );
                     }}
                     className="px-2.5 py-1 bg-primary text-white font-bold rounded-lg text-[11px] hover:bg-primary-container transition-colors cursor-pointer"
                   >
-                    Auto Fill (6km Zone)
+                    Fill Service Zone
                   </button>
                 </div>
 
@@ -1712,10 +1868,16 @@ export function CheckoutPage() {
                     type="text"
                     required
                     value={newStreet}
-                    onChange={(e) => setNewStreet(e.target.value)}
-                    placeholder="e.g. Kasipalayam Road"
+                    onChange={(e) => handleNewStreetChange(e.target.value)}
+                    list="checkout-delivery-areas"
+                    placeholder="Type or choose a nearby area"
                     className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs border border-outline-variant/20 focus:outline-none focus:ring-1 focus:ring-primary"
                   />
+                  <datalist id="checkout-delivery-areas">
+                    {getDeliveryAreaSuggestions(deliveryConfig.deliveryZones).map((area) => (
+                      <option key={area} value={area} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
@@ -1740,6 +1902,7 @@ export function CheckoutPage() {
                       type="text"
                       value={newCity}
                       onChange={(e) => setNewCity(e.target.value)}
+                      placeholder={deliveryConfig.serviceAreaDistrict}
                       className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs border border-outline-variant/20 focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
@@ -1751,6 +1914,9 @@ export function CheckoutPage() {
                       type="text"
                       value={newPincode}
                       onChange={(e) => setNewPincode(e.target.value)}
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder="Suggested from area"
                       className="w-full px-3 py-2 rounded-xl bg-surface-container-low text-xs border border-outline-variant/20 focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>

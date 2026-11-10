@@ -42,6 +42,8 @@ export function CartPage() {
     deliverySettingsError,
     redeemCoins,
     coinsToRedeem,
+    coinsAvailable,
+    checkoutSettings,
     coinValueInRupees,
     deliverySpeed,
     isExpressDeliveryAvailable,
@@ -96,7 +98,7 @@ export function CartPage() {
     loadAddressAndStaples();
   }, [user, items]);
 
-  const userCoins = user?.smartCoins ?? user?.coins ?? 0;
+  const userCoins = coinsAvailable;
 
   const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -852,14 +854,14 @@ export function CartPage() {
                     </span>
                   </div>
                   <p className="text-[11px] text-on-surface-variant mb-4 leading-relaxed">
-                    Use accumulated loyalty coins from your past fresh produce orders.
+                    Earn {checkoutSettings.smartCoinEarnRate} Smart Coin{checkoutSettings.smartCoinEarnRate === 1 ? "" : "s"} per eligible order. Redeem once your balance reaches {checkoutSettings.minCoinsToRedeem} coins, up to {checkoutSettings.maxCoinRedemptionPercent}% of your item subtotal. Coins expire after {checkoutSettings.coinValidityMonths} months.
                   </p>
 
                   {/* Redeem Checkbox Card */}
                   <div
                     onClick={() => {
-                      if (userCoins > 0) setRedeemCoins(!redeemCoins);
-                      else toast.info("No Smart Coins available in your wallet");
+                      if (coinsToRedeem > 0) setRedeemCoins(!redeemCoins);
+                      else toast.info(`You need a balance of at least ${checkoutSettings.minCoinsToRedeem} Smart Coins to redeem.`);
                     }}
                     className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                       redeemCoins
@@ -873,7 +875,7 @@ export function CartPage() {
                         checked={redeemCoins}
                         onChange={(e) => setRedeemCoins(e.target.checked)}
                         onClick={(e) => e.stopPropagation()}
-                        disabled={userCoins <= 0}
+                        disabled={coinsToRedeem <= 0}
                         className="accent-secondary cursor-pointer"
                       />
                       <div>

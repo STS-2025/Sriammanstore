@@ -6,11 +6,16 @@ import { StoreFooter } from "../components/layout/StoreFooter";
 import {
   coinService,
   convertCoinsToRupees,
+  getCoinExpiryDate,
   OFFICIAL_COIN_CONVERSION_RATE,
 } from "../services/coinService";
 import { orderService } from "../services/orderService";
 import { referralService } from "../services/referralService";
-import { settingsService } from "../services/settingsService";
+import {
+  LEGACY_CHECKOUT_DEFAULTS,
+  settingsService,
+  type LegacyCheckoutSettings,
+} from "../services/settingsService";
 import type { CoinTransaction, Order, ReferralFriend, StoreInfo } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
@@ -40,6 +45,7 @@ export function RewardsPage() {
   const [referrals, setReferrals] = useState<ReferralFriend[]>([]);
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [conversionRate, setConversionRate] = useState<number>(OFFICIAL_COIN_CONVERSION_RATE);
+  const [coinPolicy, setCoinPolicy] = useState<LegacyCheckoutSettings>(LEGACY_CHECKOUT_DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [rewardsError, setRewardsError] = useState<string | null>(null);
   const [verifiedBalance, setVerifiedBalance] = useState<number | null>(null);
@@ -62,13 +68,14 @@ export function RewardsPage() {
     setRewardsError(null);
 
     try {
-      const [historyResult, ordersResult, referralsResult, storeResult, balanceResult] =
+      const [historyResult, ordersResult, referralsResult, storeResult, balanceResult, coinPolicyResult] =
         await Promise.allSettled([
           coinService.getCoinHistory(user.id, user.legacySassId),
           orderService.getOrders(user.id, user.legacySassId),
           referralService.getReferrals(user.id, user.legacySassId),
           settingsService.getStoreInfo(),
           coinService.getUserCoins(user.id, user.legacySassId),
+          settingsService.getLegacyCheckoutSettings(),
         ]);
 
       // If a newer request was dispatched while this was in flight, discard this result
@@ -108,6 +115,7 @@ export function RewardsPage() {
       if (balanceResult.status === "fulfilled" && typeof balanceResult.value === "number") {
         setVerifiedBalance(balanceResult.value);
       }
+      if (coinPolicyResult.status === "fulfilled") setCoinPolicy(coinPolicyResult.value);
 
       // Terminal error state: if both coin history and balance failed, display actionable error
       if (historyResult.status === "rejected" && balanceResult.status === "rejected") {
@@ -176,18 +184,22 @@ export function RewardsPage() {
   // Filtered coin transactions
   const filteredActivities = useMemo(() => {
     const now = Date.now();
-    const nineMonthsMs = 270 * 24 * 60 * 60 * 1000;
+    const expiringWindowMs = 30 * 24 * 60 * 60 * 1000;
 
     return coinHistory.filter((tx) => {
       if (activityFilter === "earned") return tx.type === "earned";
       if (activityFilter === "redeemed") return tx.type === "redeemed";
       if (activityFilter === "expiring") {
-        const txAge = now - new Date(tx.timestamp).getTime();
-        return tx.type === "earned" && txAge > nineMonthsMs;
+        if (tx.type !== "earned") return false;
+        const earnedAt = new Date(tx.timestamp);
+        const expiry = tx.expiresAt
+          ? new Date(tx.expiresAt).getTime()
+          : new Date(getCoinExpiryDate(earnedAt, coinPolicy.coinValidityMonths)).getTime();
+        return expiry > now && expiry <= now + expiringWindowMs;
       }
       return true;
     });
-  }, [coinHistory, activityFilter]);
+  }, [coinHistory, activityFilter, coinPolicy.coinValidityMonths]);
 
   const visibleActivities = useMemo(() => {
     return filteredActivities.slice(0, displayCount);
@@ -288,17 +300,11 @@ export function RewardsPage() {
           {/* Heading Bar with Live Conversion Pill */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
             <div>
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-800 text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                  <span>⭐</span>
-                  <span>Loyalty & VIP Privilege Suite</span>
-                </div>
-              </div>
               <h1 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-on-surface tracking-tight">
                 Smart Coins & VIP Privilege Hub
               </h1>
               <p className="text-xs md:text-sm text-on-surface-variant mt-1 max-w-2xl">
-                Earn farm-direct rewards on every grocery order, redeem instant cash discounts, and unlock VIP free express slots.
+                Earn direct rewards on every grocery order, redeem instant cash discounts, and unlock VIP free express slots.
               </p>
             </div>
 
@@ -724,7 +730,7 @@ export function RewardsPage() {
                   Give ₹100, Earn 100 Coins
                 </h3>
                 <p className="text-xs text-on-surface-variant leading-relaxed mb-6">
-                  Introduce your neighborhood to farm-pure Tamil Nadu groceries. Friends get ₹100 off their first cart, and you receive 100 Smart Coins instantly upon delivery.
+                  Introduce your neighborhood to Tamil Nadu groceries. Friends get ₹100 off their first cart, and you receive 100 Smart Coins instantly upon delivery.
                 </p>
 
                 {/* Personal Referral Code Box */}
@@ -830,11 +836,11 @@ export function RewardsPage() {
                     1. Shop Farm Fresh & Staples
                   </h4>
                   <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
-                    Browse our seasonal harvest from Adyar, Thanjavur organic paddies, and local cold-press mills. Every ₹100 spent accrues loyalty coins instantly.
+                    Earn {coinPolicy.smartCoinEarnRate} Smart Coins for every eligible order.
                   </p>
                 </div>
                 <span className="bg-emerald-50 text-emerald-800 font-bold text-[10px] px-3 py-1 rounded-full border border-emerald-200/60 inline-block w-fit">
-                  Base rate: ~10% loyalty coins on orders
+                  Earn rate: {coinPolicy.smartCoinEarnRate} coins per order
                 </span>
               </div>
 
@@ -851,11 +857,11 @@ export function RewardsPage() {
                     2. Collect Automatically
                   </h4>
                   <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
-                    No physical punch-cards or coupon clips needed. Smart Coins credit straight to your Vault the minute our delivery runner verifies doorstep handover.
+                    Coins are credited when your order is placed and expire after {coinPolicy.coinValidityMonths} months.
                   </p>
                 </div>
                 <span className="bg-amber-50 text-amber-800 font-bold text-[10px] px-3 py-1 rounded-full border border-amber-200/60 inline-block w-fit">
-                  Instant credit on delivery verification
+                  Valid for {coinPolicy.coinValidityMonths} months
                 </span>
               </div>
 
@@ -872,11 +878,11 @@ export function RewardsPage() {
                     3. Apply at Checkout
                   </h4>
                   <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
-                    Slide the Coins Reducer toggle on your checkout screen. Watch your bill instantly slash down at 1 Coin = ₹0.05 cash value. Combine freely with bank offers!
+                    Redeem at ₹{coinPolicy.coinValueInRupees} per coin once your balance reaches {coinPolicy.minCoinsToRedeem} coins, up to {coinPolicy.maxCoinRedemptionPercent}% of your item subtotal.
                   </p>
                 </div>
                 <span className="bg-cyan-50 text-cyan-800 font-bold text-[10px] px-3 py-1 rounded-full border border-cyan-200/60 inline-block w-fit">
-                  No restrictive minimum cart limits
+                  Minimum balance to redeem: {coinPolicy.minCoinsToRedeem} coins
                 </span>
               </div>
             </div>

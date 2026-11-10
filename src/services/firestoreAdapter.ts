@@ -79,6 +79,7 @@ export const KNOWN_SINGLETON_COLLECTIONS = new Set([
 export const KNOWN_READONLY_COLLECTIONS = new Set([
   "usersByUid",
   "Settings",
+  "businessSettings",
   "promoCodes",
   "promos",
 ]);

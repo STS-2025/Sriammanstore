@@ -22,7 +22,7 @@ export function StoreFooter() {
               </div>
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant max-w-sm leading-relaxed">
-              South India's most authentic unpolished grains, artisanal wood-pressed oils, and farm-plucked morning greens delivered with single-store purity in 60 minutes.
+              South India's most authentic grains, spices, masalas, refined oil delivered with single-store purity in 60 minutes.
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <a

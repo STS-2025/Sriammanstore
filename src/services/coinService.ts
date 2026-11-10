@@ -6,18 +6,11 @@ import { productionCoinReader } from "./productionCoinReader";
 import { resolveCustomerDataSource, getCustomerProfileEndpoint } from "./customerDataSourceResolver";
 import type { CoinTransaction, Order, User } from "../types";
 
-/**
- * Official Smart Coins conversion rate confirmed by business decision (Phase 7.1):
- * - 1 coin = ₹0.05
- * - ₹1.00 = 20 coins
- */
-export const OFFICIAL_COIN_CONVERSION_RATE = 0.05;
-export const COINS_PER_RUPEE = 20;
+/** Fallback conversion values; active checkout rates come from admin businessSettings. */
+export const OFFICIAL_COIN_CONVERSION_RATE = 1;
+export const COINS_PER_RUPEE = 1;
 
-/**
- * Converts Smart Coins to INR value using the confirmed official rate (1 coin = ₹0.05).
- * Example: 20 coins = ₹1.00, 100 coins = ₹5.00.
- */
+/** Converts Smart Coins to rupees using the supplied configured value. */
 export function convertCoinsToRupees(
   coins: number,
   rate: number = OFFICIAL_COIN_CONVERSION_RATE
@@ -26,10 +19,7 @@ export function convertCoinsToRupees(
   return Number((coins * rate).toFixed(2));
 }
 
-/**
- * Converts INR value to Smart Coins using the confirmed official rate (₹1.00 = 20 coins).
- * Example: ₹1.00 = 20 coins, ₹5.00 = 100 coins.
- */
+/** Converts rupees to Smart Coins using the supplied coins-per-rupee rate. */
 export function convertRupeesToCoins(
   rupees: number,
   coinsPerRupee: number = COINS_PER_RUPEE
@@ -38,28 +28,100 @@ export function convertRupeesToCoins(
   return Math.round(rupees * coinsPerRupee);
 }
 
-/** Legacy checkout allowed coins up to the full payable amount after discounts and delivery. */
+/** Applies the cart value cap once the customer's balance reaches the redemption threshold. */
 export function getMaxRedeemableCoins(
   availableCoins: number,
-  payableAmount: number,
+  subtotal: number,
   coinValueInRupees: number = OFFICIAL_COIN_CONVERSION_RATE,
+  maxRedemptionPercent = 100,
+  minimumCoins = 0,
 ): number {
   if (
     !Number.isFinite(availableCoins) ||
-    !Number.isFinite(payableAmount) ||
+    !Number.isFinite(subtotal) ||
     !Number.isFinite(coinValueInRupees) ||
+    !Number.isFinite(maxRedemptionPercent) ||
+    !Number.isFinite(minimumCoins) ||
     availableCoins <= 0 ||
-    payableAmount <= 0 ||
+    subtotal <= 0 ||
     coinValueInRupees <= 0
   ) {
     return 0;
   }
-  return Math.min(Math.floor(availableCoins), Math.floor(payableAmount / coinValueInRupees));
+  const redemptionCap = (subtotal * Math.max(0, maxRedemptionPercent)) / 100;
+  if (availableCoins < minimumCoins) return 0;
+
+  return Math.min(
+    Math.floor(availableCoins),
+    Math.floor(redemptionCap / coinValueInRupees),
+  );
+}
+
+function addCalendarMonths(date: Date, months: number): Date {
+  const result = new Date(date);
+  const day = result.getDate();
+  result.setDate(1);
+  result.setMonth(result.getMonth() + Math.max(0, months));
+  const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(day, lastDay));
+  return result;
+}
+
+export function getCoinExpiryDate(earnedAt: Date, validityMonths: number): string {
+  return addCalendarMonths(earnedAt, validityMonths).toISOString();
+}
+
+/** Rebuilds spendable balance from the ledger, expiring earned lots by age. */
+export function calculateSpendableCoinBalance(
+  history: CoinTransaction[],
+  validityMonths: number,
+  now = new Date(),
+): number {
+  type CoinLot = { amount: number; expiresAt: number };
+  const lots: CoinLot[] = [];
+  const transactions = [...history].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+
+  const expireLots = (at: number) => {
+    for (let i = lots.length - 1; i >= 0; i--) {
+      if (lots[i].expiresAt <= at || lots[i].amount <= 0) lots.splice(i, 1);
+    }
+  };
+
+  for (const tx of transactions) {
+    const txTime = new Date(tx.timestamp).getTime();
+    if (!Number.isFinite(txTime) || !Number.isFinite(tx.amount) || tx.amount <= 0) continue;
+    expireLots(txTime);
+
+    if (tx.type === "earned") {
+      const explicitExpiry = tx.expiresAt ? new Date(tx.expiresAt).getTime() : NaN;
+      const expiry = Number.isFinite(explicitExpiry)
+        ? explicitExpiry
+        : addCalendarMonths(new Date(txTime), validityMonths).getTime();
+      if (expiry > txTime) lots.push({ amount: tx.amount, expiresAt: expiry });
+      continue;
+    }
+
+    // Spend oldest-expiring eligible coins first so later credits retain their full validity.
+    lots.sort((a, b) => a.expiresAt - b.expiresAt);
+    let remaining = tx.amount;
+    for (const lot of lots) {
+      const used = Math.min(lot.amount, remaining);
+      lot.amount -= used;
+      remaining -= used;
+      if (remaining <= 0) break;
+    }
+    expireLots(txTime);
+  }
+
+  expireLots(now.getTime());
+  return Math.max(0, Math.floor(lots.reduce((sum, lot) => sum + lot.amount, 0)));
 }
 
 export const coinService = {
-  getOfficialConversionRate(): number {
-    return OFFICIAL_COIN_CONVERSION_RATE;
+  async getOfficialConversionRate(): Promise<number> {
+    return settingsService.getLegacyCoinValue();
   },
 
   getCoinsPerRupee(): number {
@@ -112,29 +174,43 @@ export const coinService = {
       // fallback
     }
 
+    let storedBalance = 0;
     if (authManager.getMode() === "production") {
       const currentUser = authService.getCurrentUser();
       const finalLegacySassId = resolvedLegacySassId || currentUser?.legacySassId;
       if (finalLegacySassId) {
-        return productionCoinReader.getCustomerCoinBalance(resolvedId, undefined, finalLegacySassId);
+        storedBalance = await productionCoinReader.getCustomerCoinBalance(resolvedId, undefined, finalLegacySassId);
+      } else {
+        storedBalance = await productionCoinReader.getCustomerCoinBalance(resolvedId);
       }
-      return productionCoinReader.getCustomerCoinBalance(resolvedId);
+    } else {
+      try {
+        const endpoint = getCustomerProfileEndpoint(resolvedId);
+        const user = await apiClient.get<User>(endpoint);
+        if (user && typeof user.smartCoins === "number" && Number.isFinite(user.smartCoins)) {
+          storedBalance = Math.max(0, user.smartCoins);
+        } else if (user && typeof user.coins === "number" && Number.isFinite(user.coins)) {
+          storedBalance = Math.max(0, user.coins);
+        } else if (user && typeof user.availableCoins === "number" && Number.isFinite(user.availableCoins)) {
+          storedBalance = Math.max(0, user.availableCoins);
+        }
+      } catch {
+        return 0;
+      }
     }
+
     try {
-      const endpoint = getCustomerProfileEndpoint(resolvedId);
-      const user = await apiClient.get<User>(endpoint);
-      if (user && typeof user.smartCoins === "number" && Number.isFinite(user.smartCoins)) {
-        return Math.max(0, user.smartCoins);
-      }
-      if (user && typeof user.coins === "number" && Number.isFinite(user.coins)) {
-        return Math.max(0, user.coins);
-      }
-      if (user && typeof user.availableCoins === "number" && Number.isFinite(user.availableCoins)) {
-        return Math.max(0, user.availableCoins);
-      }
-      return 0;
+      const [history, settings] = await Promise.all([
+        this.getCoinHistory(resolvedId, resolvedLegacySassId),
+        settingsService.getLegacyCheckoutSettings(),
+      ]);
+      if (!history.length) return storedBalance;
+      return Math.min(
+        storedBalance,
+        calculateSpendableCoinBalance(history, settings.coinValidityMonths),
+      );
     } catch {
-      return 0;
+      return storedBalance;
     }
   },
 

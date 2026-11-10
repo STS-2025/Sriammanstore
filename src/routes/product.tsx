@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createFileRoute, useSearch, Link } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
@@ -43,11 +43,14 @@ function ProductDetailsPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
   const [complementaryProducts, setComplementaryProducts] = useState<Product[]>([]);
+  const [otherProducts, setOtherProducts] = useState<Product[]>([]);
   const [selectedOptIndex, setSelectedOptIndex] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"specs" | "reviews">("specs");
+  const [isSpecsOpen, setIsSpecsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,11 +77,14 @@ function ProductDetailsPage() {
           limit: 4,
           excludeIds: similarIds,
         });
+        const excludedIds = new Set([item.id, ...similarIds, ...complementary.map((p) => p.id)]);
         setSimilarProducts(similar);
         setComplementaryProducts(complementary);
+        setOtherProducts(all.filter((candidate) => !excludedIds.has(candidate.id)).slice(0, 12));
       } else {
         setSimilarProducts([]);
         setComplementaryProducts([]);
+        setOtherProducts([]);
       }
     } catch (err: any) {
       console.error("Failed to load product details:", err);
@@ -249,7 +255,7 @@ function ProductDetailsPage() {
         </div>
 
         {/* Product Showcase Section */}
-        <section className="max-w-[1240px] w-full mx-auto px-margin-desktop py-space-xl">
+        <section className="max-w-[1240px] w-full mx-auto px-margin-desktop py-4 sm:py-6">
 
           {/* Anomaly Notice for prod-munn8cp3 */}
           {isProductionMode && product.id === "prod-munn8cp3" && (
@@ -266,10 +272,10 @@ function ProductDetailsPage() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
             {/* Gallery Column */}
-            <div className="lg:col-span-6 flex flex-col gap-space-md">
-              <div className="relative bg-surface-container-lowest rounded-3xl shadow-sm overflow-hidden group border border-outline-variant/20">
+            <div className="lg:col-span-6 flex flex-col lg:flex-row items-stretch lg:items-start gap-2 sm:gap-3">
+              <div className="order-1 lg:order-2 relative min-w-0 w-full lg:flex-1 bg-surface-container-lowest rounded-3xl shadow-sm overflow-hidden group border border-outline-variant/20">
                 <WishlistHeartButton
                   active={wishlisted}
                   onToggle={handleToggleWishlist}
@@ -294,12 +300,33 @@ function ProductDetailsPage() {
                 </div>
 
                 {/* Main Large Image */}
-                <div className="relative w-full aspect-square flex items-center justify-center p-6 bg-surface-container-low transition-all overflow-hidden">
+                <div
+                  className="relative w-full aspect-square flex items-center justify-center p-3 sm:p-6 bg-surface-container-low transition-all overflow-hidden [touch-action:pan-y]"
+                  onTouchStart={(event) => {
+                    const touch = event.changedTouches[0];
+                    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+                  }}
+                  onTouchEnd={(event) => {
+                    const start = touchStartRef.current;
+                    const touch = event.changedTouches[0];
+                    touchStartRef.current = null;
+                    if (!start || images.length < 2) return;
+
+                    const deltaX = touch.clientX - start.x;
+                    const deltaY = touch.clientY - start.y;
+                    if (Math.abs(deltaX) < 40 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+
+                    setActiveImageIndex((currentIndex) =>
+                      (currentIndex + (deltaX < 0 ? 1 : -1) + images.length) % images.length
+                    );
+                    setImageError(false);
+                  }}
+                >
                   {activeImage && !imageError ? (
                     <img
                       src={activeImage}
                       alt={product.name}
-                      className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-500 ease-out drop-shadow-md select-none"
+                      className="w-[82%] h-[82%] object-contain group-hover:scale-[1.03] transition-transform duration-500 ease-out drop-shadow-md select-none"
                       onError={() => setImageError(true)}
                     />
                   ) : (
@@ -315,9 +342,9 @@ function ProductDetailsPage() {
                 </div>
               </div>
 
-              {/* Thumbnails Row */}
+              {/* Front/back and alternate image switcher */}
               {images.length > 1 && (
-                <div className="grid grid-cols-4 gap-space-sm">
+                <div className="order-2 lg:order-1 w-full lg:w-16 shrink-0 flex flex-row lg:flex-col gap-2 sm:gap-3 overflow-x-auto lg:overflow-visible scrollbar-none">
                   {images.map((img, idx) => (
                     <button
                       key={idx}
@@ -326,7 +353,9 @@ function ProductDetailsPage() {
                         setActiveImageIndex(idx);
                         setImageError(false);
                       }}
-                      className={`relative aspect-square rounded-2xl bg-surface-container-lowest p-2 shadow-sm transition-all overflow-hidden flex items-center justify-center cursor-pointer ${
+                      aria-label={`Show product image ${idx + 1}${idx === 0 ? " (front)" : idx === 1 ? " (back)" : ""}`}
+                      aria-pressed={activeImageIndex === idx}
+                      className={`relative aspect-square w-12 sm:w-14 lg:w-full shrink-0 rounded-xl sm:rounded-2xl bg-surface-container-lowest p-1 sm:p-2 shadow-sm transition-all overflow-hidden flex items-center justify-center cursor-pointer border border-outline-variant/20 ${
                         activeImageIndex === idx
                           ? "ring-2 ring-primary bg-primary/5"
                           : "hover:bg-surface-container opacity-70"
@@ -344,9 +373,9 @@ function ProductDetailsPage() {
             </div>
 
             {/* Product Meta Column */}
-            <div className="lg:col-span-6 flex flex-col gap-space-lg">
+            <div className="lg:col-span-6 flex flex-col gap-3">
               {/* Brand & Title */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary font-headline-sm text-xs font-bold uppercase tracking-wider">
                     {product.brand}
@@ -399,7 +428,7 @@ function ProductDetailsPage() {
               </div>
 
               {/* Price Card */}
-              <div className="bg-surface-container-lowest p-space-lg rounded-3xl shadow-sm flex flex-col gap-3 border border-outline-variant/20">
+              <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm flex flex-col gap-1.5 border border-outline-variant/20">
                 <div className="flex flex-wrap items-baseline gap-space-sm">
                   <span className="font-price-hero text-2xl font-extrabold text-on-surface tracking-tight">
                     ₹{currentPrice}
@@ -452,7 +481,7 @@ function ProductDetailsPage() {
               </div>
 
               {/* Pack Size / Variant Selector */}
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <label className="font-headline-sm text-xs font-bold text-on-surface uppercase tracking-wider">
                     Select Pack Size:
@@ -462,30 +491,25 @@ function ProductDetailsPage() {
                     {currentOption.unit} Selected
                   </span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-space-sm">
+                <div className="flex flex-wrap gap-2">
                   {product.options.map((opt, idx) => (
                     <button
                       key={idx}
                       type="button"
                       onClick={() => setSelectedOptIndex(idx)}
-                      className={`text-left p-3 rounded-2xl transition-all flex flex-col justify-between shadow-sm cursor-pointer border ${
+                      className={`w-[112px] sm:w-[124px] min-h-[58px] text-left p-2.5 rounded-xl transition-all flex flex-col justify-center shadow-sm cursor-pointer border ${
                         selectedOptIndex === idx
                           ? "bg-primary/10 border-primary ring-2 ring-primary"
                           : "bg-surface-container-lowest border-outline-variant/20 hover:bg-surface-container"
                       }`}
                     >
-                      <span className="font-headline-sm text-sm font-bold text-on-surface">
+                      <span className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface">
                         {opt.unitSize} {opt.unit}
                       </span>
-                      <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center justify-between gap-2 mt-1">
                         <span className="text-xs font-extrabold text-primary">
                           ₹{opt.offerPrice}
                         </span>
-                        {opt.mrp > opt.offerPrice && (
-                          <span className="text-[10px] text-outline line-through">
-                            ₹{opt.mrp}
-                          </span>
-                        )}
                       </div>
                     </button>
                   ))}
@@ -493,7 +517,7 @@ function ProductDetailsPage() {
               </div>
 
               {/* Delivery ETA Pill */}
-              <div className="p-3.5 rounded-2xl bg-primary-fixed/20 flex items-center justify-between gap-2 border border-primary/10">
+              <div className="p-2.5 sm:p-3 rounded-2xl bg-primary-fixed/20 flex items-center justify-between gap-2 border border-primary/10">
                 <div className="flex items-center gap-2 text-on-primary-fixed">
                   <span className="material-symbols-outlined text-primary text-[22px]">
                     electric_moped
@@ -513,19 +537,19 @@ function ProductDetailsPage() {
               </div>
 
               {/* Quantity Stepper & Add to Cart Buttons */}
-              <div className="flex flex-col gap-3 pt-2">
-                <div className="flex items-center gap-space-md">
+              <div className="flex flex-col gap-2 pt-0.5">
+                <div className="flex items-center gap-2">
                   {/* Stepper (only when in stock) */}
                   {currentOption.stock > 0 && (
                     <div className="flex items-center bg-surface-container-lowest rounded-2xl p-1 shadow-sm border border-outline-variant/20 shrink-0">
                       <button
                         type="button"
                         onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                        className="w-10 h-10 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-extrabold text-lg flex items-center justify-center transition-colors cursor-pointer"
+                        className="w-9 h-9 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-extrabold text-lg flex items-center justify-center transition-colors cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[18px]">remove</span>
                       </button>
-                      <span className="w-12 text-center font-headline-sm text-sm font-extrabold text-on-surface">
+                      <span className="w-9 text-center font-headline-sm text-sm font-extrabold text-on-surface">
                         {quantity}
                       </span>
                       <button
@@ -533,7 +557,7 @@ function ProductDetailsPage() {
                         onClick={() =>
                           setQuantity((q) => Math.min(currentOption.stock, q + 1))
                         }
-                        className="w-10 h-10 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-extrabold text-lg flex items-center justify-center transition-colors cursor-pointer"
+                        className="w-9 h-9 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-extrabold text-lg flex items-center justify-center transition-colors cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[18px]">add</span>
                       </button>
@@ -545,7 +569,7 @@ function ProductDetailsPage() {
                     <button
                       type="button"
                       onClick={handleAddToCart}
-                      className="flex-1 bg-primary hover:bg-primary-container text-on-primary py-3.5 px-6 rounded-2xl font-headline-sm text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+                      className="flex-1 bg-primary hover:bg-primary-container text-on-primary py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl font-headline-sm text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[20px]">
                         shopping_bag
@@ -555,7 +579,7 @@ function ProductDetailsPage() {
                   ) : (
                     <button
                       disabled
-                      className="flex-1 bg-surface-container text-outline py-3.5 px-6 rounded-2xl font-headline-sm text-sm font-bold flex items-center justify-center gap-2 border border-outline-variant/30 cursor-not-allowed select-none"
+                      className="flex-1 bg-surface-container text-outline py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl font-headline-sm text-xs sm:text-sm font-bold flex items-center justify-center gap-2 border border-outline-variant/30 cursor-not-allowed select-none"
                     >
                       <span className="material-symbols-outlined text-[20px]">block</span>
                       <span>Currently Out of Stock</span>
@@ -566,7 +590,7 @@ function ProductDetailsPage() {
                 {currentOption.stock > 0 && (
                   <Link
                     to="/checkout"
-                    className="w-full bg-on-surface hover:bg-inverse-surface text-on-primary py-3.5 px-6 rounded-2xl font-headline-sm text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] text-center"
+                    className="w-full bg-on-surface hover:bg-inverse-surface text-on-primary py-2.5 px-4 rounded-xl sm:rounded-2xl font-headline-sm text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] text-center"
                   >
                     <span className="material-symbols-outlined text-[20px]">bolt</span>
                     <span>Instant Express Checkout</span>
@@ -595,9 +619,18 @@ function ProductDetailsPage() {
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </Link>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+            <div
+              className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 scrollbar-none"
+              style={{ overscrollBehaviorX: "contain" }}
+            >
               {similarProducts.map((p) => (
-                <ProductCard key={p.id} product={p} readOnly={false} />
+                <div
+                  key={p.id}
+                  data-product-card
+                  className="w-[min(44vw,190px)] shrink-0 snap-start sm:w-[190px] lg:w-[204px]"
+                >
+                  <ProductCard product={p} className="h-full p-3" readOnly={false} />
+                </div>
               ))}
             </div>
           </section>
@@ -632,27 +665,39 @@ function ProductDetailsPage() {
         )}
 
         {/* Deep Details Tabs (Specs, Reviews) */}
-        <section className="w-full bg-surface-container-lowest py-4 border-t border-outline-variant/15 mt-2">
+        <section className="w-full py-8 sm:py-10 border-t border-outline-variant/15 mt-2">
           <div className="max-w-[1320px] mx-auto px-margin-desktop">
-            {/* Tab Pills */}
-            <div className="flex items-center space-x-2 pb-4 overflow-x-auto whitespace-nowrap scrollbar-none">
+            <div className="rounded-3xl bg-primary-fixed/20 border border-primary/15 p-4 sm:p-6 lg:p-8 shadow-sm">
+            {/* Specifications dropdown and reviews tab */}
+            <div className="flex flex-col items-stretch gap-2 pb-5">
               <button
                 type="button"
-                onClick={() => setActiveTab("specs")}
-                className={`px-4 py-2 rounded-full font-headline-sm text-[11px] font-bold transition-all cursor-pointer ${
-                  activeTab === "specs"
-                    ? "bg-primary text-white shadow-sm"
-                    : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
-                }`}
+                aria-expanded={activeTab === "specs" && isSpecsOpen}
+                aria-controls="product-specifications-panel"
+                onClick={() => {
+                  if (activeTab !== "specs") {
+                    setActiveTab("specs");
+                    setIsSpecsOpen(true);
+                  } else {
+                    setIsSpecsOpen((open) => !open);
+                  }
+                }}
+                className="w-full flex items-center justify-between gap-3 rounded-2xl bg-surface-container-lowest px-4 py-3 text-left font-headline-sm text-sm sm:text-base font-bold text-on-surface shadow-sm border border-primary/20 transition-colors hover:bg-surface-container-low cursor-pointer"
               >
-                Product Specifications & Nutrition
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="material-symbols-outlined shrink-0 text-primary text-[20px]">inventory_2</span>
+                  <span>Product Specifications & Nutrition</span>
+                </span>
+                <span className="material-symbols-outlined shrink-0 text-primary transition-transform duration-200">
+                  {activeTab === "specs" && isSpecsOpen ? "expand_less" : "expand_more"}
+                </span>
               </button>
               {typeof product.reviewCount === "number" &&
                 product.reviewCount > 0 && (
                   <button
                     type="button"
                     onClick={() => setActiveTab("reviews")}
-                    className={`px-4 py-2 rounded-full font-headline-sm text-[11px] font-bold transition-all cursor-pointer ${
+                    className={`self-start max-w-full px-4 py-2 rounded-full font-headline-sm text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${
                       activeTab === "reviews"
                         ? "bg-primary text-white shadow-sm"
                         : "bg-surface-container-low text-on-surface-variant hover:text-on-surface"
@@ -664,67 +709,81 @@ function ProductDetailsPage() {
             </div>
 
             {/* Specifications & Nutrition Content */}
-            {activeTab === "specs" && (
-              <div className="space-y-4">
-                <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/20">
-                  <div className="space-y-2 text-[11px]">
+            <div
+              id="product-specifications-panel"
+              aria-hidden={activeTab !== "specs" || !isSpecsOpen}
+              className={
+                activeTab === "specs" && isSpecsOpen
+                  ? "grid grid-cols-1 md:grid-cols-2 gap-4"
+                  : "hidden"
+              }
+            >
+                <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl border border-primary/15 shadow-sm">
+                  <h3 className="flex items-center gap-2 mb-3 font-headline-sm text-sm sm:text-base font-bold text-on-surface">
+                    <span className="material-symbols-outlined text-primary text-[20px]">inventory_2</span>
+                    Product Details
+                  </h3>
+                  <div className="space-y-2 text-xs sm:text-sm">
                     {product.subCategory && (
                       <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                         <span className="text-on-surface-variant">Subcategory</span>
-                        <span className="font-bold text-on-surface text-right">{product.subCategory}</span>
+                      <span className="max-w-[60%] break-words font-bold text-on-surface text-right">{product.subCategory}</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Extraction / Method</span>
-                      <span className="font-bold text-on-surface text-right">
+                      <span className="max-w-[60%] break-words font-bold text-on-surface text-right">
                         {product.extraction || "Traditional Cold Process"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Origin Basin</span>
-                      <span className="font-bold text-on-surface text-right">
+                      <span className="max-w-[60%] break-words font-bold text-on-surface text-right">
                         {product.origin || "Western Tamil Nadu Delta"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Shelf Life</span>
-                      <span className="font-bold text-on-surface text-right">6 Months from Press Date</span>
+                      <span className="max-w-[60%] break-words font-bold text-on-surface text-right">6 Months from Press Date</span>
                     </div>
                     <div className="flex items-center justify-between gap-3 py-1.5">
                       <span className="text-on-surface-variant">FSSAI Certified</span>
-                      <span className="font-bold text-primary font-mono text-right">#12421008000412</span>
+                      <span className="max-w-[60%] break-words font-bold text-primary font-mono text-right">#12421008000412</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/20">
-                  <div className="space-y-2 text-[11px]">
+                <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl border border-primary/15 shadow-sm">
+                  <h3 className="flex items-center gap-2 mb-3 font-headline-sm text-sm sm:text-base font-bold text-on-surface">
+                    <span className="material-symbols-outlined text-secondary text-[20px]">nutrition</span>
+                    Nutrition Facts
+                  </h3>
+                  <div className="space-y-2 text-xs sm:text-sm">
                     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Energy</span>
-                      <span className="font-bold text-on-surface text-right">
+                      <span className="max-w-[60%] break-words font-bold text-on-surface text-right">
                         {product.nutrition?.energy || "900 kcal"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">MUFA</span>
-                      <span className="font-bold text-primary text-right">
+                      <span className="max-w-[60%] break-words font-bold text-primary text-right">
                         {product.nutrition?.mufa || "48.2 g (Heart Healthy)"}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-3 py-1.5 border-b border-outline-variant/15">
                       <span className="text-on-surface-variant">Trans Fats & Cholesterol</span>
-                      <span className="font-bold text-primary text-right">0.00 mg (Zero)</span>
+                      <span className="max-w-[60%] break-words font-bold text-primary text-right">0.00 mg (Zero)</span>
                     </div>
                     <div className="flex items-center justify-between gap-3 py-1.5">
                       <span className="text-on-surface-variant">Vitamin E</span>
-                      <span className="font-bold text-on-surface text-right">
+                      <span className="max-w-[60%] break-words font-bold text-on-surface text-right">
                         {product.nutrition?.vitaminE || "15.7 mg"}
                       </span>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+            </div>
 
             {/* Tab 3: Reviews */}
             {activeTab === "reviews" &&
@@ -769,8 +828,42 @@ function ProductDetailsPage() {
                   </div>
                 </div>
               )}
+            </div>
           </div>
         </section>
+
+        {otherProducts.length > 0 && (
+          <section className="max-w-[1320px] w-full mx-auto px-margin-desktop py-6 sm:py-8">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="min-w-0 text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
+                Other Products
+              </h2>
+              <Link
+                to="/shop"
+                className="shrink-0 text-xs sm:text-sm font-bold text-primary hover:underline"
+              >
+                Browse all
+              </Link>
+            </div>
+            <div
+              className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 scrollbar-none"
+              style={{ overscrollBehaviorX: "contain" }}
+            >
+              {otherProducts.map((otherProduct) => (
+                <div
+                  key={otherProduct.id}
+                  className="w-[min(44vw,190px)] shrink-0 snap-start sm:w-[190px] lg:w-[204px]"
+                >
+                  <ProductCard
+                    product={otherProduct}
+                    className="h-full p-3"
+                    readOnly={false}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
       </main>
 

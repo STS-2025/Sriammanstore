@@ -4,10 +4,16 @@ import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { addressService } from "../services/addressService";
+import {
+  DEFAULT_DELIVERY_SETTINGS,
+  settingsService,
+  type StoreDeliverySettings,
+} from "../services/settingsService";
 import { authManager } from "../services/authAdapter";
 import type { Address } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
+import { findDeliveryLocation, getDeliveryAreaSuggestions } from "../lib/deliveryLocations";
 
 export const Route = createFileRoute("/addresses")({
   validateSearch: (
@@ -35,6 +41,8 @@ export function AddressesPage() {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [addressesError, setAddressesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deliveryConfig, setDeliveryConfig] =
+    useState<StoreDeliverySettings>(DEFAULT_DELIVERY_SETTINGS);
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -44,10 +52,10 @@ export function AddressesPage() {
   const [houseNo, setHouseNo] = useState("");
   const [street, setStreet] = useState("");
   const [landmark, setLandmark] = useState("");
-  const [city, setCity] = useState("Gobichettipalayam");
-  const [pincode, setPincode] = useState("638454");
-  const [lat, setLat] = useState(11.4595);
-  const [lng, setLng] = useState(77.3338);
+  const [city, setCity] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [lat, setLat] = useState(0);
+  const [lng, setLng] = useState(0);
 
   const handleOpenAddModal = () => {
     setName(user?.name || "");
@@ -55,8 +63,19 @@ export function AddressesPage() {
     setHouseNo("");
     setStreet("");
     setLandmark("");
+    setCity(deliveryConfig.serviceAreaDistrict);
+    setPincode("");
     setTag("Home");
     setShowModal(true);
+  };
+
+  const handleStreetChange = (value: string) => {
+    setStreet(value);
+    const location = findDeliveryLocation(value, deliveryConfig.deliveryZones);
+    if (location) {
+      setCity(location.city);
+      setPincode(location.pincode);
+    }
   };
 
   useEffect(() => {
@@ -73,8 +92,13 @@ export function AddressesPage() {
     try {
       setLoading(true);
       setAddressesError(null);
-      const list = await addressService.getAddresses(user.id);
+      const [list, config] = await Promise.all([
+        addressService.getAddresses(user.id),
+        settingsService.getDeliveryConfiguration(),
+      ]);
       setAddresses(list || []);
+      setDeliveryConfig(config);
+      setCity((current) => current || config.serviceAreaDistrict);
     } catch (err: any) {
       console.error("Failed to load addresses:", err);
       const msg =
@@ -118,13 +142,21 @@ export function AddressesPage() {
   };
 
   const handleSimulateGPS = () => {
-    // Center of Gobichettipalayam delivery zone
-    setLat(11.4598);
-    setLng(77.334);
-    setCity("Gobichettipalayam");
-    setPincode("638454");
-    setStreet("Kasipalayam High Road");
-    toast.info("GPS coordinates mapped to Gobichettipalayam Hub (Distance ~150m)");
+    // Use an admin-managed zone to demonstrate an eligible address.
+    const firstZone = deliveryConfig.deliveryZones[0];
+    const location = firstZone
+      ? findDeliveryLocation(firstZone, deliveryConfig.deliveryZones)
+      : undefined;
+    setLat(0);
+    setLng(0);
+    setCity(location?.city || deliveryConfig.serviceAreaDistrict);
+    setPincode(location?.pincode || "");
+    setStreet(firstZone || "");
+    toast.info(
+      firstZone
+        ? `Address set inside the ${firstZone} delivery zone.`
+        : "Enter an address inside the service area."
+    );
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -234,7 +266,10 @@ export function AddressesPage() {
               </h1>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <p className="text-xs text-on-surface-variant">
-                  Store Hub: Gobichettipalayam • Service Radius: 50.0 KM
+                  {deliveryConfig.storeName}: {deliveryConfig.storeAddress}
+                  {deliveryConfig.deliveryZones.length > 0
+                    ? ` • Zones: ${deliveryConfig.deliveryZones.join(", ")}`
+                    : ` • Service Radius: ${deliveryConfig.deliveryRadiusKm} KM`}
                 </p>
               </div>
             </div>
@@ -297,7 +332,10 @@ export function AddressesPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {addresses.map((addr) => {
-                const geo = addressService.validateGeofence(addr.lat, addr.lng);
+                const geo = addressService.validateDeliveryServiceability(
+                  addr,
+                  deliveryConfig
+                );
                 return (
                   <div
                     key={addr.id}
@@ -344,10 +382,12 @@ export function AddressesPage() {
                           <span className="material-symbols-outlined text-[16px]">
                             {geo.eligible ? "verified" : "error"}
                           </span>
-                          {geo.eligible ? "Eligible (Within 50km)" : "Ineligible (Exceeds 50km)"}
+                          {geo.eligible ? "In service area" : "Outside service area"}
                         </span>
                         <span className="text-on-surface-variant font-mono text-[11px]">
-                          {geo.distanceKm} km
+                          {deliveryConfig.deliveryZones.length > 0
+                            ? "Zone match"
+                            : `${geo.distanceKm} km`}
                         </span>
                       </div>
                     </div>
@@ -467,10 +507,16 @@ export function AddressesPage() {
                   type="text"
                   required
                   value={street}
-                  onChange={(e) => setStreet(e.target.value)}
-                  placeholder="e.g. Kasipalayam"
+                  onChange={(e) => handleStreetChange(e.target.value)}
+                  list="saved-address-delivery-areas"
+                  placeholder="Type or choose a nearby area"
                   className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/20"
                 />
+                <datalist id="saved-address-delivery-areas">
+                  {getDeliveryAreaSuggestions(deliveryConfig.deliveryZones).map((area) => (
+                    <option key={area} value={area} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
@@ -492,6 +538,7 @@ export function AddressesPage() {
                     required
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
+                    placeholder={deliveryConfig.serviceAreaDistrict}
                     className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/20"
                   />
                 </div>
@@ -502,6 +549,9 @@ export function AddressesPage() {
                     required
                     value={pincode}
                     onChange={(e) => setPincode(e.target.value)}
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="PIN is suggested from area"
                     className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/20"
                   />
                 </div>

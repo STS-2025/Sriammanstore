@@ -21,7 +21,7 @@ export const Route = createFileRoute("/wishlist")({
       {
         name: "description",
         content:
-          "Save your favorite farm-pressed staples and seasonal produce for frictionless replenishment and rapid 60-min delivery.",
+          "Save your favorite staples and seasonal produce for frictionless replenishment and rapid 60-min delivery.",
       },
     ],
   }),
@@ -432,7 +432,7 @@ export function WishlistPage() {
                 My Wishlist
               </h1>
               <p className="text-xs md:text-sm text-on-surface-variant mt-1 max-w-2xl">
-                Save your favorite farm-pressed staples and seasonal produce for frictionless replenishment and rapid 60-min delivery.
+                Save your staples and seasonal produce for frictionless replenishment and rapid 60-min delivery.
               </p>
             </div>
 
@@ -612,19 +612,6 @@ export function WishlistPage() {
                 <span>Move All In-Stock to Cart ({inStockCount} items)</span>
               </button>
             </div>
-          </div>
-
-          {/* Live Inventory Calibration Info Banner */}
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-xs">
-            <div className="flex items-center gap-2 text-xs text-amber-900 font-medium">
-              <span className="material-symbols-outlined text-amber-700 text-[18px]">info</span>
-              <span>
-                Prices and inventory refresh automatically in real-time. Staples remain available until completed checkout.
-              </span>
-            </div>
-            <span className="text-[10px] font-extrabold text-amber-800 tracking-wider uppercase bg-amber-500/20 px-2.5 py-1 rounded-lg shrink-0">
-              ADYAR HUB: FAST STOCK
-            </span>
           </div>
 
           {/* Saved Items Product Grid */}

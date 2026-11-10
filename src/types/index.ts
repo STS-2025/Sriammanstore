@@ -348,6 +348,7 @@ export interface CoinTransaction {
   type: "earned" | "redeemed";
   description: string;
   timestamp: string;
+  expiresAt?: string;
 }
 
 export interface ReferralFriend {
@@ -426,5 +427,6 @@ export interface StoreInfo {
   maxRadiusKm: number;
   coinValueInRupees: number;
   vipSpendingThreshold: number;
+  minOrderForFreeDelivery?: number;
 }
 

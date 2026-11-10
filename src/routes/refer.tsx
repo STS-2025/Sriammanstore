@@ -15,7 +15,6 @@ import type {
   ReferralFriend,
   CoinTransaction,
   StoreInfo,
-  DeliverySettings,
 } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
@@ -41,9 +40,8 @@ export function ReferPage() {
 
   const [referrals, setReferrals] = useState<ReferralFriend[]>([]);
   const [coinHistory, setCoinHistory] = useState<CoinTransaction[]>([]);
+  const [verifiedCoinBalance, setVerifiedCoinBalance] = useState<number | null>(null);
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
-  const [deliverySettings, setDeliverySettings] =
-    useState<DeliverySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,18 +66,17 @@ export function ReferPage() {
     setError(null);
 
     try {
-      const [userReferrals, userCoinHistory, store, delivery] =
-        await Promise.all([
-          referralService.getReferrals(user.id, user.legacySassId),
-          coinService.getCoinHistory(user.id, user.legacySassId),
-          settingsService.getStoreInfo(),
-          settingsService.getDeliverySettings(),
-        ]);
+      const [userReferrals, userCoinHistory, store, spendableCoins] = await Promise.all([
+        referralService.getReferrals(user.id, user.legacySassId),
+        coinService.getCoinHistory(user.id, user.legacySassId),
+        settingsService.getStoreInfo(),
+        coinService.getUserCoins(user.id, user.legacySassId),
+      ]);
 
       setReferrals(userReferrals || []);
       setCoinHistory(userCoinHistory || []);
       setStoreInfo(store || null);
-      setDeliverySettings(delivery || null);
+      setVerifiedCoinBalance(spendableCoins);
     } catch (err: any) {
       console.error("Failed to load referral dashboard data:", err);
       setError(
@@ -112,11 +109,12 @@ export function ReferPage() {
   }, [coinHistory]);
 
   const availableCoins = useMemo(() => {
+    if (verifiedCoinBalance !== null) return verifiedCoinBalance;
     if (coinHistory.length > 0) {
       return ledgerStats.netBalance;
     }
     return user?.smartCoins ?? user?.coins ?? 0;
-  }, [coinHistory.length, ledgerStats.netBalance, user?.smartCoins, user?.coins]);
+  }, [verifiedCoinBalance, coinHistory.length, ledgerStats.netBalance, user?.smartCoins, user?.coins]);
 
   // Compute referral statistics
   const referralStats = useMemo(() => {
@@ -1242,8 +1240,8 @@ export function ReferPage() {
                       {storeInfo?.maxRadiusKm ?? 6} km delivery radius
                     </strong>{" "}
                     around {storeLocation}
-                    {deliverySettings?.minOrderForFreeDelivery
-                      ? ` (free standard delivery on orders ₹${deliverySettings.minOrderForFreeDelivery}+)`
+                    {storeInfo?.minOrderForFreeDelivery
+                      ? ` (free standard delivery on orders ₹${storeInfo.minOrderForFreeDelivery}+)`
                       : ""}
                     .
                   </p>

@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from "react";
 import { cartService } from "../services/cartService";
-import { convertCoinsToRupees, getMaxRedeemableCoins } from "../services/coinService";
+import { coinService, convertCoinsToRupees, getMaxRedeemableCoins } from "../services/coinService";
 import { calculateLegacyPromoDiscount, fetchPromoByCode } from "../services/promoService";
 import {
   calculateLegacyDeliveryCharge,
@@ -63,6 +63,7 @@ interface CartContextType {
   redeemCoins: boolean;
   coinsRedeemed: number;
   coinsToRedeem: number;
+  coinsAvailable: number;
   coinDiscount: number;
   coinValueInRupees: number;
   deliverySpeed: "standard" | "express";
@@ -70,6 +71,7 @@ interface CartContextType {
   standardDeliveryFee: number;
   expressDeliveryFee: number;
   deliverySettingsError: string | null;
+  checkoutSettings: LegacyCheckoutSettings;
   isExpressDeliveryAvailable: boolean;
   finalTotal: number;
   selectedAddressId: string;
@@ -142,6 +144,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     useState<LegacyCheckoutSettings>(LEGACY_CHECKOUT_DEFAULTS);
   const [deliverySettingsError, setDeliverySettingsError] = useState<string | null>(null);
   const [checkoutSettingsLoaded, setCheckoutSettingsLoaded] = useState(false);
+  const [coinsAvailable, setCoinsAvailable] = useState(0);
   const currentHour = new Date().getHours();
   const isExpressDeliveryAvailable = isLegacyExpressAvailable(currentHour, legacyCheckoutSettings);
 
@@ -164,6 +167,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!user) {
+      setCoinsAvailable(0);
+      return () => { active = false; };
+    }
+    coinService
+      .getUserCoins(user.id, user.legacySassId)
+      .then((balance) => {
+        if (active) setCoinsAvailable(balance);
+      })
+      .catch(() => {
+        if (active) setCoinsAvailable(user.smartCoins ?? user.coins ?? user.availableCoins ?? 0);
+      });
+    return () => { active = false; };
+  }, [user?.id, user?.legacySassId, user?.smartCoins, user?.coins, user?.availableCoins]);
 
   const [selectedAddressId, setSelectedAddressIdState] = useState<string>(() =>
     getStored(addressKey, "")
@@ -293,6 +313,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     optionIndex: number = 0,
     quantity: number = 1
   ) => {
+    const currentQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+    if (currentQuantity + quantity > legacyCheckoutSettings.maxItemsPerOrder) {
+      toast.error(
+        `Your order can contain up to ${legacyCheckoutSettings.maxItemsPerOrder} items.`
+      );
+      return;
+    }
     const isVIP = !!user?.isVIP;
     const cartOwnerId = guestCartSyncError ? "guest_session" : user?.id;
     const updatedItem = await cartService.addToCart(product, optionIndex, quantity, cartOwnerId, isVIP);
@@ -311,6 +338,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateQty = async (cartKey: string, quantity: number) => {
+    const otherQuantity = items.reduce(
+      (sum, item) =>
+        item.id === cartKey || item.cartKey === cartKey
+          ? sum
+          : sum + item.quantity,
+      0
+    );
+    if (quantity > 0 && otherQuantity + quantity > legacyCheckoutSettings.maxItemsPerOrder) {
+      toast.error(
+        `Your order can contain up to ${legacyCheckoutSettings.maxItemsPerOrder} items.`
+      );
+      return;
+    }
     const updatedItem = await cartService.updateQuantity(
       cartKey,
       quantity,
@@ -442,21 +482,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!appliedCoupon) return 0;
     return calculateLegacyPromoDiscount(appliedCoupon, cartSubtotal);
   }, [appliedCoupon, cartSubtotal]);
-
-  // Smart Coins calculations (1 coin = ₹0.05 official rate)
-  const userCoins =
-    typeof user?.smartCoins === "number"
-      ? user.smartCoins
-      : typeof user?.coins === "number"
-        ? user.coins
-        : typeof user?.availableCoins === "number"
-          ? user.availableCoins
-          : 0;
-  const amountBeforeCoins = Math.max(0, cartSubtotal - couponDiscount + deliveryFee);
+  // Smart Coins calculations follow the admin-managed reward and redemption rules.
+  const amountBeforeCoins = cartSubtotal;
   const coinsToRedeem = getMaxRedeemableCoins(
-    userCoins,
+    coinsAvailable,
     amountBeforeCoins,
     legacyCheckoutSettings.coinValueInRupees,
+    legacyCheckoutSettings.maxCoinRedemptionPercent,
+    legacyCheckoutSettings.minCoinsToRedeem,
   );
   const coinsRedeemed = redeemCoins ? coinsToRedeem : 0;
   const coinDiscount = redeemCoins
@@ -492,11 +525,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         redeemCoins,
         coinsRedeemed,
         coinsToRedeem,
+        coinsAvailable,
         coinDiscount,
         coinValueInRupees: legacyCheckoutSettings.coinValueInRupees,
         deliverySpeed,
         deliveryFee,
         deliverySettingsError,
+        checkoutSettings: legacyCheckoutSettings,
         isExpressDeliveryAvailable,
         standardDeliveryFee,
         expressDeliveryFee,

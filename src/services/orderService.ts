@@ -2,9 +2,18 @@ import { apiClient } from "./apiClient";
 import type { Order, OrderStatus, CartItem, Address, DeliverySlot, User } from "../types";
 import { cartService } from "./cartService";
 import { addressService } from "./addressService";
-import { settingsService } from "./settingsService";
+import {
+  DEFAULT_PAYMENT_SETTINGS,
+  isOrderCutoffPassed,
+  settingsService,
+} from "./settingsService";
 import { notificationService, SUPPORTED_ORDER_STATUSES } from "./notificationService";
-import { convertRupeesToCoins, coinService } from "./coinService";
+import {
+  calculateSpendableCoinBalance,
+  convertRupeesToCoins,
+  coinService,
+  getCoinExpiryDate,
+} from "./coinService";
 import { authService } from "./authService";
 import { authManager } from "./authAdapter";
 import { productionOrderReader } from "./productionOrderReader";
@@ -138,6 +147,59 @@ export const orderService = {
       throw new Error("Cannot place an order with an empty cart");
     }
 
+    const [checkoutSettings, paymentSettings] = await Promise.all([
+      settingsService.getLegacyCheckoutSettings(),
+      settingsService.getPaymentConfiguration(),
+    ]);
+    const itemQuantity = params.cartItems.reduce(
+      (total, item) => total + item.quantity,
+      0
+    );
+    const itemSubtotal = params.cartItems.reduce(
+      (total, item) => total + item.price * item.quantity,
+      0
+    );
+    if (Math.abs(itemSubtotal - params.subtotal) > 0.01) {
+      throw new Error("Order subtotal does not match the cart items.");
+    }
+    if (itemSubtotal < checkoutSettings.minimumOrderAmount) {
+      throw new Error(
+        `The minimum order amount is ₹${checkoutSettings.minimumOrderAmount}.`
+      );
+    }
+    if (itemQuantity > checkoutSettings.maxItemsPerOrder) {
+      throw new Error(
+        `An order can contain up to ${checkoutSettings.maxItemsPerOrder} items.`
+      );
+    }
+    if (isOrderCutoffPassed(checkoutSettings.orderCutoffTime)) {
+      throw new Error(
+        `Today's order cutoff time (${checkoutSettings.orderCutoffTime}) has passed.`
+      );
+    }
+    if (params.paymentMethod === "cod" && !paymentSettings.codEnabled) {
+      throw new Error("Cash on delivery is currently unavailable.");
+    }
+    if (
+      params.paymentMethod === "cod" &&
+      Math.max(
+        0,
+        params.subtotal -
+          Math.min(
+            params.subtotal,
+            Math.max(0, params.coinDiscount || 0) +
+              Math.max(0, params.couponDiscount || 0)
+          ) +
+          params.deliveryFee
+      ) >
+        (paymentSettings.maxCodAmount ??
+          DEFAULT_PAYMENT_SETTINGS.maxCodAmount)
+    ) {
+      throw new Error(
+        `Cash on delivery is available for orders up to ₹${paymentSettings.maxCodAmount ?? DEFAULT_PAYMENT_SETTINGS.maxCodAmount}.`
+      );
+    }
+
     // Enforce dynamic delivery geofence validation (Settings/delivery radius)
     if (params.address) {
       const deliveryConfig = await settingsService.getDeliveryConfiguration();
@@ -146,9 +208,9 @@ export const orderService = {
         deliveryConfig
       );
       if (!serviceability.eligible) {
-        const radius = deliveryConfig.deliveryRadiusKm;
         throw new Error(
-          `Delivery address is outside the ${radius}km delivery boundary (${serviceability.distanceKm}km away).`
+          serviceability.reason ||
+            `Delivery address is outside the ${deliveryConfig.deliveryRadiusKm}km delivery boundary.`
         );
       }
     }
@@ -189,12 +251,15 @@ export const orderService = {
       );
     }
 
-    const availableCoins =
+    const storedCoins =
       customerRecord && typeof customerRecord.smartCoins === "number"
         ? customerRecord.smartCoins
         : customerRecord && typeof customerRecord.coins === "number"
         ? customerRecord.coins
         : customerRecord?.availableCoins ?? 0;
+    const availableCoins = await coinService
+      .getUserCoins(cleanUserId)
+      .catch(() => storedCoins);
 
     let coinsToDeduct = 0;
     if (typeof params.coinsRedeemed === "number" && params.coinsRedeemed > 0) {
@@ -205,9 +270,33 @@ export const orderService = {
       }
       coinsToDeduct = params.coinsRedeemed;
     } else if (coinDisc > 0) {
-      const calculatedCoins = convertRupeesToCoins(coinDisc);
+      const calculatedCoins = convertRupeesToCoins(
+        coinDisc,
+        1 / checkoutSettings.coinValueInRupees,
+      );
       // Cap at available balance when coinsRedeemed was not explicitly supplied
       coinsToDeduct = Math.min(availableCoins, calculatedCoins);
+    }
+
+    if (coinsToDeduct > 0) {
+      if (availableCoins < checkoutSettings.minCoinsToRedeem) {
+        throw new Error(`At least ${checkoutSettings.minCoinsToRedeem} Smart Coins are required to redeem.`);
+      }
+      const expectedCoinDiscount = Number(
+        (coinsToDeduct * checkoutSettings.coinValueInRupees).toFixed(2),
+      );
+      if (Math.abs(coinDisc - expectedCoinDiscount) > 0.01) {
+        throw new Error("Smart Coin discount does not match the current redemption value.");
+      }
+      const maxDiscount =
+        (params.subtotal * checkoutSettings.maxCoinRedemptionPercent) / 100;
+      if (coinDisc > maxDiscount + 0.01) {
+        throw new Error(
+          `Smart Coins can cover up to ${checkoutSettings.maxCoinRedemptionPercent}% of the item subtotal.`,
+        );
+      }
+    } else if (coinDisc > 0) {
+      throw new Error("Smart Coin discount was provided without eligible coins.");
     }
 
     // Generate atomic sequence test order ID: ORD-000xxxx with collision prevention
@@ -340,10 +429,11 @@ export const orderService = {
       }
     }
 
-    // Award coins for purchase (approx 10% of subtotal as reward coins)
-    const earnedCoins = Math.max(5, Math.floor(params.subtotal * 0.1));
+    // Award the configured Smart Coin amount once per eligible order.
+    const earnedCoins = Math.floor(checkoutSettings.smartCoinEarnRate);
     if (earnedCoins > 0 && !alreadyEarned) {
       try {
+        const earnedAt = createdOrder?.createdAt || new Date().toISOString();
         await apiClient.post("/coinHistory", {
           id: `coin_earn_${committedOrderId}`,
           userId: cleanUserId,
@@ -351,7 +441,11 @@ export const orderService = {
           amount: earnedCoins,
           type: "earned",
           description: `Smart Coins earned on Order #${committedOrderId}`,
-          timestamp: createdOrder?.createdAt || new Date().toISOString(),
+          timestamp: earnedAt,
+          expiresAt: getCoinExpiryDate(
+            new Date(earnedAt),
+            checkoutSettings.coinValidityMonths,
+          ),
         });
 
         // Trigger coin earned notification
@@ -377,12 +471,7 @@ export const orderService = {
         const userEndpoint = getCustomerProfileEndpoint(cleanUserId);
         const latestUser = await apiClient.get<User>(userEndpoint);
         if (latestUser) {
-          const startingBalance =
-            typeof latestUser.smartCoins === "number"
-              ? latestUser.smartCoins
-              : typeof latestUser.coins === "number"
-              ? latestUser.coins
-              : latestUser.availableCoins ?? 0;
+          const startingBalance = availableCoins;
           const updatedCoins = Math.max(
             0,
             startingBalance - effectiveDeduction + effectiveAward
@@ -531,6 +620,7 @@ export const orderService = {
     } catch {
       // Best effort history fetch
     }
+    const coinPolicy = await settingsService.getLegacyCheckoutSettings();
 
     // 2. Multi-layer resolution of exact coins redeemed on this order
     const burnTx = history.find(
@@ -554,7 +644,10 @@ export const orderService = {
     } else if (burnTx && typeof burnTx.amount === "number" && burnTx.amount > 0) {
       redeemedCoins = burnTx.amount;
     } else if (order.pricingSummary?.coinDiscount && order.pricingSummary.coinDiscount > 0) {
-      redeemedCoins = convertRupeesToCoins(order.pricingSummary.coinDiscount);
+      redeemedCoins = convertRupeesToCoins(
+        order.pricingSummary.coinDiscount,
+        1 / coinPolicy.coinValueInRupees,
+      );
     }
 
     // 3. Idempotency guard: check if redemption was already refunded
@@ -608,6 +701,7 @@ export const orderService = {
           type: "earned", // Conforms to firestoreAdapter validation ['earned', 'redeemed']
           description: `Smart Coins refund for cancelled Order #${orderId}`,
           timestamp: nowIso,
+          expiresAt: getCoinExpiryDate(new Date(nowIso), coinPolicy.coinValidityMonths),
         });
       } catch (refundErr) {
         console.error(`Failed to record coin refund for order #${orderId}:`, refundErr);
@@ -638,14 +732,32 @@ export const orderService = {
       const userEndpoint = getCustomerProfileEndpoint(cleanUserId);
       const latestUser = await apiClient.get<User>(userEndpoint);
       if (latestUser) {
-        const startingBalance =
+        const storedBalance =
           typeof latestUser.smartCoins === "number"
             ? latestUser.smartCoins
             : typeof latestUser.coins === "number"
             ? latestUser.coins
             : latestUser.availableCoins ?? 0;
 
-        newBalance = Math.max(0, startingBalance + effectiveRefund - effectiveClawback);
+        let startingBalance = storedBalance;
+        let balanceIncludesRefund = false;
+        try {
+          const refreshedHistory = await coinService.getCoinHistory(cleanUserId);
+          if (refreshedHistory.length > 0) {
+            startingBalance = Math.min(
+              storedBalance + effectiveRefund,
+              calculateSpendableCoinBalance(refreshedHistory, coinPolicy.coinValidityMonths),
+            );
+            balanceIncludesRefund = true;
+          }
+        } catch {
+          startingBalance = storedBalance;
+        }
+
+        newBalance = Math.max(
+          0,
+          startingBalance + (balanceIncludesRefund ? 0 : effectiveRefund) - effectiveClawback,
+        );
 
         const patchPayload: Record<string, unknown> = {
           smartCoins: newBalance,

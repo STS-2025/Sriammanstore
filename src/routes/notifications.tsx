@@ -1,13 +1,17 @@
 /* eslint-disable prettier/prettier */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
-import { settingsService } from "../services/settingsService";
-import { convertCoinsToRupees } from "../services/coinService";
+import {
+  LEGACY_CHECKOUT_DEFAULTS,
+  settingsService,
+  type LegacyCheckoutSettings,
+} from "../services/settingsService";
+import { coinService, convertCoinsToRupees } from "../services/coinService";
 import type { NotificationItem, NotificationCategory } from "../types";
 import { toast } from "sonner";
 
@@ -45,6 +49,30 @@ export function NotificationsPage() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [displayLimit, setDisplayLimit] = useState<number>(5);
   const [showAlertSettingsModal, setShowAlertSettingsModal] = useState(false);
+  const [coinPolicy, setCoinPolicy] = useState<LegacyCheckoutSettings>(LEGACY_CHECKOUT_DEFAULTS);
+  const [coinBalance, setCoinBalance] = useState(user?.smartCoins ?? user?.coins ?? 0);
+
+  useEffect(() => {
+    let active = true;
+    settingsService.getLegacyCheckoutSettings().then((settings) => {
+      if (active) setCoinPolicy(settings);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!user) {
+      setCoinBalance(0);
+      return () => { active = false; };
+    }
+    coinService.getUserCoins(user.id, user.legacySassId).then((balance) => {
+      if (active) setCoinBalance(balance);
+    }).catch(() => {
+      if (active) setCoinBalance(user.smartCoins ?? user.coins ?? 0);
+    });
+    return () => { active = false; };
+  }, [user?.id, user?.legacySassId, user?.smartCoins, user?.coins]);
 
   // Alert Settings form state
   const [inAppAlerts, setInAppAlerts] = useState(preferences.inAppAlerts);
@@ -690,7 +718,7 @@ export function NotificationsPage() {
                     MY COIN STASH
                   </span>
                   <span className="text-xs font-black text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-lg">
-                    = ₹{convertCoinsToRupees((user?.smartCoins ?? user?.coins) || 0).toFixed(2)} Value
+                    = ₹{convertCoinsToRupees(coinBalance, coinPolicy.coinValueInRupees).toFixed(2)} Value
                   </span>
                 </div>
 
@@ -698,16 +726,16 @@ export function NotificationsPage() {
                   <span className="text-3xl">🪙</span>
                   <div>
                     <div className="font-headline-lg text-2xl font-black text-on-surface">
-                      {(user?.smartCoins ?? user?.coins) || 0} Smart Coins
+                      {coinBalance} Smart Coins
                     </div>
                     <div className="text-[11px] text-on-surface-variant font-medium">
-                      1 Coin = ₹0.05 cash discount
+                      1 Coin = ₹{coinPolicy.coinValueInRupees} cash discount
                     </div>
                   </div>
                 </div>
 
                 <p className="text-xs text-on-surface-variant mt-3 leading-relaxed">
-                  Earn 1 Coin for every ₹10 spent on out grocery products.
+                    Earn {coinPolicy.smartCoinEarnRate} Smart Coins per eligible order. Coins expire after {coinPolicy.coinValidityMonths} months. Redeem once your balance reaches {coinPolicy.minCoinsToRedeem} coins, up to {coinPolicy.maxCoinRedemptionPercent}% of your item subtotal.
                 </p>
 
                 <div className="mt-4 pt-3 border-t border-amber-200/50">

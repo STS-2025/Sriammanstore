@@ -100,7 +100,7 @@ export const addressService = {
    * Validates address deliverability against dynamic store configuration (50 km radius, Erode, Tamil Nadu).
    */
   validateDeliveryServiceability(
-    address: Address | { lat?: number; lng?: number; city?: string; district?: string; state?: string; pincode?: string },
+    address: Address | { lat?: number; lng?: number; city?: string; district?: string; street?: string; landmark?: string; state?: string; pincode?: string },
     config?: Partial<StoreDeliverySettings>
   ): DeliveryServiceabilityResult {
     const options: Parameters<typeof validateDeliveryServiceability>[1] = {};
@@ -111,6 +111,7 @@ export const addressService = {
     if (config?.storeAddress !== undefined) options.storeAddress = config.storeAddress;
     if (config?.serviceAreaDistrict !== undefined) options.serviceAreaDistrict = config.serviceAreaDistrict;
     if (config?.serviceAreaState !== undefined) options.serviceAreaState = config.serviceAreaState;
+    if (config?.deliveryZones !== undefined) options.deliveryZones = config.deliveryZones;
 
     return validateDeliveryServiceability(address, options);
   },

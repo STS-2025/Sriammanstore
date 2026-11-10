@@ -123,6 +123,16 @@ export function normalizeLegacyCoinTransaction(
     }
   }
 
+  const rawExpiry = docData["expiresAt"];
+  let expiresAt: string | undefined;
+  if (rawExpiry && typeof (rawExpiry as any).toDate === "function") {
+    expiresAt = (rawExpiry as any).toDate().toISOString();
+  } else if (rawExpiry && typeof (rawExpiry as any).seconds === "number") {
+    expiresAt = new Date((rawExpiry as any).seconds * 1000).toISOString();
+  } else if (typeof rawExpiry === "string" && !Number.isNaN(new Date(rawExpiry).getTime())) {
+    expiresAt = new Date(rawExpiry).toISOString();
+  }
+
   return {
     id,
     userId,
@@ -131,6 +141,7 @@ export function normalizeLegacyCoinTransaction(
     type,
     description,
     timestamp,
+    ...(expiresAt ? { expiresAt } : {}),
   };
 }
 

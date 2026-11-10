@@ -431,7 +431,7 @@ export const notificationService = {
       badge: type === "earned" ? "COINS EARNED" : "COINS REDEEMED",
       title,
       message,
-      ctaText: "View Smart Coins Balance →",
+      ctaText: "View Smart Coins Balance",
       actionUrl: "/rewards",
       read: false,
       timestamp: new Date().toISOString(),
