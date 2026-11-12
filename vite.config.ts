@@ -1,31 +1,64 @@
-// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
-// or the app will break with duplicate plugins:
-//   - TanStack devtools (dev-only, first), tanstackStart, viteReact, tailwindcss, tsConfigPaths,
-//     nitro (disabled below in favor of Netlify's adapter), VITE_* env injection, @ path alias,
-//     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
-// You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import tailwindcss from "@tailwindcss/vite";
 import netlify from "@netlify/vite-plugin-tanstack-start";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import react from "@vitejs/plugin-react";
+import { loadEnv, defineConfig } from "vite";
+import { resolve } from "node:path";
 
-export default defineConfig({
-  plugins: [netlify()],
-  vite: {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "VITE_");
+
+  return {
+    define: Object.fromEntries(
+      Object.entries(env).map(([key, value]) => [
+        `import.meta.env.${key}`,
+        JSON.stringify(value),
+      ]),
+    ),
+    resolve: {
+      alias: { "@": resolve(process.cwd(), "src") },
+      tsconfigPaths: true,
+      dedupe: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "@tanstack/react-query",
+        "@tanstack/query-core",
+      ],
+    },
+    optimizeDeps: {
+      include: [
+        "react",
+        "react-dom",
+        "react-dom/client",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+      ],
+      ignoreOutdatedRequests: true,
+    },
+    plugins: [
+      tanstackStart({
+        importProtection: {
+          behavior: "error",
+          client: {
+            files: ["**/server/**"],
+            specifiers: ["server-only"],
+          },
+        },
+        server: { entry: "server" },
+      }),
+      react(),
+      tailwindcss(),
+      netlify({ dev: { edgeFunctions: { enabled: false } } }),
+    ],
     server: {
-      // Use localhost because Firebase Auth authorizes hostnames, and 127.0.0.1
-      // may not be present in the project's Authorized Domains list.
+      // Firebase Auth authorizes hostnames, so keep localhost rather than 127.0.0.1.
       host: "localhost",
       port: 5173,
     },
-    build: {
-      outDir: "dist",
-    },
-  },
-  // Netlify's TanStack Start adapter builds the server function and static
-  // assets for Netlify. Do not also emit the default Cloudflare Nitro target.
-  nitro: false,
-  tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
-    server: { entry: "server" },
-  },
+    build: { outDir: "dist" },
+    // Netlify's adapter owns the TanStack Start deployment output.
+    nitro: false,
+  };
 });

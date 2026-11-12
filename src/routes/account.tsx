@@ -210,6 +210,12 @@ function AccountPage() {
       to: "/settings",
     },
     {
+      label: "Reset Password",
+      detail: "Get a password reset link by email",
+      icon: "lock_reset",
+      to: "/reset-password",
+    },
+    {
       label: "Help, Support & FAQ",
       detail: "Get help with your account or order",
       icon: "help_outline",

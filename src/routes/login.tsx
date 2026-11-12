@@ -422,18 +422,6 @@ export function LoginPage() {
     }
   };
 
-  const handleForgotPassword = () => {
-    if (email.trim()) {
-      toast.info(
-        `Password reset instructions are managed via store support. Please reach out to store support at +91 98400 12345 or support@sriamman.store for account ${email.trim()}.`,
-      );
-    } else {
-      toast.info(
-        "Please enter your registered email address first, or contact Sri Amman Store support at +91 98400 12345.",
-      );
-    }
-  };
-
   // Clean one-time Firebase oobCode parameters from browser URL after consumption
   const clearConsumedEmailLinkSearchParams = () => {
     if (typeof window === "undefined" || !window.history?.replaceState) return;
@@ -868,13 +856,12 @@ export function LoginPage() {
                 <label className="text-xs font-bold text-on-surface" htmlFor="pwd-input">
                   Password <span className="text-primary">*</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={handleForgotPassword}
+                <Link
+                  to="/reset-password"
                   className="text-xs font-bold text-primary hover:underline focus:outline-none"
                 >
                   Forgot Password?
-                </button>
+                </Link>
               </div>
               <div className="relative flex items-center rounded-xl border border-outline-variant/20 bg-surface-container-low px-3.5 py-2.5 focus-within:ring-2 focus-within:ring-primary">
                 <input

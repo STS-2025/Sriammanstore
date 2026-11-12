@@ -1599,9 +1599,9 @@ export function CheckoutPage() {
                         {items.map((item) => (
                           <div
                             key={item.id}
-                            className="p-3 rounded-2xl bg-surface-container-low/50 border border-outline-variant/15 flex items-center gap-3"
+                            className="p-3 rounded-2xl border border-outline-variant/15 flex items-center gap-3"
                           >
-                            <div className="w-12 h-12 rounded-xl bg-surface-container-low shrink-0 flex items-center justify-center p-1 border border-outline-variant/15 overflow-hidden">
+                            <div className="w-12 h-12 rounded-xl shrink-0 flex items-center justify-center p-1 border border-outline-variant/15 overflow-hidden">
                               <img
                                 src={item.image}
                                 alt={item.name}

@@ -4,6 +4,7 @@ import {
   signInWithPopup,
   createUserWithEmailAndPassword as firebaseCreateUserWithEmailAndPassword,
   sendEmailVerification as firebaseSendEmailVerification,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type Auth,
@@ -56,7 +57,7 @@ export class ProductionAuthSafetyError extends Error {
   constructor(action: string) {
     super(
       `SAFETY VIOLATION: Production write action "${action}" is strictly prohibited in Phase 2.\n` +
-      `Creating production auth accounts, sending live password resets, verification emails, or mutating customer documents require separate explicit user approval.`
+      `Creating production auth accounts, sending verification emails, or mutating customer documents require separate explicit user approval.`
     );
     this.name = "ProductionAuthSafetyError";
   }
@@ -185,6 +186,7 @@ export interface IAuthAdapter {
   loginWithEmail(email: string, password: string): Promise<AuthUserIdentity>;
   createUserWithEmailAndPassword(email: string, password: string): Promise<AuthUserIdentity>;
   sendEmailVerification(): Promise<void>;
+  sendPasswordResetEmail(email?: string): Promise<void>;
   signOut(): Promise<void>;
   assertWritePermitted?(action: string): void;
 }
@@ -202,6 +204,7 @@ export interface FirebaseAuthDriver {
     password: string
   ): Promise<{ user: FirebaseUser }>;
   sendEmailVerification?(user: FirebaseUser): Promise<void>;
+  sendPasswordResetEmail?(auth: Auth, email: string): Promise<void>;
   signOut(auth: Auth): Promise<void>;
   onAuthStateChanged(
     auth: Auth,
@@ -223,6 +226,9 @@ class DefaultFirebaseAuthDriver implements FirebaseAuthDriver {
   }
   sendEmailVerification(user: FirebaseUser) {
     return firebaseSendEmailVerification(user);
+  }
+  sendPasswordResetEmail(auth: Auth, email: string) {
+    return firebaseSendPasswordResetEmail(auth, email);
   }
   signOut(auth: Auth) {
     return firebaseSignOut(auth);
@@ -372,9 +378,9 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
   }
 
   /**
-   * Production write blockers:
-   * Any attempt to register live production users, trigger password reset emails,
-   * or send live verification emails is intercepted and blocked.
+   * Production write handling for account creation and verification remains subject to
+   * the project's existing safety controls. Password reset emails are explicitly enabled
+   * as a customer initiated account recovery action.
    */
   async createUserWithEmailAndPassword(email = "", password = ""): Promise<AuthUserIdentity> {
     const cleanEmail = email.trim().toLowerCase();
@@ -391,9 +397,18 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
     }
   }
 
-  async sendPasswordResetEmail(): Promise<never> {
-    this.assertWritePermitted("sendPasswordResetEmail");
-    throw new ProductionAuthSafetyError("sendPasswordResetEmail");
+  async sendPasswordResetEmail(email = ""): Promise<void> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) throw new Error("Enter the email address for your account.");
+    try {
+      const { auth } = this.getAuthInstance();
+      if (!this.driver.sendPasswordResetEmail) {
+        throw new Error("Password reset is unavailable in this session.");
+      }
+      await this.driver.sendPasswordResetEmail(auth, cleanEmail);
+    } catch (err: unknown) {
+      throw new Error(mapFirebaseAuthError(err));
+    }
   }
 
   async sendEmailVerification(): Promise<void> {
@@ -492,6 +507,10 @@ export class MockAuthAdapter implements IAuthAdapter {
 
   async sendEmailVerification(): Promise<never> {
     throw new Error("Email verification is available only through the Firebase Auth Emulator.");
+  }
+
+  async sendPasswordResetEmail(): Promise<never> {
+    throw new Error("Password reset is available only through Firebase Authentication.");
   }
 
   async signOut(): Promise<void> {
@@ -634,6 +653,10 @@ export class AuthManager {
 
   async sendEmailVerification(): Promise<void> {
     return this.getActiveAdapter().sendEmailVerification();
+  }
+
+  async sendPasswordResetEmail(email?: string): Promise<void> {
+    return this.getActiveAdapter().sendPasswordResetEmail(email);
   }
 
   async signOut(): Promise<void> {

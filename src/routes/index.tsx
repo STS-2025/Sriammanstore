@@ -655,7 +655,7 @@ function ProductCategorySection({
             key={product.id}
             className="w-[min(44vw,190px)] shrink-0 snap-start sm:w-[190px] lg:w-[204px]"
           >
-            <ProductCard product={product} className="h-full p-3" />
+            <ProductCard product={product} className="h-full" />
           </div>
         ))}
       </div>

@@ -46,6 +46,7 @@ export const METHOD_QUALITY_OPTIONS: MethodQualityOption[] = [
 
 export interface ProductFilterState {
   categories: string[];
+  brands?: string[];
   subcategories?: string[];
   inStockOnly: boolean;
   minPrice: number;
@@ -321,6 +322,14 @@ export function filterAndSortProducts(
         (sub) => sub.trim().toLowerCase() === cleanProdSub
       );
       if (!matchesSubcategory) {
+        return false;
+      }
+    }
+
+    // 3c. Brand Multi-select
+    if (filter.brands && filter.brands.length > 0) {
+      const productBrand = (p.brand || "").trim().toLocaleLowerCase();
+      if (!filter.brands.some((brand) => brand.trim().toLocaleLowerCase() === productBrand)) {
         return false;
       }
     }

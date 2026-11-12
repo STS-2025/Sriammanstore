@@ -8,6 +8,7 @@ import { useLanguage } from "../../context/LanguageContext";
 import { buildCartKey } from "../../lib/productUtils";
 import { CART_ADD_ANIMATION_EVENT, type CartAddAnimationDetail } from "../../hooks/useCartFlyAnimation";
 import { WishlistHeartButton } from "./WishlistHeartButton";
+import { ProductNameSlider } from "./ProductNameSlider";
 import { toast } from "sonner";
 
 interface ProductCardProps {
@@ -119,18 +120,18 @@ export function ProductCard({
   return (
     <div
       data-product-card-root
-      className={`bg-surface-container-lowest rounded-2xl p-space-md flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow relative group border border-outline-variant/15 ${className}`}
+      className={`rounded-2xl p-2 sm:p-space-md flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow relative group border border-outline-variant/15 ${className}`}
     >
       <div>
         {/* Product Image & Badges */}
-        <div data-product-image-container className="relative w-full aspect-square rounded-2xl overflow-hidden bg-surface-container-low mb-space-md flex items-center justify-center p-3 border border-outline-variant/10">
+        <div data-product-image-container className="relative w-full aspect-square rounded-2xl overflow-hidden mb-2 sm:mb-space-md flex items-center justify-center p-1 sm:p-3 border border-outline-variant/10">
           {product.imageUrl && !imageError ? (
             readOnly ? (
               <div className="flex items-center justify-center w-full h-full cursor-default">
                 <img
                   src={product.imageUrl}
                   alt={product.name}
-                  className="max-w-full max-h-full object-contain select-none"
+                  className="max-w-full max-h-full scale-105 object-contain select-none sm:scale-100"
                   loading="lazy"
                   onError={() => setImageError(true)}
                 />
@@ -140,7 +141,7 @@ export function ProductCard({
                 <img
                   src={product.imageUrl}
                   alt={product.name}
-                  className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-sm select-none"
+                  className="max-w-full max-h-full scale-105 object-contain group-hover:scale-110 transition-transform duration-300 drop-shadow-sm select-none sm:scale-100 sm:group-hover:scale-105"
                   loading="lazy"
                   onError={() => setImageError(true)}
                 />
@@ -149,7 +150,7 @@ export function ProductCard({
           ) : (
             <div
               data-testid="product-image-fallback"
-              className="w-full h-full flex flex-col items-center justify-center text-outline gap-1.5 p-4 bg-surface-container select-none"
+              className="w-full h-full flex flex-col items-center justify-center text-outline gap-1.5 p-4 select-none"
             >
               <span className="material-symbols-outlined text-[32px] text-outline-variant">
                 inventory_2
@@ -231,13 +232,13 @@ export function ProductCard({
             id: product.id,
             ...(readOnly ? { catalogMode: "production-readonly" } : {}),
           } as any}
-          className="block"
+          className="block min-w-0 overflow-hidden"
         >
-          <h3 className="font-headline-sm text-label-button whitespace-normal break-words font-bold text-on-surface group-hover:text-primary transition-colors text-sm">
-            {t(product.name, product.tamilName)}
+          <h3 className="font-headline-sm text-label-button min-w-0 font-bold text-on-surface group-hover:text-primary transition-colors text-xs sm:text-sm">
+            <ProductNameSlider name={t(product.name, product.tamilName)} />
           </h3>
         </Link>
-        <p className="font-body-sm text-xs text-on-surface-variant mb-space-sm line-clamp-1">
+        <p className="font-body-sm text-[10px] sm:text-xs text-on-surface-variant mb-1 sm:mb-space-sm line-clamp-1">
           {product.brand}
         </p>
 
@@ -278,8 +279,8 @@ export function ProductCard({
         )}
 
         {/* Prices & Savings */}
-        <div className="flex flex-wrap items-baseline gap-x-space-xs gap-y-1 mb-space-md">
-          <span className="font-price-card text-price-card text-on-surface font-black text-base">
+        <div className="flex flex-wrap items-baseline gap-x-space-xs gap-y-1 mb-2 sm:mb-space-md">
+          <span className="font-price-card text-price-card text-on-surface font-black text-sm sm:text-base">
             ₹
             {isVipCustomer && currentOption.specialPrice
               ? currentOption.specialPrice
@@ -299,7 +300,7 @@ export function ProductCard({
       </div>
 
       {/* Cart Control: Add or Stepper */}
-      <div className="w-full mt-2">
+      <div className="w-full mt-1 sm:mt-2">
         {readOnly ? (
           <div className="w-full py-2.5 px-space-md bg-surface-container-high/60 text-on-surface-variant rounded-xl font-label-button text-xs font-semibold flex items-center justify-center gap-1.5 border border-outline-variant/30 select-none">
             <span className="material-symbols-outlined text-[16px]">visibility</span>
@@ -315,16 +316,16 @@ export function ProductCard({
         ) : quantity === 0 ? (
           <button
             onClick={handleAddToCart}
-            className="w-full py-2.5 px-space-md bg-primary-fixed hover:bg-primary-fixed-dim text-on-primary-fixed rounded-xl font-label-button text-xs font-bold flex items-center justify-center gap-space-xs transition-colors shadow-sm cursor-pointer active:scale-95"
+            className="w-full py-1.5 sm:py-2.5 px-space-md bg-primary-fixed hover:bg-primary-fixed-dim text-on-primary-fixed rounded-xl font-label-button text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 sm:gap-space-xs transition-colors shadow-sm cursor-pointer active:scale-95"
           >
-            <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
+            <span className="material-symbols-outlined text-[16px] sm:text-[18px]">add_shopping_cart</span>
             <span>Add to Cart</span>
           </button>
         ) : (
           <div className="w-full flex items-center justify-between bg-primary text-on-primary rounded-xl p-1 shadow-sm">
             <button
               onClick={handleDecrement}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+              className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all cursor-pointer sm:h-8 sm:w-8"
               title="Decrease quantity"
             >
               <span className="material-symbols-outlined text-[18px]">remove</span>
@@ -334,7 +335,7 @@ export function ProductCard({
             </span>
             <button
               onClick={handleIncrement}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all cursor-pointer"
+              className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-white/10 active:scale-95 transition-all cursor-pointer sm:h-8 sm:w-8"
               title="Increase quantity"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>

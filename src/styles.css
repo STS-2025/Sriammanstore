@@ -2,6 +2,24 @@
 @source "../src";
 @import "tw-animate-css";
 
+@keyframes product-name-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--product-name-overflow)); }
+}
+
+.product-name-slider {
+  animation: product-name-slide 7s ease-in-out infinite alternate;
+}
+
+.product-name-slider-viewport:hover .product-name-slider,
+.product-name-slider-viewport:focus-within .product-name-slider {
+  animation-play-state: paused;
+}
+
+@media (min-width: 640px), (prefers-reduced-motion: reduce) {
+  .product-name-slider { animation: none; }
+}
+
 @keyframes announcement-marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }

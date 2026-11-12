@@ -629,7 +629,7 @@ function ProductDetailsPage() {
                   data-product-card
                   className="w-[min(44vw,190px)] shrink-0 snap-start sm:w-[190px] lg:w-[204px]"
                 >
-                  <ProductCard product={p} className="h-full p-3" readOnly={false} />
+                  <ProductCard product={p} className="h-full" readOnly={false} />
                 </div>
               ))}
             </div>
@@ -856,7 +856,7 @@ function ProductDetailsPage() {
                 >
                   <ProductCard
                     product={otherProduct}
-                    className="h-full p-3"
+                    className="h-full"
                     readOnly={false}
                   />
                 </div>

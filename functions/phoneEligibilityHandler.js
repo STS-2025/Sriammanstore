@@ -69,6 +69,75 @@ function validCustomerProfile(document, phone, countryCode, number) {
   return true;
 }
 
+function mappedLegacyCustomerId(mapping, uid) {
+  if (!mapping || typeof mapping !== "object") return null;
+  const mappedUserDocId =
+    typeof mapping.userDocId === "string" ? mapping.userDocId.trim() : "";
+  const mappedCustomerId =
+    typeof mapping.customerId === "string" ? mapping.customerId.trim() : "";
+  const id = mappedUserDocId || mappedCustomerId;
+  if (
+    typeof id !== "string" ||
+    !/^SASS\d{6,7}$/i.test(id) ||
+    (Object.prototype.hasOwnProperty.call(mapping, "uid") && mapping.uid !== uid) ||
+    (Object.prototype.hasOwnProperty.call(mapping, "accountType") &&
+      mapping.accountType !== "customer") ||
+    (mapping.collection && mapping.collection !== "users")
+  ) {
+    return null;
+  }
+  return id;
+}
+
+function matchesStoredLegacyPhone(profile, phone, countryCode, number) {
+  if (!profile || typeof profile !== "object") return false;
+  if (profile.countryCode && normalizeCountryCode(profile.countryCode) !== countryCode) {
+    return false;
+  }
+
+  const storedPhone = typeof profile.phone === "string" ? profile.phone.trim() : "";
+  if (storedPhone.startsWith("+")) {
+    const normalized = `+${storedPhone.slice(1).replace(/\D/g, "")}`;
+    if (normalized === phone) return true;
+  }
+
+  return [profile.number, profile.phone, profile.phoneNumber, profile.contact].some(
+    (value) => typeof value === "string" && value.replace(/\D/g, "") === number,
+  );
+}
+
+function validMappedLegacyCustomer(profile, customerId, uid, phone, countryCode, number) {
+  if (
+    !profile ||
+    profile.merged === true ||
+    profile.phoneVerified === false ||
+    !matchesStoredLegacyPhone(profile, phone, countryCode, number) ||
+    isStaffOrAdmin(profile)
+  ) {
+    return false;
+  }
+
+  const explicitType = profile.accountType || profile.userType || profile.role;
+  if (explicitType && explicitType !== "customer") return false;
+  if (
+    profile.uid &&
+    profile.uid !== uid &&
+    !(Array.isArray(profile.linkedUids) && profile.linkedUids.includes(uid))
+  ) {
+    return false;
+  }
+  if (profile.userId && profile.userId !== customerId) return false;
+  if (profile.customerId && profile.customerId !== customerId) return false;
+  if (
+    profile.id &&
+    profile.id !== customerId &&
+    !(profile.id === uid && profile.userId === customerId)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function matchesPhone(profile, phone, countryCode, number) {
   if (!profile || typeof profile !== "object") return false;
   if (profile.countryCode && normalizeCountryCode(profile.countryCode) !== countryCode) return false;
@@ -278,6 +347,47 @@ function createPhoneEligibilityHandler({
       );
     }
 
+    const mapping = mappingSnapshot.exists ? mappingSnapshot.data() : null;
+    const legacyCustomerId = mappedLegacyCustomerId(mapping, authOwner.uid);
+    if (legacyCustomerId) {
+      let legacyProfileSnapshot;
+      try {
+        legacyProfileSnapshot = await db.collection("users").doc(legacyCustomerId).get();
+      } catch {
+        throw makeError(
+          HttpsError,
+          "unavailable",
+          "Mobile number eligibility cannot be checked right now.",
+        );
+      }
+      if (!legacyProfileSnapshot.exists) return { eligible: false };
+
+      const legacyProfile = legacyProfileSnapshot.data();
+      if (
+        !validMappedLegacyCustomer(
+          legacyProfile,
+          legacyCustomerId,
+          authOwner.uid,
+          phone,
+          countryCode,
+          number,
+        ) ||
+        matchingLegacyProfiles.some(
+          (candidate) => {
+            if (candidate.id === legacyCustomerId) return false;
+            const candidateProfile = candidate.data();
+            return (
+              !profileOwnedByUid(candidateProfile, authOwner.uid) ||
+              isStaffOrAdmin(candidateProfile)
+            );
+          },
+        )
+      ) {
+        return { eligible: false };
+      }
+      return { eligible: true };
+    }
+
     if (
       matchingProfiles.length !== 1 ||
       !mappingSnapshot.exists ||
@@ -286,7 +396,6 @@ function createPhoneEligibilityHandler({
       return { eligible: false };
     const profileSnapshot = matchingProfiles[0];
     const customerId = profileSnapshot.id;
-    const mapping = mappingSnapshot.data();
     const profile = profileSnapshot.data();
     if (
       (mapping.uid && mapping.uid !== authOwner.uid) ||

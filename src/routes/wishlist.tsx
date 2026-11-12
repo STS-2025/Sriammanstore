@@ -4,6 +4,7 @@ import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { OrderProductImage } from "../components/product/OrderProductImage";
+import { ProductNameSlider } from "../components/product/ProductNameSlider";
 import { WishlistHeartButton } from "../components/product/WishlistHeartButton";
 import { productService } from "../services/productService";
 import type { Wishlist, WishlistProduct, Product } from "../types";
@@ -666,11 +667,11 @@ export function WishlistPage() {
               {sortedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-surface-container-lowest rounded-3xl p-4 border border-outline-variant/15 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group relative"
+                  className="rounded-3xl p-2.5 sm:p-4 border border-outline-variant/15 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group relative"
                 >
                   <div>
                     {/* Card Top: Image + Badges + Heart Button */}
-                    <div className="relative aspect-square rounded-2xl overflow-hidden bg-surface-container-low mb-3 flex items-center justify-center p-3.5 border border-outline-variant/10">
+                    <div className="relative aspect-square rounded-2xl overflow-hidden mb-2 sm:mb-3 flex items-center justify-center p-1 sm:p-3.5 border border-outline-variant/10">
                       <OrderProductImage
                         item={{
                           productId: item.productId,
@@ -717,8 +718,8 @@ export function WishlistPage() {
                       <span className="text-[10px] uppercase font-bold text-primary tracking-wider block mb-1">
                         {item.tag}
                       </span>
-                      <h4 className="whitespace-normal break-words font-headline-sm text-sm font-bold text-on-surface leading-snug mb-1">
-                        {item.name}
+                      <h4 className="overflow-hidden font-headline-sm text-xs sm:text-sm font-bold text-on-surface leading-snug mb-1">
+                        <ProductNameSlider name={item.name} />
                       </h4>
                       {(item.catalogProd?.brand || item.brandName) && (
                         <span className="text-xs text-on-surface-variant block mb-1">
@@ -767,7 +768,7 @@ export function WishlistPage() {
                       type="button"
                       onClick={() => handleAddToCart(item)}
                       disabled={!item.inStock}
-                      className={`w-full py-2.5 rounded-xl font-headline-sm text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      className={`w-full py-1.5 sm:py-2.5 rounded-xl font-headline-sm text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         item.inStock
                           ? "bg-primary-fixed hover:bg-primary-fixed-dim text-on-primary-fixed shadow-xs"
                           : "bg-surface-container text-outline cursor-not-allowed"
@@ -865,15 +866,15 @@ export function WishlistPage() {
                   return (
                     <div
                       key={prod.id}
-                      className="bg-surface-container-lowest rounded-3xl p-4 border border-outline-variant/15 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                      className="rounded-3xl p-2.5 sm:p-4 border border-outline-variant/15 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
                     >
                       <div>
                         {/* Image + Wishlist Heart Toggle */}
-                        <div className="relative aspect-square rounded-2xl overflow-hidden bg-surface-container-low mb-3 flex items-center justify-center p-3.5 border border-outline-variant/10">
+                        <div className="relative aspect-square rounded-2xl overflow-hidden mb-2 sm:mb-3 flex items-center justify-center p-1 sm:p-3.5 border border-outline-variant/10">
                           <img
                             src={prod.imageUrl}
                             alt={prod.name}
-                            className="max-w-full max-h-full object-contain hover:scale-105 transition-transform duration-300 drop-shadow-sm select-none"
+                            className="max-w-full max-h-full scale-105 object-contain hover:scale-110 transition-transform duration-300 drop-shadow-sm select-none sm:scale-100 sm:hover:scale-105"
                             loading="lazy"
                           />
                           <WishlistHeartButton
@@ -900,8 +901,8 @@ export function WishlistPage() {
                         </span>
 
                         {/* Title */}
-                        <h4 className="whitespace-normal break-words font-headline-sm text-sm font-bold text-on-surface mb-1">
-                          {prod.name}
+                        <h4 className="overflow-hidden font-headline-sm text-xs sm:text-sm font-bold text-on-surface mb-1">
+                          <ProductNameSlider name={prod.name} />
                         </h4>
 
                         {/* Pack size */}
@@ -927,7 +928,7 @@ export function WishlistPage() {
                           addToCart(prod, 0, 1);
                           toast.success(`Added ${prod.name} to cart`);
                         }}
-                        className="w-full bg-primary/10 hover:bg-primary/20 text-primary py-2.5 rounded-xl font-headline-sm text-xs font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                        className="w-full bg-primary/10 hover:bg-primary/20 text-primary py-1.5 sm:py-2.5 rounded-xl font-headline-sm text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[16px]">add</span>
                         <span>Add to Cart</span>

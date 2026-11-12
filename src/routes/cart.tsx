@@ -4,6 +4,7 @@ import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { WishlistHeartButton } from "../components/product/WishlistHeartButton";
+import { ProductNameSlider } from "../components/product/ProductNameSlider";
 import { CheckoutProgressBar } from "../components/checkout/CheckoutProgressBar";
 import { OrderBillSummary } from "../components/checkout/OrderBillSummary";
 import { useCart } from "../context/CartContext";
@@ -688,20 +689,20 @@ export function CartPage() {
                         return (
                           <div
                             key={p.id}
-                            className="p-3.5 rounded-2xl bg-surface-container-low/40 border border-outline-variant/15 flex items-center justify-between gap-3"
+                            className="p-3.5 rounded-2xl border border-outline-variant/15 flex items-center justify-between gap-3"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-xl bg-surface-container-low shrink-0 flex items-center justify-center p-1 border border-outline-variant/15 overflow-hidden">
+                              <div className="h-14 w-14 rounded-xl shrink-0 flex items-center justify-center p-0.5 border border-outline-variant/15 overflow-hidden">
                                 <img
                                   src={p.imageUrl}
                                   alt={p.name}
-                                  className="max-w-full max-h-full object-contain"
+                                  className="max-w-full max-h-full scale-105 object-contain"
                                   loading="lazy"
                                 />
                               </div>
-                              <div>
-                                <h4 className="whitespace-normal break-words font-headline-sm text-xs font-bold text-on-surface">
-                                  {p.name}
+                              <div className="min-w-0">
+                                <h4 className="overflow-hidden font-headline-sm text-xs font-bold text-on-surface">
+                                  <ProductNameSlider name={p.name} />
                                 </h4>
                                 <span className="text-[11px] text-on-surface-variant">
                                   {opt.unitSize} {opt.unit} Pack
