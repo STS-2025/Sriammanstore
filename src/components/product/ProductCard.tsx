@@ -15,12 +15,16 @@ interface ProductCardProps {
   product: Product;
   className?: string;
   readOnly?: boolean;
+  compact?: boolean;
+  compactAddToCart?: boolean;
 }
 
 export function ProductCard({
   product,
   className = "",
   readOnly = false,
+  compact = false,
+  compactAddToCart = false,
 }: ProductCardProps) {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { addToCart, updateQty, getItemQuantity } = useCart();
@@ -120,18 +124,18 @@ export function ProductCard({
   return (
     <div
       data-product-card-root
-      className={`rounded-2xl p-2 sm:p-space-md flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow relative group border border-outline-variant/15 ${className}`}
+      className={`rounded-2xl ${compact ? "p-1.5 sm:p-space-md" : "p-2 sm:p-space-md"} flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow relative group border border-outline-variant/15 ${className}`}
     >
       <div>
         {/* Product Image & Badges */}
-        <div data-product-image-container className="relative w-full aspect-square rounded-2xl overflow-hidden mb-2 sm:mb-space-md flex items-center justify-center p-1 sm:p-3 border border-outline-variant/10">
+        <div data-product-image-container className={`relative ${compact ? "mx-auto w-[88%] sm:mx-0 sm:w-full" : "w-full"} aspect-square rounded-2xl overflow-hidden mb-2 sm:mb-space-md flex items-center justify-center p-1 sm:p-3 border border-outline-variant/10`}>
           {product.imageUrl && !imageError ? (
             readOnly ? (
               <div className="flex items-center justify-center w-full h-full cursor-default">
                 <img
                   src={product.imageUrl}
                   alt={product.name}
-                  className="max-w-full max-h-full scale-105 object-contain select-none sm:scale-100"
+                  className={`${compact ? "max-w-[88%] max-h-[88%] sm:max-w-full sm:max-h-full" : "max-w-full max-h-full"} scale-105 object-contain select-none sm:scale-100`}
                   loading="lazy"
                   onError={() => setImageError(true)}
                 />
@@ -141,7 +145,7 @@ export function ProductCard({
                 <img
                   src={product.imageUrl}
                   alt={product.name}
-                  className="max-w-full max-h-full scale-105 object-contain group-hover:scale-110 transition-transform duration-300 drop-shadow-sm select-none sm:scale-100 sm:group-hover:scale-105"
+                  className={`${compact ? "max-w-[88%] max-h-[88%] sm:max-w-full sm:max-h-full" : "max-w-full max-h-full"} scale-105 object-contain group-hover:scale-110 transition-transform duration-300 drop-shadow-sm select-none sm:scale-100 sm:group-hover:scale-105`}
                   loading="lazy"
                   onError={() => setImageError(true)}
                 />
@@ -280,17 +284,17 @@ export function ProductCard({
 
         {/* Prices & Savings */}
         <div className="flex flex-wrap items-baseline gap-x-space-xs gap-y-1 mb-2 sm:mb-space-md">
+          {currentOption.mrp > currentOption.offerPrice && (
+            <span className="font-price-mrp text-xs text-outline line-through">
+              ₹{currentOption.mrp}
+            </span>
+          )}
           <span className="font-price-card text-price-card text-on-surface font-black text-sm sm:text-base">
             ₹
             {isVipCustomer && currentOption.specialPrice
               ? currentOption.specialPrice
               : currentOption.offerPrice}
           </span>
-          {currentOption.mrp > currentOption.offerPrice && (
-            <span className="font-price-mrp text-xs text-outline line-through">
-              ₹{currentOption.mrp}
-            </span>
-          )}
           {currentOption.mrp > currentOption.offerPrice && (
             <span className="font-body-sm text-[11px] text-primary font-bold ml-auto">
               Save ₹{currentOption.mrp - currentOption.offerPrice}
@@ -316,9 +320,9 @@ export function ProductCard({
         ) : quantity === 0 ? (
           <button
             onClick={handleAddToCart}
-            className="w-full py-1.5 sm:py-2.5 px-space-md bg-primary-fixed hover:bg-primary-fixed-dim text-on-primary-fixed rounded-xl font-label-button text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 sm:gap-space-xs transition-colors shadow-sm cursor-pointer active:scale-95"
+            className={`w-full py-1.5 sm:py-2.5 ${compactAddToCart ? "px-1 whitespace-nowrap sm:whitespace-normal text-[10px] gap-0.5 sm:px-space-md sm:text-xs sm:gap-space-xs" : "px-space-md text-[11px] gap-1 sm:text-xs sm:gap-space-xs"} bg-primary-fixed hover:bg-primary-fixed-dim text-on-primary-fixed rounded-xl font-label-button font-bold flex items-center justify-center transition-colors shadow-sm cursor-pointer active:scale-95`}
           >
-            <span className="material-symbols-outlined text-[16px] sm:text-[18px]">add_shopping_cart</span>
+            <span className={`material-symbols-outlined shrink-0 ${compactAddToCart ? "text-[14px] sm:text-[18px]" : "text-[16px] sm:text-[18px]"}`}>add_shopping_cart</span>
             <span>Add to Cart</span>
           </button>
         ) : (

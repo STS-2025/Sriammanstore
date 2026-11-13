@@ -272,7 +272,7 @@ function ProductDetailsPage() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
+          <div className="grid grid-cols-2 sm:grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-5 items-start">
             {/* Gallery Column */}
             <div className="lg:col-span-6 flex flex-col lg:flex-row items-stretch lg:items-start gap-2 sm:gap-3">
               <div className="order-1 lg:order-2 relative min-w-0 w-full lg:flex-1 bg-surface-container-lowest rounded-3xl shadow-sm overflow-hidden group border border-outline-variant/20">
@@ -282,17 +282,17 @@ function ProductDetailsPage() {
                   size="md"
                   ariaLabel="Add to wishlist"
                   activeAriaLabel="Remove from wishlist"
-                  className="absolute right-3 top-3 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface shadow-md transition-colors hover:bg-surface-container-low sm:right-4 sm:top-4"
+                  className="absolute right-2 top-2 z-20 flex h-8 w-8 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface shadow-md transition-colors hover:bg-surface-container-low sm:right-4 sm:top-4"
                 />
                 {/* Badges */}
-                <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 pointer-events-none">
+                <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-10 flex flex-col gap-1 sm:gap-2 pointer-events-none">
                   {discountPercent > 0 && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary text-on-tertiary font-label-badge text-xs tracking-wider shadow-md font-bold uppercase">
+                    <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-tertiary text-on-tertiary font-label-badge text-[9px] sm:text-xs tracking-wider shadow-md font-bold uppercase">
                       {discountPercent}% OFF
                     </span>
                   )}
                   {product.tags?.[0] && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-on-primary font-label-badge text-xs tracking-wider shadow-sm uppercase font-bold">
+                    <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-primary text-on-primary font-label-badge text-[9px] sm:text-xs tracking-wider shadow-sm uppercase font-bold">
                       <span className="material-symbols-outlined text-[14px]">spa</span>
                       {product.tags[0]}
                     </span>
@@ -301,7 +301,7 @@ function ProductDetailsPage() {
 
                 {/* Main Large Image */}
                 <div
-                  className="relative w-full aspect-square flex items-center justify-center p-3 sm:p-6 bg-surface-container-low transition-all overflow-hidden [touch-action:pan-y]"
+                  className="relative w-full aspect-square flex items-center justify-center p-1.5 sm:p-6 bg-surface-container-low transition-all overflow-hidden [touch-action:pan-y]"
                   onTouchStart={(event) => {
                     const touch = event.changedTouches[0];
                     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
@@ -373,30 +373,30 @@ function ProductDetailsPage() {
             </div>
 
             {/* Product Meta Column */}
-            <div className="lg:col-span-6 flex flex-col gap-3">
+            <div className="contents sm:flex sm:flex-col sm:gap-3 min-w-0 lg:col-span-6">
               {/* Brand & Title */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary font-headline-sm text-xs font-bold uppercase tracking-wider">
+              <div className="col-start-2 row-start-1 flex flex-col gap-1.5 sm:col-auto sm:row-auto">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded-full bg-primary/10 text-primary font-headline-sm text-[9px] sm:text-xs font-bold uppercase tracking-wider">
                     {product.brand}
                   </span>
                   {currentOption.stock > 0 ? (
-                    <span className="text-xs font-semibold text-primary flex items-center gap-1">
+                    <span className="text-[9px] sm:text-xs font-semibold text-primary flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                       In Stock ({currentOption.stock} available)
                     </span>
                   ) : (
-                    <span className="text-xs font-semibold text-outline flex items-center gap-1">
+                    <span className="text-[9px] sm:text-xs font-semibold text-outline flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-outline"></span>
                       Out of Stock
                     </span>
                   )}
                 </div>
 
-                <h1 className="font-headline-lg text-xl md:text-2xl text-on-surface font-extrabold tracking-tight leading-tight">
+                <h1 className="font-headline-lg text-sm sm:text-xl md:text-2xl text-on-surface font-extrabold tracking-tight leading-tight">
                   {t(product.name, product.tamilName)}
                 </h1>
-                <p className="font-body-md text-sm text-on-surface-variant leading-relaxed">
+                <p className="font-body-md text-[10px] sm:text-sm text-on-surface-variant leading-relaxed">
                   {product.description}
                 </p>
 
@@ -428,23 +428,23 @@ function ProductDetailsPage() {
               </div>
 
               {/* Price Card */}
-              <div className="bg-surface-container-lowest p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm flex flex-col gap-1.5 border border-outline-variant/20">
+              <div className="col-span-2 row-start-2 bg-surface-container-lowest p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm flex flex-col gap-1.5 border border-outline-variant/20 sm:col-auto sm:row-auto">
                 <div className="flex flex-wrap items-baseline gap-space-sm">
-                  <span className="font-price-hero text-2xl font-extrabold text-on-surface tracking-tight">
-                    ₹{currentPrice}
-                  </span>
                   {currentOption.mrp > currentOption.offerPrice && (
-                    <span className="font-price-mrp text-sm text-outline line-through">
+                    <span className="font-price-mrp text-[16px] sm:text-sm text-outline line-through">
                       MRP ₹{currentOption.mrp}
                     </span>
                   )}
+                  <span className="font-price-hero text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
+                    ₹{currentPrice}
+                  </span>
                   {discountPercent > 0 && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-label-badge text-xs font-bold">
+                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-label-badge text-[10px] sm:text-xs font-bold">
                       {discountPercent}% OFF (Save ₹{currentOption.mrp - currentPrice})
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-on-surface-variant font-medium">
+                <p className="text-[10px] sm:text-[11px] text-on-surface-variant font-medium">
                   Inclusive of all taxes
                 </p>
 
@@ -481,12 +481,12 @@ function ProductDetailsPage() {
               </div>
 
               {/* Pack Size / Variant Selector */}
-              <div className="flex flex-col gap-2">
+              <div className="col-span-2 row-start-3 flex flex-col gap-2 sm:col-auto sm:row-auto">
                 <div className="flex items-center justify-between">
-                  <label className="font-headline-sm text-xs font-bold text-on-surface uppercase tracking-wider">
+                  <label className="font-headline-sm text-[10px] sm:text-xs font-bold text-on-surface uppercase tracking-wider">
                     Select Pack Size:
                   </label>
-                  <span className="text-xs text-primary font-semibold">
+                  <span className="text-[10px] sm:text-xs text-primary font-semibold text-right">
                     {currentOption.unitSize}
                     {currentOption.unit} Selected
                   </span>
@@ -497,7 +497,7 @@ function ProductDetailsPage() {
                       key={idx}
                       type="button"
                       onClick={() => setSelectedOptIndex(idx)}
-                      className={`w-[112px] sm:w-[124px] min-h-[58px] text-left p-2.5 rounded-xl transition-all flex flex-col justify-center shadow-sm cursor-pointer border ${
+                      className={`w-[58px] sm:w-[124px] min-h-[42px] sm:min-h-[58px] text-center p-2 sm:p-2.5 rounded-xl transition-all flex flex-col justify-center shadow-sm cursor-pointer border ${
                         selectedOptIndex === idx
                           ? "bg-primary/10 border-primary ring-2 ring-primary"
                           : "bg-surface-container-lowest border-outline-variant/20 hover:bg-surface-container"
@@ -506,38 +506,33 @@ function ProductDetailsPage() {
                       <span className="font-headline-sm text-xs sm:text-sm font-bold text-on-surface">
                         {opt.unitSize} {opt.unit}
                       </span>
-                      <div className="flex items-center justify-between gap-2 mt-1">
-                        <span className="text-xs font-extrabold text-primary">
-                          ₹{opt.offerPrice}
-                        </span>
-                      </div>
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Delivery ETA Pill */}
-              <div className="p-2.5 sm:p-3 rounded-2xl bg-primary-fixed/20 flex items-center justify-between gap-2 border border-primary/10">
+              <div className="hidden sm:flex col-span-2 row-start-4 p-2.5 sm:p-3 rounded-2xl bg-primary-fixed/20 items-center justify-between gap-2 border border-primary/10 sm:col-auto sm:row-auto">
                 <div className="flex items-center gap-2 text-on-primary-fixed">
-                  <span className="material-symbols-outlined text-primary text-[22px]">
+                  <span className="material-symbols-outlined text-primary text-[20px] sm:text-[22px]">
                     electric_moped
                   </span>
                   <div>
-                    <span className="font-headline-sm text-xs font-bold block">
+                    <span className="font-headline-sm text-[10px] sm:text-xs font-bold block">
                       Express Delivery in 60 Minutes
                     </span>
-                    <span className="text-[11px] text-on-surface-variant">
+                    <span className="text-[10px] sm:text-[11px] text-on-surface-variant">
                       Gobichettipalayam & Kasipalayam local hub
                     </span>
                   </div>
                 </div>
-                <span className="font-label-badge text-xs bg-primary text-on-primary px-2.5 py-1 rounded-md font-bold shrink-0">
+                <span className="font-label-badge text-[10px] sm:text-xs bg-primary text-on-primary px-2 sm:px-2.5 py-1 rounded-md font-bold shrink-0">
                   FREE on ₹499+
                 </span>
               </div>
 
               {/* Quantity Stepper & Add to Cart Buttons */}
-              <div className="flex flex-col gap-2 pt-0.5">
+              <div className="col-span-2 row-start-4 flex flex-col gap-2 pt-0.5 sm:col-auto sm:row-auto">
                 <div className="flex items-center gap-2">
                   {/* Stepper (only when in stock) */}
                   {currentOption.stock > 0 && (
@@ -569,9 +564,9 @@ function ProductDetailsPage() {
                     <button
                       type="button"
                       onClick={handleAddToCart}
-                      className="flex-1 bg-primary hover:bg-primary-container text-on-primary py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl font-headline-sm text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+                      className="flex-1 bg-primary hover:bg-primary-container text-on-primary py-2.5 px-2 sm:px-4 rounded-xl sm:rounded-2xl font-headline-sm text-[10px] sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
                     >
-                      <span className="material-symbols-outlined text-[20px]">
+                      <span className="material-symbols-outlined text-[18px] sm:text-[20px]">
                         shopping_bag
                       </span>
                       <span>Add to Cart • ₹{currentPrice * quantity}</span>
@@ -579,7 +574,7 @@ function ProductDetailsPage() {
                   ) : (
                     <button
                       disabled
-                      className="flex-1 bg-surface-container text-outline py-2.5 px-3 sm:px-4 rounded-xl sm:rounded-2xl font-headline-sm text-xs sm:text-sm font-bold flex items-center justify-center gap-2 border border-outline-variant/30 cursor-not-allowed select-none"
+                      className="flex-1 bg-surface-container text-outline py-2.5 px-2 sm:px-4 rounded-xl sm:rounded-2xl font-headline-sm text-[10px] sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 border border-outline-variant/30 cursor-not-allowed select-none whitespace-nowrap"
                     >
                       <span className="material-symbols-outlined text-[20px]">block</span>
                       <span>Currently Out of Stock</span>

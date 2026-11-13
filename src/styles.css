@@ -3,12 +3,12 @@
 @import "tw-animate-css";
 
 @keyframes product-name-slide {
-  from { transform: translateX(0); }
-  to { transform: translateX(var(--product-name-overflow)); }
+  0%, 33.333% { transform: translateX(0); }
+  80%, 100% { transform: translateX(var(--product-name-overflow)); }
 }
 
 .product-name-slider {
-  animation: product-name-slide 7s ease-in-out infinite alternate;
+  animation: product-name-slide 15s linear infinite;
 }
 
 .product-name-slider-viewport:hover .product-name-slider,

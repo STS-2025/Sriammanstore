@@ -11,7 +11,6 @@ import {
   filterAndSortProducts,
   getCatalogPriceBounds,
   formatPackSize,
-  METHOD_QUALITY_OPTIONS,
 } from "../lib/filterUtils";
 
 export const Route = createFileRoute("/shop")({
@@ -83,7 +82,6 @@ function ShopPage() {
   const [searchQuery, setSearchQuery] = useState<string>(searchParams.q || "");
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedPackSizes, setSelectedPackSizes] = useState<string[]>([]);
-  const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [minRating, setMinRating] = useState(0);
   const [minDiscount, setMinDiscount] = useState(0);
@@ -211,7 +209,7 @@ function ShopPage() {
     return counts;
   }, [allProducts]);
   const filterCount = selectedCategories.length + selectedSubcategories.length + selectedBrands.length +
-    selectedPackSizes.length + selectedMethods.length + (onlyDeals ? 1 : 0) + (inStockOnly ? 1 : 0) +
+    selectedPackSizes.length + (onlyDeals ? 1 : 0) + (inStockOnly ? 1 : 0) +
     (minRating ? 1 : 0) + (minDiscount ? 1 : 0) + (customPriceRange ? 1 : 0);
 
   // Subcategory navigation for the active category scope
@@ -266,7 +264,6 @@ function ShopPage() {
     onlyDeals,
     brands: selectedBrands,
     packSizes: selectedPackSizes,
-    methods: selectedMethods,
     inStockOnly,
     minPrice: activePriceRange.min,
     maxPrice: activePriceRange.max,
@@ -280,7 +277,6 @@ function ShopPage() {
     onlyDeals,
     selectedBrands,
     selectedPackSizes,
-    selectedMethods,
     inStockOnly,
     activePriceRange,
     minRating,
@@ -301,7 +297,6 @@ function ShopPage() {
     setSortOption("popular");
     setSelectedBrands([]);
     setSelectedPackSizes([]);
-    setSelectedMethods([]);
     setInStockOnly(false);
     setMinRating(0);
     setMinDiscount(0);
@@ -497,18 +492,6 @@ function ShopPage() {
           </details>
         )}
 
-        <details className="py-3">
-          <summary className="cursor-pointer list-none text-xs font-extrabold">Product type</summary>
-          <div className="mt-3 space-y-2">
-            {METHOD_QUALITY_OPTIONS.map((method) => (
-              <label key={method.id} className="flex cursor-pointer items-center gap-2 text-xs">
-                <input type="checkbox" checked={selectedMethods.includes(method.id)} onChange={() => toggleSelection(selectedMethods, method.id, setSelectedMethods)} className="h-3.5 w-3.5 accent-primary" />
-                <span>{method.label}</span>
-              </label>
-            ))}
-          </div>
-        </details>
-
         <div className="py-3">
           <label htmlFor={mobile ? "mobile-sort" : "desktop-sort"} className="mb-2 block text-xs font-extrabold">Sort by</label>
           <select
@@ -697,6 +680,7 @@ function ShopPage() {
                         key={product.id}
                         product={product}
                         readOnly={false}
+                        compactAddToCart
                       />
                     ))}
                   </div>
