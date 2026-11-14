@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useState, useEffect, useRef } from "react";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
@@ -8,6 +8,13 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/help")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab:
+      search["tab"] === "request" || search["tab"] === "report" || search["tab"] === "faqs"
+        ? search["tab"]
+        : undefined,
+    product: typeof search["product"] === "string" ? search["product"] : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Help & Customer Support — Sri Amman Smart Store" },
@@ -38,7 +45,11 @@ const FAQS = [
 
 function HelpPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"faqs" | "report" | "request">("faqs");
+  const searchParams = useSearch({ from: "/help" });
+  const [activeTab, setActiveTab] = useState<"faqs" | "report" | "request">(
+    searchParams.tab || "faqs",
+  );
+  const requestSectionRef = useRef<HTMLDivElement>(null);
 
   // Report Problem form
   const [repCategory, setRepCategory] = useState("Damaged Item");
@@ -47,10 +58,16 @@ function HelpPage() {
   const [myTickets, setMyTickets] = useState<ReportedProblem[]>([]);
 
   // Request Product form
-  const [reqName, setReqName] = useState("");
+  const [reqName, setReqName] = useState(searchParams.product || "");
   const [reqBrand, setReqBrand] = useState("");
   const [reqNotes, setReqNotes] = useState("");
   const [myRequests, setMyRequests] = useState<ProductRequest[]>([]);
+
+  useEffect(() => {
+    if (searchParams.tab === "request") {
+      requestSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [searchParams.tab]);
 
   useEffect(() => {
     async function loadData() {
@@ -338,7 +355,7 @@ function HelpPage() {
 
           {/* TAB 3: Request a Product Form */}
           {activeTab === "request" && (
-            <div className="space-y-8">
+            <div ref={requestSectionRef} id="request-product-section" className="scroll-mt-24 space-y-8">
               <div className="bg-surface-container-lowest p-6 md:p-8 rounded-3xl border border-outline-variant/20 shadow-sm">
                 <h3 className="font-headline-lg text-lg font-bold text-on-surface mb-4">
                   Request a Native or Organic Item

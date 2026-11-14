@@ -433,7 +433,7 @@ export function OrdersPage() {
     <PageShell>
       <main className="min-h-[calc(100vh-80px)] bg-surface pb-24 pt-20">
         <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8">
-          <nav aria-label="Breadcrumb" className="mb-5 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
+          <nav aria-label="Breadcrumb" className="mb-5 hidden flex-wrap items-center gap-2 text-xs text-on-surface-variant md:flex">
             <Link to="/" className="hover:text-primary">Home</Link><span>/</span><Link to="/account" className="hover:text-primary">My Account</Link><span>/</span><span className="font-bold text-on-surface">My Orders</span>
           </nav>
 

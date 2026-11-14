@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
@@ -100,6 +100,7 @@ export function LoginPage() {
   const [otpError, setOtpError] = useState("");
   const phoneConfirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+  const recaptchaReadyRef = useRef<Promise<RecaptchaVerifier> | null>(null);
   const otpRequestInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export function LoginPage() {
         recaptchaVerifierRef.current.clear();
         recaptchaVerifierRef.current = null;
       }
+      recaptchaReadyRef.current = null;
     };
   }, []);
 
@@ -145,6 +147,39 @@ export function LoginPage() {
   const cleanPhoneDigits = phone.replace(/\D/g, "");
   const isPhoneValid = cleanPhoneDigits.length === 10;
 
+  const ensureRecaptchaVerifier = useCallback(() => {
+    if (recaptchaReadyRef.current) return recaptchaReadyRef.current;
+
+    const { auth } = authManager.getProductionAdapter().getAuthInstance();
+    const verifier =
+      recaptchaVerifierRef.current ??
+      new RecaptchaVerifier(auth, "login-recaptcha-container", { size: "invisible" });
+    recaptchaVerifierRef.current = verifier;
+
+    const ready = verifier
+      .render()
+      .then(() => verifier)
+      .catch((error: unknown) => {
+        verifier.clear();
+        if (recaptchaVerifierRef.current === verifier) {
+          recaptchaVerifierRef.current = null;
+          recaptchaReadyRef.current = null;
+        }
+        throw error;
+      });
+    recaptchaReadyRef.current = ready;
+    return ready;
+  }, []);
+
+  useEffect(() => {
+    if (!isPhoneValid || authMode === "mock") return;
+    try {
+      void ensureRecaptchaVerifier().catch(() => undefined);
+    } catch {
+      // Keep setup errors for the OTP submit flow to report to the user.
+    }
+  }, [isPhoneValid, authMode, ensureRecaptchaVerifier]);
+
   // Countdown timer for OTP resend
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -167,6 +202,9 @@ export function LoginPage() {
 
   const requestEligibleFirebaseOtp = async (): Promise<boolean> => {
     const e164PhoneNumber = formatToE164(countryCode, cleanPhoneDigits);
+    const verifierReady = ensureRecaptchaVerifier();
+    void verifierReady.catch(() => undefined);
+
     let eligible: boolean;
     try {
       eligible = await checkCustomerPhoneEligibility(e164PhoneNumber);
@@ -189,15 +227,11 @@ export function LoginPage() {
     }
 
     const { auth } = authManager.getProductionAdapter().getAuthInstance();
-    if (!recaptchaVerifierRef.current) {
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "login-recaptcha-container", {
-        size: "invisible",
-      });
-    }
+    const verifier = await verifierReady;
     phoneConfirmationRef.current = await signInWithPhoneNumber(
       auth,
       e164PhoneNumber,
-      recaptchaVerifierRef.current,
+      verifier,
     );
     return true;
   };
@@ -292,6 +326,7 @@ export function LoginPage() {
       if (recaptchaVerifierRef.current) {
         recaptchaVerifierRef.current.clear();
         recaptchaVerifierRef.current = null;
+        recaptchaReadyRef.current = null;
       }
       const sent = await requestEligibleFirebaseOtp();
       if (!sent) return;
@@ -622,16 +657,16 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen bg-surface text-on-surface antialiased">
-      <main className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-        <div className="w-full max-w-xl rounded-[28px] border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-[0_24px_60px_rgba(17,24,39,0.08)] sm:p-8">
+      <main className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-4 sm:px-6 sm:py-12 lg:px-8">
+        <div className="w-full max-w-xl rounded-[28px] border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-[0_24px_60px_rgba(17,24,39,0.08)] sm:p-8">
           {/* Header */}
-          <div className="mb-6 flex items-start justify-between gap-3">
+          <div className="mb-4 flex items-start justify-between gap-3 sm:mb-6">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
                 Welcome back
               </p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
-                Sign in to Sri Amman
+                Sign in to Sriman
               </h1>
               <p className="mt-1 text-xs text-on-surface-variant">
                 Choose your preferred sign-in method.
@@ -649,7 +684,7 @@ export function LoginPage() {
           {searchParams.redirect?.startsWith("/checkout") && (
             <p
               role="status"
-              className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-on-surface-variant"
+              className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-on-surface-variant sm:mb-6"
             >
               Sign in or create an account to continue checkout. The items in your cart are saved and will be ready when you return.
             </p>
@@ -659,7 +694,7 @@ export function LoginPage() {
           {(isEmailLinkCallback || emailLinkNeedsConfirmation) && !firebaseUser && (
             <form
               onSubmit={handleConfirmEmailForLink}
-              className="mb-6 space-y-4 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4"
+              className="mb-4 space-y-3 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 sm:mb-6 sm:space-y-4 sm:p-4"
             >
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">
@@ -675,7 +710,7 @@ export function LoginPage() {
                 value={confirmationEmailInput}
                 onChange={(e) => setConfirmationEmailInput(e.target.value)}
                 placeholder="Enter your email"
-                className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-3 py-2.5 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-3 py-2 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary sm:py-2.5"
               />
               {emailLinkError && (
                 <div className="rounded-xl border border-error/20 bg-error/10 p-3 text-xs font-semibold text-error">
@@ -685,7 +720,7 @@ export function LoginPage() {
               <button
                 type="submit"
                 disabled={isCompletingEmailLink || !confirmationEmailInput.trim()}
-                className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-white transition-opacity hover:bg-primary-container disabled:opacity-50"
+                className="w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white transition-opacity hover:bg-primary-container disabled:opacity-50 sm:py-3"
               >
                 {isCompletingEmailLink ? "Verifying sign-in link..." : "Complete email-link sign-in"}
               </button>
@@ -693,26 +728,26 @@ export function LoginPage() {
           )}
 
           {emailLinkSentMessage && !firebaseUser && (
-            <div className="mb-6 rounded-2xl border border-secondary/30 bg-secondary-fixed/25 p-4 text-xs">
+            <div className="mb-4 rounded-2xl border border-secondary/30 bg-secondary-fixed/25 p-3 text-xs sm:mb-6 sm:p-4">
               <p className="font-bold text-secondary">Link ready</p>
               <p className="mt-1 text-on-surface">{emailLinkSentMessage}</p>
             </div>
           )}
 
           {/* Section A: Mobile OTP Authentication */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <div id="login-recaptcha-container" aria-hidden="true" />
 
             {!otpSent ? (
-              <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3.5 space-y-2">
+              <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 space-y-1.5 sm:p-3.5 sm:space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-on-surface" htmlFor="phone-input">
                     Mobile number <span className="text-primary">*</span>
                   </label>
-                  <span className="text-[11px] font-bold text-primary">Instant OTP</span>
+                  {/* <span className="text-[11px] font-bold text-primary">Instant OTP</span> */}
                 </div>
 
-                <div className="flex items-center rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-2 py-1.5 focus-within:ring-2 focus-within:ring-primary">
+                <div className="flex items-center rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-2 py-1 focus-within:ring-2 focus-within:ring-primary sm:py-1.5">
                   <select
                     value={countryCode}
                     onChange={(e) => setCountryCode(e.target.value)}
@@ -740,13 +775,13 @@ export function LoginPage() {
                   type="button"
                   onClick={() => void handleSendOtp()}
                   disabled={isSubmitting || isEmailSubmitting || !isPhoneValid}
-                  className="mt-1 w-full rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-sm transition-opacity hover:bg-primary-container disabled:opacity-50"
+                  className="mt-0.5 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:bg-primary-container disabled:opacity-50 sm:mt-1 sm:py-3"
                 >
                   {isSubmitting ? "Sending OTP..." : "Get OTP Passcode"}
                 </button>
               </div>
             ) : (
-              <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-4 space-y-3">
+              <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 space-y-2 sm:p-4 sm:space-y-3">
                 <div className="flex items-center justify-between text-xs text-on-surface-variant">
                   <span>Enter 6-digit OTP</span>
                   <button
@@ -782,7 +817,7 @@ export function LoginPage() {
                       onKeyDown={(e) => handleDigitKeyDown(idx, e)}
                       onPaste={(e) => handleDigitPaste(idx, e)}
                       aria-label={`OTP Digit ${idx + 1}`}
-                      className="h-11 w-full min-w-0 max-w-full box-border px-0 py-0 rounded-xl border border-outline-variant/20 bg-surface-container-lowest text-center text-lg font-black text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="h-10 w-full min-w-0 max-w-full box-border px-0 py-0 rounded-xl border border-outline-variant/20 bg-surface-container-lowest text-center text-lg font-black text-primary focus:outline-none focus:ring-2 focus:ring-primary sm:h-11"
                     />
                   ))}
                 </div>
@@ -805,7 +840,7 @@ export function LoginPage() {
                   type="button"
                   onClick={() => void handleVerifyOtp()}
                   disabled={isSubmitting || otpDigits.join("").length < 6}
-                  className="w-full rounded-xl bg-primary py-3.5 text-sm font-bold text-white shadow-md transition-opacity hover:bg-primary-container disabled:opacity-50"
+                  className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-md transition-opacity hover:bg-primary-container disabled:opacity-50 sm:py-3.5"
                 >
                   {isSubmitting ? "Verifying..." : "Verify & Continue"}
                 </button>
@@ -820,7 +855,7 @@ export function LoginPage() {
           </div>
 
           {/* Separator */}
-          <div className="relative my-6 flex items-center justify-center">
+          <div className="relative my-4 flex items-center justify-center sm:my-6">
             <div className="w-full border-t border-outline-variant/20" />
             <span className="absolute bg-surface-container-lowest px-4 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               OR
@@ -828,7 +863,7 @@ export function LoginPage() {
           </div>
 
           {/* Section B: Email & Password */}
-          <form onSubmit={handleEmailLogin} className="space-y-4">
+          <form onSubmit={handleEmailLogin} className="space-y-3 sm:space-y-4">
             {firebaseUser && identityResolution?.status === "unlinked" && identityNotice && (
               <div className="rounded-2xl border border-secondary/30 bg-secondary-fixed/25 p-4 text-xs">
                 <p className="font-bold text-secondary">{identityNotice.title}</p>
@@ -847,7 +882,7 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-low px-3.5 py-2.5 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-low px-3.5 py-2 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary sm:py-2.5"
               />
             </div>
 
@@ -863,7 +898,7 @@ export function LoginPage() {
                   Forgot Password?
                 </Link>
               </div>
-              <div className="relative flex items-center rounded-xl border border-outline-variant/20 bg-surface-container-low px-3.5 py-2.5 focus-within:ring-2 focus-within:ring-primary">
+              <div className="relative flex items-center rounded-xl border border-outline-variant/20 bg-surface-container-low px-3.5 py-2 focus-within:ring-2 focus-within:ring-primary sm:py-2.5">
                 <input
                   id="pwd-input"
                   type={showPassword ? "text" : "password"}
@@ -893,19 +928,19 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={isEmailSubmitting || isSubmitting || !email.trim() || password.length < 6}
-              className="w-full rounded-xl bg-primary py-3.5 text-sm font-bold text-white shadow-md transition-opacity hover:bg-primary-container disabled:opacity-50"
+              className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-md transition-opacity hover:bg-primary-container disabled:opacity-50 sm:py-3.5"
             >
               {isEmailSubmitting ? "Signing in..." : "Sign in with Email"}
             </button>
           </form>
 
           {/* Section C: Google Auth */}
-          <div className="mt-5">
+          <div className="mt-4 sm:mt-5">
             <button
               type="button"
               onClick={() => void handleGoogleLogin()}
               disabled={isSubmitting || isEmailSubmitting}
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest py-3 text-sm font-bold text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/50 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/50 disabled:opacity-50 sm:py-3"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24">
                 <path
@@ -930,7 +965,7 @@ export function LoginPage() {
           </div>
 
           {/* Section D: Referral & Legal */}
-          <div className="mt-5 rounded-xl border border-outline-variant/15 bg-surface-container-low p-3">
+          <div className="mt-4 rounded-xl border border-outline-variant/15 bg-surface-container-low p-3 sm:mt-5">
             <button
               type="button"
               onClick={() => setIsReferralOpen((prev) => !prev)}
@@ -963,7 +998,7 @@ export function LoginPage() {
             )}
           </div>
 
-          <p className="mt-6 text-center text-[11px] text-on-surface-variant">
+          <p className="mt-4 text-center text-[11px] text-on-surface-variant sm:mt-6">
             By continuing, you agree to the Sri Amman Smart Store{" "}
             <Link to="/policies" className="font-bold text-primary underline-offset-4 hover:underline">
               Terms of Service

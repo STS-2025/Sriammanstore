@@ -176,18 +176,11 @@ function AccountPage() {
       badge: `${summary.wishlistItems} Items`,
     },
     {
-      label: "Smart Coins & Rewards",
+      label: "Smart Coins, Rewards & VIP",
       detail: "Balance and reward history",
       icon: "monetization_on",
       to: "/rewards",
       badge: `${summary.smartCoins} Available`,
-    },
-    {
-      label: "VIP Privilege Pass",
-      detail: "Membership status and benefits",
-      icon: "workspace_premium",
-      to: "/rewards",
-      badge: summary.isVip ? "Active Pass" : "View Benefits",
     },
     {
       label: "Refer & Earn",

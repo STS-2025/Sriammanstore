@@ -124,7 +124,7 @@ function AccountSettingsPage() {
       <StoreHeader />
       <main className="min-h-[calc(100vh-80px)] px-4 py-8 pb-24 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl">
-          <nav aria-label="Breadcrumb" className="mb-5 flex items-center gap-2 text-xs text-on-surface-variant">
+          <nav aria-label="Breadcrumb" className="mb-5 hidden items-center gap-2 text-xs text-on-surface-variant md:flex">
             <Link to="/account" className="hover:text-primary">Account</Link>
             <span aria-hidden="true">/</span>
             <span className="font-semibold text-on-surface">Settings & Privacy</span>

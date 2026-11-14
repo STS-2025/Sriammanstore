@@ -243,7 +243,7 @@ function ProductDetailsPage() {
 
       <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         {/* Breadcrumb Bar */}
-        <div className="w-full bg-surface-container-low border-b border-outline-variant/15">
+        <div className="hidden w-full bg-surface-container-low border-b border-outline-variant/15 md:block">
           <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-sm flex flex-wrap items-center justify-between gap-space-sm text-xs">
             <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-on-surface-variant">
               <Link to="/" className="hover:text-primary transition-colors flex items-center gap-1">
@@ -399,7 +399,7 @@ function ProductDetailsPage() {
                   )}
                 </div>
 
-                <h1 className="font-headline-lg text-sm sm:text-xl md:text-2xl text-on-surface font-extrabold tracking-tight leading-tight">
+                <h1 className="font-headline-lg text-[30px] sm:text-xl md:text-2xl text-on-surface font-extrabold tracking-tight leading-tight">
                   {t(product.name, product.tamilName)}
                 </h1>
                 <p className="font-body-md text-[10px] sm:text-sm text-on-surface-variant leading-relaxed">
@@ -429,59 +429,6 @@ function ProductDetailsPage() {
                       </strong>{" "}
                       Verified Ratings
                     </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Price Card */}
-              <div className="col-span-2 row-start-2 bg-surface-container-lowest p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm flex flex-col gap-1.5 border border-outline-variant/20 sm:col-auto sm:row-auto">
-                <div className="flex flex-wrap items-baseline gap-space-sm">
-                  {currentOption.mrp > currentOption.offerPrice && (
-                    <span className="font-price-mrp text-[16px] sm:text-sm text-outline line-through">
-                      MRP ₹{currentOption.mrp}
-                    </span>
-                  )}
-                  <span className="font-price-hero text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
-                    ₹{currentPrice}
-                  </span>
-                  {discountPercent > 0 && (
-                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-label-badge text-[10px] sm:text-xs font-bold">
-                      {discountPercent}% OFF (Save ₹{currentOption.mrp - currentPrice})
-                    </span>
-                  )}
-                </div>
-                <p className="text-[10px] sm:text-[11px] text-on-surface-variant font-medium">
-                  Inclusive of all taxes
-                </p>
-
-                {/* VIP Price Highlight Box */}
-                {currentOption.specialPrice && (
-                  <div className="flex items-center justify-between p-3 rounded-2xl bg-secondary-fixed/30 text-on-secondary-fixed border border-secondary-fixed/50">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[18px]">
-                          workspace_premium
-                        </span>
-                      </div>
-                      <div>
-                        <div className="font-headline-sm text-xs font-bold leading-tight">
-                          Sri Amman VIP Price: ₹{currentOption.specialPrice}
-                        </div>
-                        <div className="text-[11px] text-on-secondary-fixed-variant">
-                          {isVip
-                            ? "Active VIP discount applied to your account"
-                            : "Unlock extra savings + 2X Smart Coins"}
-                        </div>
-                      </div>
-                    </div>
-                    {!isVip && (
-                      <Link
-                        to="/rewards"
-                        className="px-3 py-1 bg-secondary text-on-secondary rounded-lg font-headline-sm text-[11px] font-bold"
-                      >
-                        Join VIP
-                      </Link>
-                    )}
                   </div>
                 )}
               </div>
@@ -516,6 +463,58 @@ function ProductDetailsPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Price Card */}
+              <div className="col-span-2 row-start-2 bg-surface-container-lowest p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm flex flex-col gap-1.5 border border-outline-variant/20 sm:col-auto sm:row-auto">
+                <div className="flex flex-wrap items-baseline gap-space-sm">
+                  {currentOption.mrp > currentOption.offerPrice && (
+                    <span className="font-price-mrp text-[16px] sm:text-sm text-outline line-through">
+                      MRP ₹{currentOption.mrp}
+                    </span>
+                  )}
+                  <span className="font-price-hero text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
+                    ₹{currentPrice}
+                  </span>
+                  {discountPercent > 0 && (
+                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-label-badge text-[10px] sm:text-xs font-bold">
+                      {discountPercent}% OFF (Save ₹{currentOption.mrp - currentPrice})
+                    </span>
+                  )}
+                </div>
+
+                {/* VIP Price Highlight Box */}
+                {currentOption.specialPrice && (
+                  <div className="flex items-center justify-between p-3 rounded-2xl bg-secondary-fixed/30 text-on-secondary-fixed border border-secondary-fixed/50">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0">
+                        <span className="material-symbols-outlined text-[18px]">
+                          workspace_premium
+                        </span>
+                      </div>
+                      <div>
+                        <div className="font-headline-sm text-xs font-bold leading-tight">
+                          Sri Amman VIP Price: ₹{currentOption.specialPrice}
+                        </div>
+                        <div className="text-[11px] text-on-secondary-fixed-variant">
+                          {isVip
+                            ? "Active VIP discount applied to your account"
+                            : "Unlock extra savings + 2X Smart Coins"}
+                        </div>
+                      </div>
+                    </div>
+                    {!isVip && (
+                      <Link
+                        to="/rewards"
+                        className="px-3 py-1 bg-secondary text-on-secondary rounded-lg font-headline-sm text-[11px] font-bold"
+                      >
+                        Join VIP
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              
 
               {/* Delivery ETA Pill */}
               <div className="hidden sm:flex col-span-2 row-start-4 p-2.5 sm:p-3 rounded-2xl bg-primary-fixed/20 items-center justify-between gap-2 border border-primary/10 sm:col-auto sm:row-auto">

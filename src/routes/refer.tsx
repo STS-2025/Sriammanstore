@@ -265,7 +265,7 @@ export function ReferPage() {
           {/* Breadcrumb Navigation */}
           <nav
             aria-label="Breadcrumb"
-            className="flex items-center gap-2 text-xs text-on-surface-variant mb-5"
+            className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant mb-5"
           >
             <Link
               to="/"

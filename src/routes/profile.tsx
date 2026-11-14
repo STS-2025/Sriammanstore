@@ -108,7 +108,7 @@ function ProfilePage() {
 
   return (
     <PageShell>
-      <nav aria-label="Breadcrumb" className="mb-5 min-w-0 text-xs text-on-surface-variant">
+      <nav aria-label="Breadcrumb" className="mb-5 hidden min-w-0 text-xs text-on-surface-variant md:block">
         <ol className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <li className="shrink-0">
             <Link to="/account" className="inline-flex min-h-8 items-center gap-1 rounded-md hover:text-primary">

@@ -222,25 +222,6 @@ export function StoreHeader() {
         {/* Right Actions & Navigation */}
         <div className="flex items-center gap-0 sm:gap-space-md shrink-0">
 
-          <form onSubmit={handleSearch} className="flex w-[clamp(6rem,34vw,14rem)] items-center gap-1 rounded-full bg-surface-container-low px-2 py-1 ring-1 ring-outline-variant/30 lg:hidden">
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search..."
-              aria-label="Search products"
-              className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-xs text-on-surface placeholder:text-outline focus:outline-none sm:text-sm"
-            />
-            <button
-              type="submit"
-              aria-label="Submit search"
-              disabled={!searchQuery.trim()}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <span className="material-symbols-outlined text-[18px]">search</span>
-            </button>
-          </form>
-
           {/* Notifications Bell */}
           <Link
             to="/notifications"

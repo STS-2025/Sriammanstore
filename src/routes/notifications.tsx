@@ -225,7 +225,7 @@ export function NotificationsPage() {
       <main className="w-full pt-20 min-h-[calc(100vh-80px)] pb-24">
         <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           {/* Breadcrumbs */}
-          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-on-surface-variant mb-4">
+          <nav className="hidden flex-wrap items-center gap-x-2 gap-y-1 text-xs text-on-surface-variant mb-4 md:flex">
             <Link to="/" className="hover:text-primary transition-colors">
               Home
             </Link>

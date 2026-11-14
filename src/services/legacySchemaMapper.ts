@@ -467,6 +467,22 @@ export function normalizeLegacyProductOption(
 
   const { unit, unitSize } = unitAndSize;
 
+  const rawProductVariants = Array.isArray(rawProduct?.["variants"])
+    ? (rawProduct["variants"] as unknown[])
+    : [];
+  const matchingRawVariant = rawProductVariants.find((candidate) => {
+    if (!isPlainRecord(candidate)) return false;
+    const candidateUnitAndSize = extractOptionUnitAndSize(candidate);
+    return (
+      candidateUnitAndSize !== null &&
+      candidateUnitAndSize.unit.toLowerCase() === unit.toLowerCase() &&
+      candidateUnitAndSize.unitSize === unitSize
+    );
+  });
+  const correspondingRawVariant =
+    (isPlainRecord(matchingRawVariant) ? matchingRawVariant : null) ??
+    (isPlainRecord(rawProductVariants[index]) ? rawProductVariants[index] : null);
+
   const optionOfferOverride = findMatchingOptionOfferPrice(
     rawProduct,
     unit,
@@ -522,16 +538,14 @@ export function normalizeLegacyProductOption(
     return null;
   }
 
-  // Resolve MRP: variant MRP -> corresponding variants[index] MRP -> product MRP -> offerPrice (ensuring mrp >= offerPrice)
-  const rawMrp =
-    pickMrpNumber(rawVariant) ??
-    (rawProduct &&
-    Array.isArray(rawProduct["variants"]) &&
-    isPlainRecord(rawProduct["variants"][index])
-      ? pickMrpNumber(rawProduct["variants"][index] as Record<string, unknown>)
-      : null) ??
-    (rawProduct ? pickMrpNumber(rawProduct) : null);
-  const mrp = rawMrp !== null && rawMrp >= offerPrice ? rawMrp : offerPrice;
+  // Use the first available MRP that is valid for this option's offer price.
+  const mrp =
+    [
+      pickMrpNumber(rawVariant),
+      correspondingRawVariant ? pickMrpNumber(correspondingRawVariant) : null,
+      rawProduct ? pickMrpNumber(rawProduct) : null,
+    ].find((candidate): candidate is number => candidate !== null && candidate >= offerPrice) ??
+    offerPrice;
 
   // Resolve optional VIP / special price: variant -> product (must be strictly lower than offerPrice)
   const rawSpecialPrice =

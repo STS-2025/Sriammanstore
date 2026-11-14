@@ -1,6 +1,6 @@
 /* eslint-disable prettier/prettier */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
@@ -31,6 +31,8 @@ const BANNER_DATA_REFRESH_MS = 15_000;
 
 function HomePage() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -124,12 +126,116 @@ function HomePage() {
   const visibleCategories = showAllCategories
     ? categories
     : categories.slice(0, INITIAL_CATEGORY_COUNT);
+  const matchingProducts = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) return [];
+
+    return products
+      .filter((product) => {
+        if (!product.isActive) return false;
+        const searchableText = [
+          product.name,
+          product.tamilName,
+          product.brand,
+          product.category,
+          ...product.tags,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase();
+        return searchableText.includes(query);
+      })
+      .slice(0, 6);
+  }, [products, searchQuery]);
+
+  const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
+    navigate({ to: "/shop", search: { q: query } as any });
+  };
 
   return (
     <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased">
       <StoreHeader />
       <main className="min-h-[calc(100vh-80px)] w-full overflow-hidden bg-surface pt-20">
         <div className="w-full pb-24 md:pb-10">
+          <div className="relative z-30 mx-4 mb-3 lg:hidden">
+            <form onSubmit={handleSearch} className="flex items-center gap-1 rounded-full bg-surface-container-low px-2 py-1 ring-1 ring-outline-variant/30">
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search products..."
+                aria-label="Search products"
+                aria-controls="home-product-search-results"
+                aria-expanded={Boolean(searchQuery.trim())}
+                className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-on-surface placeholder:text-outline focus:outline-none"
+              />
+              <button
+                type="submit"
+                aria-label="Submit search"
+                disabled={!searchQuery.trim()}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined text-[18px]">search</span>
+              </button>
+            </form>
+            {searchQuery.trim() && (
+              <div
+                id="home-product-search-results"
+                role="listbox"
+                aria-label="Matching products"
+                className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-1 shadow-xl"
+              >
+                {matchingProducts.length > 0 ? (
+                  matchingProducts.map((product) => (
+                    <Link
+                      key={product.id}
+                      to="/product"
+                      search={{ id: product.id } as any}
+                      role="option"
+                      aria-selected="false"
+                      className="flex items-center gap-3 rounded-xl p-2 text-left hover:bg-surface-container-low"
+                    >
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt=""
+                          className="h-12 w-12 shrink-0 rounded-lg bg-surface-container-low object-cover"
+                        />
+                      ) : (
+                        <span className="material-symbols-outlined flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant">
+                          image
+                        </span>
+                      )}
+                      <span className="min-w-0 truncate text-sm font-semibold text-on-surface">
+                        {t(product.name, product.tamilName)}
+                      </span>
+                    </Link>
+                  ))
+                ) : (
+                  loading ? (
+                    <p className="px-3 py-4 text-sm text-on-surface-variant">Loading products...</p>
+                  ) : (
+                    <>
+                    <p className="text-center">
+                      No results found. 
+                    </p>
+                    <Link
+                      to="/help"
+                      search={{ tab: "request", product: searchQuery.trim() } as any}
+                      className="flex items-center justify-between text-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-primary hover:bg-surface-container-low"
+                    >
+                      <span>Request the product you want?</span>
+                      <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                    </Link>
+                    </>
+                  )
+                )}
+              </div>
+            )}
+          </div>
           <OffersScroller announcements={announcements} />
           <PromotionalBannerCarousel banners={banners} loading={bannersLoading} />
           <div className="mx-auto mt-7 flex w-full max-w-[1440px] flex-col gap-7 px-4 sm:px-6 lg:mt-9 lg:gap-9 lg:px-8">

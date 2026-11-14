@@ -527,7 +527,7 @@ function ShopPage() {
           {/* 1. Breadcrumbs */}
           <nav
             aria-label="Breadcrumb"
-            className="mb-3 flex items-center gap-2 text-xs text-on-surface-variant"
+            className="mb-3 hidden items-center gap-2 text-xs text-on-surface-variant md:flex"
           >
             <span className="hover:text-primary transition-colors flex items-center gap-1 cursor-pointer">
               <span className="material-symbols-outlined text-[15px]">home</span>

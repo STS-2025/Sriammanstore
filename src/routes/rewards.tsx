@@ -284,7 +284,7 @@ export function RewardsPage() {
       <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
           {/* Breadcrumb Navigation */}
-          <nav className="flex items-center gap-2 text-xs text-on-surface-variant mb-4">
+          <nav className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant mb-4">
             <Link to="/" className="hover:text-primary transition-colors flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px]">home</span>
               <span>Home</span>
@@ -303,9 +303,6 @@ export function RewardsPage() {
               <h1 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-on-surface tracking-tight">
                 Smart Coins & VIP Privilege Hub
               </h1>
-              <p className="text-xs md:text-sm text-on-surface-variant mt-1 max-w-2xl">
-                Earn direct rewards on every grocery order, redeem instant cash discounts, and unlock VIP free express slots.
-              </p>
             </div>
 
             {/* Live Conversion Rate Pill */}
