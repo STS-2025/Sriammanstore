@@ -47,7 +47,11 @@ function ProductDetailsPage() {
   const [selectedOptIndex, setSelectedOptIndex] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
+  const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
+  const [imageZoom, setImageZoom] = useState(1);
+  const pinchDistanceRef = useRef<number | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const imageSwipeRef = useRef(false);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState<"specs" | "reviews">("specs");
   const [isSpecsOpen, setIsSpecsOpen] = useState(true);
@@ -97,6 +101,15 @@ function ProductDetailsPage() {
   useEffect(() => {
     loadProduct();
   }, [productId]);
+
+  useEffect(() => {
+    if (!isImageZoomOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsImageZoomOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isImageZoomOpen]);
 
   if (loading) {
     return (
@@ -215,6 +228,15 @@ function ProductDetailsPage() {
     }
   };
 
+  const openImageZoom = () => {
+    setImageZoom(1);
+    setIsImageZoomOpen(true);
+  };
+
+  const adjustImageZoom = (amount: number) => {
+    setImageZoom((current) => Math.min(4, Math.max(1, current + amount)));
+  };
+
   return (
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
@@ -246,32 +268,12 @@ function ProductDetailsPage() {
                   </span>
                 </>
               )}
-              <span className="text-outline-variant font-bold">/</span>
-              <span className="whitespace-normal break-words text-on-surface font-headline-sm font-semibold">
-                {product.name}
-              </span>
             </nav>
           </div>
         </div>
 
         {/* Product Showcase Section */}
         <section className="max-w-[1240px] w-full mx-auto px-margin-desktop py-4 sm:py-6">
-
-          {/* Anomaly Notice for prod-munn8cp3 */}
-          {isProductionMode && product.id === "prod-munn8cp3" && (
-            <div
-              data-testid="production-product-anomaly-banner"
-              className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-3 shadow-sm mb-6"
-            >
-              <span className="material-symbols-outlined text-amber-600 text-[22px] shrink-0 mt-0.5">
-                warning
-              </span>
-              <div className="leading-relaxed">
-                <strong className="block mb-0.5 text-sm font-bold">Diagnostic Notice: Stored Packaging Discrepancy</strong>
-                The stored photograph in production Firestore (<code>products/prod-munn8cp3</code>) shows a 20g packet of <strong>Sakthi Puliyogare Rice Powder</strong> (Barcode <code>8906002081042</code>) rather than Chicken Masala. This discrepancy originates strictly within the production database document and is faithfully displayed here for audit purposes.
-              </div>
-            </div>
-          )}
           <div className="grid grid-cols-2 sm:grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-5 items-start">
             {/* Gallery Column */}
             <div className="lg:col-span-6 flex flex-col lg:flex-row items-stretch lg:items-start gap-2 sm:gap-3">
@@ -284,25 +286,28 @@ function ProductDetailsPage() {
                   activeAriaLabel="Remove from wishlist"
                   className="absolute right-2 top-2 z-20 flex h-8 w-8 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest/95 text-on-surface shadow-md transition-colors hover:bg-surface-container-low sm:right-4 sm:top-4"
                 />
-                {/* Badges */}
-                <div className="absolute top-2 left-2 sm:top-4 sm:left-4 z-10 flex flex-col gap-1 sm:gap-2 pointer-events-none">
-                  {discountPercent > 0 && (
-                    <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-tertiary text-on-tertiary font-label-badge text-[9px] sm:text-xs tracking-wider shadow-md font-bold uppercase">
-                      {discountPercent}% OFF
-                    </span>
-                  )}
-                  {product.tags?.[0] && (
-                    <span className="inline-flex items-center gap-1 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-primary text-on-primary font-label-badge text-[9px] sm:text-xs tracking-wider shadow-sm uppercase font-bold">
-                      <span className="material-symbols-outlined text-[14px]">spa</span>
-                      {product.tags[0]}
-                    </span>
-                  )}
-                </div>
 
                 {/* Main Large Image */}
                 <div
-                  className="relative w-full aspect-square flex items-center justify-center p-1.5 sm:p-6 bg-surface-container-low transition-all overflow-hidden [touch-action:pan-y]"
+                  className="relative w-full aspect-square flex items-center justify-center p-1.5 sm:p-6 bg-surface-container-low transition-all overflow-hidden cursor-zoom-in [touch-action:pan-y]"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open ${product.name} image zoom`}
+                  onClick={() => {
+                    if (imageSwipeRef.current) {
+                      imageSwipeRef.current = false;
+                      return;
+                    }
+                    openImageZoom();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openImageZoom();
+                    }
+                  }}
                   onTouchStart={(event) => {
+                    imageSwipeRef.current = false;
                     const touch = event.changedTouches[0];
                     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
                   }}
@@ -316,6 +321,7 @@ function ProductDetailsPage() {
                     const deltaY = touch.clientY - start.y;
                     if (Math.abs(deltaX) < 40 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
 
+                    imageSwipeRef.current = true;
                     setActiveImageIndex((currentIndex) =>
                       (currentIndex + (deltaX < 0 ? 1 : -1) + images.length) % images.length
                     );
@@ -326,7 +332,7 @@ function ProductDetailsPage() {
                     <img
                       src={activeImage}
                       alt={product.name}
-                      className="w-[82%] h-[82%] object-contain group-hover:scale-[1.03] transition-transform duration-500 ease-out drop-shadow-md select-none"
+                      className="w-[96%] h-[96%] object-contain transition-transform duration-300 ease-out drop-shadow-md select-none pointer-events-none"
                       onError={() => setImageError(true)}
                     />
                   ) : (
@@ -861,6 +867,93 @@ function ProductDetailsPage() {
         )}
 
       </main>
+
+      {isImageZoomOpen && activeImage && !imageError && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-3 sm:p-8"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${product.name} image viewer`}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setIsImageZoomOpen(false);
+          }}
+          onWheel={(event) => {
+            event.preventDefault();
+            adjustImageZoom(event.deltaY < 0 ? 0.2 : -0.2);
+          }}
+          onTouchStart={(event) => {
+            if (event.touches.length === 2) {
+              const [first, second] = Array.from(event.touches);
+              pinchDistanceRef.current = Math.hypot(
+                second.clientX - first.clientX,
+                second.clientY - first.clientY
+              );
+            }
+          }}
+          onTouchMove={(event) => {
+            if (event.touches.length !== 2 || pinchDistanceRef.current === null) return;
+            event.preventDefault();
+            const [first, second] = Array.from(event.touches);
+            const distance = Math.hypot(
+              second.clientX - first.clientX,
+              second.clientY - first.clientY
+            );
+            const change = distance - pinchDistanceRef.current;
+            if (Math.abs(change) > 8) {
+              adjustImageZoom(change > 0 ? 0.1 : -0.1);
+              pinchDistanceRef.current = distance;
+            }
+          }}
+          onTouchEnd={() => {
+            pinchDistanceRef.current = null;
+          }}
+          style={{ touchAction: "none" }}
+        >
+          <button
+            type="button"
+            onClick={() => setIsImageZoomOpen(false)}
+            aria-label="Close image viewer"
+            className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          <div className="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/15 p-2 text-white backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={() => adjustImageZoom(-0.25)}
+              disabled={imageZoom <= 1}
+              aria-label="Zoom out"
+              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/15 disabled:opacity-40"
+            >
+              <span className="material-symbols-outlined">remove</span>
+            </button>
+            <span className="min-w-12 text-center text-sm font-semibold">{Math.round(imageZoom * 100)}%</span>
+            <button
+              type="button"
+              onClick={() => adjustImageZoom(0.25)}
+              disabled={imageZoom >= 4}
+              aria-label="Zoom in"
+              className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white/15 disabled:opacity-40"
+            >
+              <span className="material-symbols-outlined">add</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setImageZoom(1)}
+              className="rounded-full px-3 py-2 text-xs font-semibold hover:bg-white/15"
+            >
+              Reset
+            </button>
+          </div>
+          <img
+            src={activeImage}
+            alt={product.name}
+            draggable={false}
+            className="max-h-full max-w-full select-none object-contain transition-transform duration-100"
+            style={{ transform: `scale(${imageZoom})` }}
+          />
+        </div>
+      )}
 
       <StoreFooter />
       <BottomNav />

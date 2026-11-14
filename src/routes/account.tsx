@@ -251,19 +251,21 @@ function AccountPage() {
               <Link
                 key={item.label}
                 to={item.to as any}
-                className="rounded-2xl border border-outline-variant/20 bg-white p-3 shadow-sm transition-colors hover:bg-surface-container-low sm:p-4"
+                className="rounded-2xl border border-outline-variant/20 bg-white p-2.5 shadow-sm transition-colors hover:bg-surface-container-low sm:p-4"
               >
-                <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="mb-2 flex items-center justify-between gap-2 sm:mb-3">
                   <span className="text-[10px] font-bold text-on-surface-variant sm:text-xs">{item.label}</span>
                   <span className="material-symbols-outlined shrink-0 text-[17px] text-primary sm:text-[20px]">{item.icon}</span>
                 </div>
-                <span className="block truncate text-xl font-black text-on-surface sm:text-2xl">
-                  {summaryLoading ? "--" : item.value.toLocaleString("en-IN")}
-                </span>
-                <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-primary">
-                  View details
-                  <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
-                </span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-lg font-black text-on-surface sm:text-2xl">
+                    {summaryLoading ? "--" : item.value.toLocaleString("en-IN")}
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold text-primary">
+                    View details
+                    <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                  </span>
+                </div>
               </Link>
             ))}
           </section>

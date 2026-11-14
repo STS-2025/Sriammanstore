@@ -239,7 +239,7 @@ export function CartPage() {
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-on-surface">
+                  <h1 className="min-w-0 font-headline-lg text-lg font-extrabold tracking-tight text-on-surface sm:text-xl md:text-2xl">
                     Review Cart
                   </h1>
                   {cartCount > 0 && (

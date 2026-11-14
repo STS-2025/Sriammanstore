@@ -330,3 +330,59 @@ html,body{margin:0;padding:0;min-width:320px;}body{overscroll-behavior:none;}img
 .wishlist-heart-particles span:nth-child(6){--heart-dx:0px;--heart-dy:18px;animation-delay:60ms}
 @keyframes wishlist-heart-particle{0%{opacity:0;transform:translate(-50%,-50%) scale(.25)}18%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(calc(-50% + var(--heart-dx)),calc(-50% + var(--heart-dy))) scale(.65)}}
 @media(prefers-reduced-motion:reduce){.wishlist-heart-icon,.wishlist-heart-shape{transition:none}.wishlist-heart-particles span{animation-duration:.01ms}}
+
+/* Keep mobile typography compact and consistent across every route. */
+@media (max-width: 639px) {
+  body {
+    font-size: 14px;
+  }
+
+  h1:not(.material-symbols-outlined) {
+    font-size: 1.25rem !important;
+    line-height: 1.3 !important;
+  }
+
+  h2:not(.material-symbols-outlined) {
+    font-size: 1.125rem !important;
+    line-height: 1.3 !important;
+  }
+
+  h3:not(.material-symbols-outlined) {
+    font-size: 1rem !important;
+    line-height: 1.35 !important;
+  }
+
+  h4:not(.material-symbols-outlined),
+  h5:not(.material-symbols-outlined),
+  h6:not(.material-symbols-outlined) {
+    font-size: 0.875rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .text-7xl:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 2.375rem !important; line-height: 1.15 !important; }
+  .text-6xl:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 2.125rem !important; line-height: 1.15 !important; }
+  .text-5xl:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.875rem !important; line-height: 1.2 !important; }
+  .text-4xl:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.625rem !important; line-height: 1.2 !important; }
+  .text-3xl:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.4375rem !important; line-height: 1.25 !important; }
+  .text-2xl:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.25rem !important; line-height: 1.3 !important; }
+  .text-xl:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.125rem !important; line-height: 1.35 !important; }
+  .text-lg:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.9375rem !important; line-height: 1.4 !important; }
+  .text-base:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.875rem !important; line-height: 1.4 !important; }
+  .text-sm:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.8125rem !important; line-height: 1.4 !important; }
+  .text-xs:not(.material-symbols-outlined):not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.6875rem !important; line-height: 1.4 !important; }
+
+  .text-headline-lg:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.375rem !important; line-height: 1.3 !important; }
+  .text-headline-lg-mobile:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.25rem !important; line-height: 1.3 !important; }
+  .text-headline-md:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.125rem !important; line-height: 1.35 !important; }
+  .text-headline-sm:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.9375rem !important; line-height: 1.4 !important; }
+  .text-display-hero:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.875rem !important; line-height: 1.15 !important; }
+  .text-display-hero-mobile:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.5rem !important; line-height: 1.2 !important; }
+  .text-price-hero:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1.4375rem !important; line-height: 1.25 !important; }
+  .text-price-card:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 1rem !important; line-height: 1.3 !important; }
+  .text-price-mrp:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.75rem !important; line-height: 1.35 !important; }
+  .text-body-lg:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.9375rem !important; line-height: 1.45 !important; }
+  .text-body-md:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.8125rem !important; line-height: 1.45 !important; }
+  .text-body-sm:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.6875rem !important; line-height: 1.4 !important; }
+  .text-label-button:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.8125rem !important; line-height: 1.35 !important; }
+  .text-label-badge:not(:is(h1, h2, h3, h4, h5, h6)) { font-size: 0.625rem !important; line-height: 1.3 !important; }
+}

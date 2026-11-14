@@ -1,17 +1,11 @@
 /* eslint-disable prettier/prettier */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
-import {
-  LEGACY_CHECKOUT_DEFAULTS,
-  settingsService,
-  type LegacyCheckoutSettings,
-} from "../services/settingsService";
-import { coinService, convertCoinsToRupees } from "../services/coinService";
 import type { NotificationItem, NotificationCategory } from "../types";
 import { toast } from "sonner";
 
@@ -48,32 +42,9 @@ export function NotificationsPage() {
 
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [displayLimit, setDisplayLimit] = useState<number>(5);
+  const [showMobileActionsSidebar, setShowMobileActionsSidebar] = useState(false);
+  const [expandedMobileNotifId, setExpandedMobileNotifId] = useState<string | null>(null);
   const [showAlertSettingsModal, setShowAlertSettingsModal] = useState(false);
-  const [coinPolicy, setCoinPolicy] = useState<LegacyCheckoutSettings>(LEGACY_CHECKOUT_DEFAULTS);
-  const [coinBalance, setCoinBalance] = useState(user?.smartCoins ?? user?.coins ?? 0);
-
-  useEffect(() => {
-    let active = true;
-    settingsService.getLegacyCheckoutSettings().then((settings) => {
-      if (active) setCoinPolicy(settings);
-    }).catch(() => {});
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    if (!user) {
-      setCoinBalance(0);
-      return () => { active = false; };
-    }
-    coinService.getUserCoins(user.id, user.legacySassId).then((balance) => {
-      if (active) setCoinBalance(balance);
-    }).catch(() => {
-      if (active) setCoinBalance(user.smartCoins ?? user.coins ?? 0);
-    });
-    return () => { active = false; };
-  }, [user?.id, user?.legacySassId, user?.smartCoins, user?.coins]);
-
   // Alert Settings form state
   const [inAppAlerts, setInAppAlerts] = useState(preferences.inAppAlerts);
   const [orderUpdates, setOrderUpdates] = useState(preferences.orderUpdates);
@@ -252,9 +223,9 @@ export function NotificationsPage() {
       <StoreHeader />
 
       <main className="w-full pt-20 min-h-[calc(100vh-80px)] pb-24">
-        <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           {/* Breadcrumbs */}
-          <nav className="flex items-center gap-2 text-xs text-on-surface-variant mb-4">
+          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-on-surface-variant mb-4">
             <Link to="/" className="hover:text-primary transition-colors">
               Home
             </Link>
@@ -266,34 +237,28 @@ export function NotificationsPage() {
             <span className="font-bold text-on-surface">Notifications Center</span>
           </nav>
 
-          {/* Subheading Vault Pill */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/60 text-[11px] font-bold text-emerald-800 mb-6">
-            <span className="material-symbols-outlined text-[13px]">shield</span>
-            <span>PERSONAL UPDATES VAULT</span>
-          </div>
-
           {/* Heading Row & Header Actions */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="font-headline-lg text-2xl sm:text-3xl font-black text-on-surface">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <h1 className="font-headline-lg text-xl sm:text-3xl font-black text-on-surface">
                   Notifications & Updates
                 </h1>
                 {unreadCount > 0 && (
-                  <span className="bg-rose-100 text-rose-800 text-xs font-black px-2.5 py-0.5 rounded-full">
+                  <span className="bg-rose-100 text-rose-800 text-[10px] sm:text-xs font-black px-2.5 py-0.5 rounded-full">
                     {unreadCount} Unread
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="hidden w-full flex-wrap items-center gap-2 shrink-0 sm:w-auto sm:gap-3 md:flex">
               <button
                 type="button"
                 data-testid="mark-all-read-btn"
                 onClick={handleMarkAllRead}
                 disabled={unreadCount === 0}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-outline-variant/25 text-xs font-bold text-on-surface hover:bg-surface-container-low transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-white border border-outline-variant/25 text-[11px] sm:text-xs font-bold text-on-surface hover:bg-surface-container-low transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs sm:flex-none sm:px-3.5"
               >
                 <span className="material-symbols-outlined text-[16px] text-emerald-700">done_all</span>
                 <span>Mark All as Read</span>
@@ -302,7 +267,7 @@ export function NotificationsPage() {
               <button
                 type="button"
                 onClick={() => setShowAlertSettingsModal(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-outline-variant/25 text-xs font-bold text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer shadow-xs"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl bg-white border border-outline-variant/25 text-[11px] sm:text-xs font-bold text-on-surface hover:bg-surface-container-low transition-colors cursor-pointer shadow-xs sm:flex-none sm:px-3.5"
               >
                 <span className="material-symbols-outlined text-[16px]">tune</span>
                 <span>Alert Settings</span>
@@ -310,8 +275,24 @@ export function NotificationsPage() {
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setShowMobileActionsSidebar(true)}
+            className="mb-4 inline-flex w-full items-center justify-between rounded-2xl border border-outline-variant/25 bg-white px-4 py-3 text-xs font-bold text-on-surface shadow-xs md:hidden"
+            aria-label="Open notification filters and actions"
+          >
+            <span className="inline-flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-primary">tune</span>
+              Filters & actions
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-on-surface-variant">
+              {activeTab === "all" ? "All Notifications" : activeTab}
+              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+            </span>
+          </button>
+
           {/* Category Filter Chips */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none mb-6">
+          <div className="hidden items-center gap-2 overflow-x-auto pb-2 scrollbar-none mb-4 sm:mb-6 md:flex">
             <button
               type="button"
               onClick={() => {
@@ -404,12 +385,12 @@ export function NotificationsPage() {
             </button>
           </div>
 
-          {/* Two-Column Responsive Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Notification List */}
+          <div className="grid grid-cols-1 items-start">
             {/* ============================================================== */}
             {/* LEFT COLUMN: NOTIFICATION CARDS LIST                           */}
             {/* ============================================================== */}
-            <div className="lg:col-span-8 space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {error && (
                 <div
                   role="alert"
@@ -472,7 +453,7 @@ export function NotificationsPage() {
                     <div
                       key={notif.id}
                       onClick={() => handleNotificationClick(notif)}
-                      className={`relative bg-white rounded-3xl p-5 sm:p-6 border transition-all cursor-pointer hover:shadow-sm ${
+                      className={`relative bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 border transition-all cursor-pointer hover:shadow-sm ${
                         notif.read
                           ? "border-outline-variant/20 opacity-90"
                           : "border-[#005f3f]/30 shadow-xs ring-1 ring-[#005f3f]/10"
@@ -480,13 +461,13 @@ export function NotificationsPage() {
                     >
                       {/* Left Accent indicator dot for unread */}
                       {!notif.read && (
-                        <div className="absolute top-6 left-3 w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <div className="absolute left-1 top-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse sm:left-3 sm:top-6"></div>
                       )}
 
-                      <div className="flex items-start gap-4">
+                      <div className="flex items-start gap-3 sm:gap-4">
                         {/* Icon Circle */}
                         <div
-                          className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+                          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
                             isOrder
                               ? "bg-emerald-50 text-[#005f3f]"
                               : isHarvest
@@ -494,7 +475,7 @@ export function NotificationsPage() {
                               : "bg-amber-50 text-amber-800"
                           }`}
                         >
-                          <span className="material-symbols-outlined text-[22px]">
+                          <span className="material-symbols-outlined text-[20px] sm:text-[22px]">
                             {isOrder
                               ? notif.badge?.includes("DELIVERED")
                                 ? "check_circle"
@@ -537,11 +518,29 @@ export function NotificationsPage() {
                           </h3>
 
                           {/* Description */}
-                          <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
+                          <p className={`text-xs text-on-surface-variant mt-1 leading-relaxed ${
+                            expandedMobileNotifId === notif.id ? "" : "line-clamp-2 sm:line-clamp-none"
+                          }`}>
                             {notif.message}
                           </p>
 
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setExpandedMobileNotifId((current) => current === notif.id ? null : notif.id);
+                            }}
+                            aria-expanded={expandedMobileNotifId === notif.id}
+                            className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-[#005f3f] sm:hidden"
+                          >
+                            {expandedMobileNotifId === notif.id ? "Show less" : "More details"}
+                            <span className="material-symbols-outlined text-[14px]">
+                              {expandedMobileNotifId === notif.id ? "expand_less" : "expand_more"}
+                            </span>
+                          </button>
+
                           {/* Extra Contextual Strips & Snippets */}
+                          <div className={expandedMobileNotifId === notif.id ? "mt-3 space-y-2" : "hidden sm:block mt-3 space-y-2"}>
                           {/* 1. Live Driver Context Strip */}
                           {notif.driverName && (
                             <div className="mt-3 p-3 bg-surface-container-low/70 border border-outline-variant/15 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -614,6 +613,7 @@ export function NotificationsPage() {
                               )}
                             </div>
                           )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -643,164 +643,113 @@ export function NotificationsPage() {
             </div>
 
             {/* ============================================================== */}
-            {/* RIGHT COLUMN: PREFERENCES & CONTEXTUAL CARDS                  */}
-            {/* ============================================================== */}
-            <div className="lg:col-span-4 space-y-6">
-              {/* Card 1: Alert Channels */}
-              <div className="bg-white rounded-3xl p-6 border border-outline-variant/20 shadow-xs space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#005f3f] text-[20px]">podcasts</span>
-                  <h3 className="font-headline-sm text-sm font-black text-on-surface">
-                    Alert Channels
-                  </h3>
-                </div>
 
-                {/* Instant WhatsApp & SMS */}
-                <div className="p-3.5 rounded-2xl bg-surface-container-low/70 border border-outline-variant/15 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-bold text-on-surface">Instant WhatsApp & SMS</div>
-                    <div className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
-                      Live driver GPS links & OTP pings to {user?.phone || "+91 98400 12345"}
-                    </div>
-                    <div className="mt-1.5 inline-block text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/50">
-                      Simulated Channel
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={preferences.whatsappSmsMock}
-                    onChange={(e) => {
-                      updatePreferences({ whatsappSmsMock: e.target.checked });
-                      toast.info(`WhatsApp & SMS alerts ${e.target.checked ? "enabled" : "muted"}`);
-                    }}
-                    className="mt-1 rounded text-[#005f3f] focus:ring-[#005f3f] cursor-pointer"
-                  />
-                </div>
-
-                {/* New Stock Influx */}
-                <div className="p-3.5 rounded-2xl bg-surface-container-low/70 border border-outline-variant/15 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-bold text-on-surface">New Stock Influx</div>
-                    <div className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
-                      Alerts when new products and items arrive.
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={preferences.harvestAlerts}
-                    onChange={(e) => {
-                      updatePreferences({ harvestAlerts: e.target.checked });
-                      toast.info(`Harvest batch notifications ${e.target.checked ? "enabled" : "muted"}`);
-                    }}
-                    className="mt-1 rounded text-[#005f3f] focus:ring-[#005f3f] cursor-pointer"
-                  />
-                </div>
-
-                {/* Delivery Quiet Hours */}
-                <div className="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/50">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-950 mb-1">
-                    <span className="material-symbols-outlined text-[16px] text-emerald-800">bedtime</span>
-                    <span>Delivery Quiet Hours</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-900 leading-relaxed mb-2">
-                    Strictly no promo sounds or ring calls during 10:00 PM - 6:30 AM.
-                  </p>
-                  <span className="inline-block text-[9px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded">
-                    ENFORCED STORE POLICY
-                  </span>
-                </div>
-              </div>
-
-              {/* Card 2: MY COIN STASH */}
-              <div className="bg-gradient-to-br from-[#fffdf8] to-[#fff8ea] rounded-3xl p-6 border border-amber-200/60 shadow-xs relative overflow-hidden">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] font-black tracking-wider text-amber-900 uppercase">
-                    MY COIN STASH
-                  </span>
-                  <span className="text-xs font-black text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-lg">
-                    = ₹{convertCoinsToRupees(coinBalance, coinPolicy.coinValueInRupees).toFixed(2)} Value
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-3 my-2">
-                  <span className="text-3xl">🪙</span>
-                  <div>
-                    <div className="font-headline-lg text-2xl font-black text-on-surface">
-                      {coinBalance} Smart Coins
-                    </div>
-                    <div className="text-[11px] text-on-surface-variant font-medium">
-                      1 Coin = ₹{coinPolicy.coinValueInRupees} cash discount
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-xs text-on-surface-variant mt-3 leading-relaxed">
-                    Earn {coinPolicy.smartCoinEarnRate} Smart Coins per eligible order. Coins expire after {coinPolicy.coinValidityMonths} months. Redeem once your balance reaches {coinPolicy.minCoinsToRedeem} coins, up to {coinPolicy.maxCoinRedemptionPercent}% of your item subtotal.
-                </p>
-
-                <div className="mt-4 pt-3 border-t border-amber-200/50">
-                  <Link
-                    to="/rewards"
-                    className="inline-flex items-center gap-1 text-xs font-black text-[#005f3f] hover:underline"
-                  >
-                    <span>Redeem at Checkout</span>
-                    <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                  </Link>
-                </div>
-              </div>
-
-              {/* Card 3: Need Help with an Alert? */}
-              <div className="bg-white rounded-3xl p-6 border border-outline-variant/20 shadow-xs space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-[#005f3f] flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[20px]">storefront</span>
-                  </div>
-                  <div>
-                    <h3 className="font-headline-sm text-xs font-black text-on-surface">
-                      Need Help with an Alert?
-                    </h3>
-                    <p className="text-[11px] text-on-surface-variant">
-                      Gobichettipalayam Flagship Store Desk
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  Connect directly with Store Supervisor regarding batch delivery times or PIN verifications.
-                </p>
-
-                <div className="space-y-2 pt-1">
-                  <a
-                    href="tel:+919840012345"
-                    className="w-full py-2.5 rounded-xl bg-[#005f3f] hover:bg-[#004d32] text-white font-black text-xs flex items-center justify-center gap-2 shadow-xs transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">call</span>
-                    <span>Call +91 98400 12345</span>
-                  </a>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      toast.info("WhatsApp support desk connected (+91 98400 12345)");
-                    }}
-                    className="w-full py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-[#005f3f] font-black text-xs flex items-center justify-center gap-2 border border-emerald-200/60 transition-colors cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">chat</span>
-                    <span>Chat on WhatsApp</span>
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </main>
+
+      {showMobileActionsSidebar && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/45 md:hidden"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setShowMobileActionsSidebar(false);
+          }}
+        >
+          <aside
+            className="flex h-full w-[min(20rem,86vw)] flex-col overflow-y-auto bg-white p-4 pt-[max(1rem,env(safe-area-inset-top))] shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Notification filters and actions"
+          >
+            <div className="mb-5 flex items-center justify-between gap-3 border-b border-outline-variant/20 pb-4">
+              <div>
+                <h2 className="text-base font-black text-on-surface">Notifications</h2>
+                <p className="mt-0.5 text-[11px] text-on-surface-variant">
+                  {unreadCount} unread updates
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMobileActionsSidebar(false)}
+                aria-label="Close filters and actions"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-on-surface-variant"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-2 border-b border-outline-variant/20 pb-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileActionsSidebar(false);
+                  handleMarkAllRead();
+                }}
+                disabled={unreadCount === 0}
+                className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-outline-variant/20 px-3 text-left text-xs font-bold text-on-surface disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined text-[18px] text-primary">done_all</span>
+                Mark all as read
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMobileActionsSidebar(false);
+                  setShowAlertSettingsModal(true);
+                }}
+                className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-outline-variant/20 px-3 text-left text-xs font-bold text-on-surface"
+              >
+                <span className="material-symbols-outlined text-[18px] text-primary">settings</span>
+                Alert settings
+              </button>
+            </div>
+
+            <div className="pt-5">
+              <h3 className="mb-2 px-1 text-[10px] font-black uppercase tracking-wider text-on-surface-variant">
+                Filter notifications
+              </h3>
+              <div className="space-y-1">
+                {([
+                  { id: "all", label: "All Notifications", count: notifications.length, icon: "notifications" },
+                  { id: "orders", label: "Orders & Delivery", count: ordersCount, icon: "local_shipping" },
+                  { id: "rewards", label: "Smart Coins & VIP", count: rewardsCount, icon: "workspace_premium" },
+                  { id: "harvest", label: "New Stock Updates", count: harvestCount, icon: "spa" },
+                ] as const).map((filter) => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(filter.id);
+                      setDisplayLimit(5);
+                      setShowMobileActionsSidebar(false);
+                    }}
+                    aria-pressed={activeTab === filter.id}
+                    className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-xs font-bold transition-colors ${
+                      activeTab === filter.id
+                        ? "bg-emerald-50 text-[#005f3f]"
+                        : "text-on-surface hover:bg-surface-container-low"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">{filter.icon}</span>
+                    <span className="flex-1">{filter.label}</span>
+                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px]">
+                      {filter.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
 
       {/* ============================================================== */}
       {/* ALERT SETTINGS MODAL                                           */}
       {/* ============================================================== */}
       {showAlertSettingsModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-outline-variant/20 animate-in fade-in zoom-in-95 duration-150">
+          <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 max-w-md w-full shadow-2xl border border-outline-variant/20 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-[#005f3f] text-[22px]">tune</span>
@@ -850,19 +799,6 @@ export function NotificationsPage() {
 
               <div className="flex items-center justify-between p-3 rounded-2xl bg-surface-container-low border border-outline-variant/15">
                 <div>
-                  <div className="font-bold text-on-surface">Fresh Wood-Pressed Harvest Alerts</div>
-                  <div className="text-[10px] text-on-surface-variant">Early batch notices before stock clears</div>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={harvestAlerts}
-                  onChange={(e) => setHarvestAlerts(e.target.checked)}
-                  className="rounded text-[#005f3f] focus:ring-[#005f3f] cursor-pointer"
-                />
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-surface-container-low border border-outline-variant/15">
-                <div>
                   <div className="font-bold text-on-surface">Smart Coins & VIP Perks</div>
                   <div className="text-[10px] text-on-surface-variant">Passbook credits and reward multipliers</div>
                 </div>
@@ -874,17 +810,52 @@ export function NotificationsPage() {
                 />
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-surface-container-low border border-outline-variant/15">
-                <div>
-                  <div className="font-bold text-on-surface">WhatsApp & SMS Gateway</div>
-                  <div className="text-[10px] text-on-surface-variant">Simulated demonstration mode</div>
+              <div className="border-t border-outline-variant/20 pt-3">
+                <h4 className="mb-2 text-[10px] font-black uppercase tracking-wider text-on-surface-variant">
+                  Alert Channels
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-outline-variant/15 bg-surface-container-low p-3">
+                    <div className="min-w-0">
+                      <div className="font-bold text-on-surface">New Stock Influx</div>
+                      <div className="text-[10px] text-on-surface-variant">Alerts when new products and items arrive.</div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={harvestAlerts}
+                      onChange={(e) => setHarvestAlerts(e.target.checked)}
+                      className="shrink-0 rounded text-[#005f3f] focus:ring-[#005f3f] cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-outline-variant/15 bg-surface-container-low p-3">
+                    <div className="min-w-0">
+                      <div className="font-bold text-on-surface">Instant WhatsApp & SMS</div>
+                      <div className="text-[10px] text-on-surface-variant">
+                        Driver GPS links and OTP alerts to {user?.phone || "+91 98400 12345"}.
+                      </div>
+                      <span className="mt-1 inline-block rounded border border-amber-200/50 bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-800">
+                        Simulated channel
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={whatsappSmsMock}
+                      onChange={(e) => setWhatsappSmsMock(e.target.checked)}
+                      className="shrink-0 rounded text-[#005f3f] focus:ring-[#005f3f] cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-200/50 bg-emerald-50/60 p-3">
+                    <div className="mb-1 flex items-center gap-1.5 font-bold text-emerald-950">
+                      <span className="material-symbols-outlined text-[15px] text-emerald-800">bedtime</span>
+                      Delivery Quiet Hours
+                    </div>
+                    <p className="text-[10px] leading-relaxed text-emerald-900">
+                      No promotional sounds or calls from 10:00 PM to 6:30 AM. This store policy is always enforced.
+                    </p>
+                  </div>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={whatsappSmsMock}
-                  onChange={(e) => setWhatsappSmsMock(e.target.checked)}
-                  className="rounded text-[#005f3f] focus:ring-[#005f3f] cursor-pointer"
-                />
               </div>
 
               <div className="pt-2 flex gap-3">
