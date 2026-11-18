@@ -739,7 +739,7 @@ export function LoginPage() {
             <div id="login-recaptcha-container" aria-hidden="true" />
 
             {!otpSent ? (
-              <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 space-y-1.5 sm:p-3.5 sm:space-y-2">
+              <div className="rounded-2xl border border-outline-variant/20 bg-[#ffffff] p-3 space-y-1.5 sm:p-3.5 sm:space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-on-surface" htmlFor="phone-input">
                     Mobile number <span className="text-primary">*</span>
@@ -747,7 +747,7 @@ export function LoginPage() {
                   {/* <span className="text-[11px] font-bold text-primary">Instant OTP</span> */}
                 </div>
 
-                <div className="flex items-center rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-2 py-1 focus-within:ring-2 focus-within:ring-primary sm:py-1.5">
+                <div className="flex items-center rounded-xl border border-outline-variant/20 bg-surface-container-low px-2 py-1 focus-within:ring-2 focus-within:ring-primary sm:py-1.5">
                   <select
                     value={countryCode}
                     onChange={(e) => setCountryCode(e.target.value)}
@@ -767,7 +767,7 @@ export function LoginPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="Enter 10-digit number"
-                    className="w-full bg-transparent px-2 py-1 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none"
+                    className="w-full bg-surface-container-low px-2 py-1 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none"
                   />
                 </div>
 
@@ -965,7 +965,7 @@ export function LoginPage() {
           </div>
 
           {/* Section D: Referral & Legal */}
-          <div className="mt-4 rounded-xl border border-outline-variant/15 bg-surface-container-low p-3 sm:mt-5">
+          <div className="mt-4 rounded-xl border border-outline-variant/15 bg-transparent p-3 sm:mt-5">
             <button
               type="button"
               onClick={() => setIsReferralOpen((prev) => !prev)}

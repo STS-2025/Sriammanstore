@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useRef } from "react";
 import { useCart } from "../../context/CartContext";
 import { useCartFlyAnimation } from "../../hooks/useCartFlyAnimation";
@@ -9,6 +9,7 @@ export function BottomNav() {
   const showMobileCartAdded = useCartFlyAnimation(mobileCartTargetRef, "mobile");
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
+  const navigate = useNavigate();
 
   const isActive = (path: string) => {
     if (path === "/" && currentPath === "/") return true;
@@ -16,11 +17,37 @@ export function BottomNav() {
     return false;
   };
 
+  const handleSearchClick = () => {
+    if (currentPath === "/shop") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.setTimeout(() => {
+        const searchInput = document.getElementById("shop-product-search-input");
+        if (searchInput instanceof HTMLInputElement) {
+          searchInput.focus({ preventScroll: true });
+        }
+      }, 250);
+      return;
+    }
+
+    if (currentPath !== "/") {
+      void navigate({ to: "/shop", search: { focusSearch: true } as any });
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.setTimeout(() => {
+      const searchInput = document.getElementById("home-product-search-input");
+      if (searchInput instanceof HTMLInputElement) {
+        searchInput.focus({ preventScroll: true });
+      }
+    }, 250);
+  };
+
   return (
     <>
       {/* Floating cart teaser pill if cart has items and not currently on cart/checkout */}
       {cartCount > 0 && !currentPath.includes("/cart") && !currentPath.includes("/checkout") && (
-        <div className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-4 md:hidden">
+        <div className={`fixed ${currentPath === "/shop" ? "bottom-[calc(10rem+env(safe-area-inset-bottom))]" : "bottom-[calc(4.25rem+env(safe-area-inset-bottom))]"} left-0 right-0 z-40 px-4 md:hidden`}>
           <Link
             to="/cart"
             className="flex items-center justify-between bg-primary text-on-primary px-4 py-3 rounded-2xl shadow-xl animate-fade-in"
@@ -70,8 +97,18 @@ export function BottomNav() {
             >
               storefront
             </span>
-            <span className="text-[10px] font-medium mt-0.5">Shop</span>
+            <span className="text-[10px] font-medium mt-0.5">Categories</span>
           </Link>
+
+          <button
+            type="button"
+            onClick={handleSearchClick}
+            aria-label={currentPath === "/" ? "Search products" : "Browse all products"}
+            className="flex min-h-11 flex-col items-center py-1 text-on-surface-variant transition-colors hover:text-primary"
+          >
+            <span className="material-symbols-outlined text-[22px]">search</span>
+            <span className="mt-0.5 text-[10px] font-medium">Search</span>
+          </button>
 
           <Link
             to="/cart"
@@ -116,20 +153,6 @@ export function BottomNav() {
             <span className="text-[10px] font-medium mt-0.5">Orders</span>
           </Link>
 
-          <Link
-            to="/account"
-            className={`flex min-h-11 flex-col items-center py-1 transition-colors ${
-              isActive("/account") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
-            }`}
-          >
-            <span
-              className="material-symbols-outlined text-[22px]"
-              style={isActive("/account") ? { fontVariationSettings: "'FILL' 1" } : {}}
-            >
-              person
-            </span>
-            <span className="text-[10px] font-medium mt-0.5">Account</span>
-          </Link>
         </div>
       </nav>
     </>

@@ -237,6 +237,16 @@ export function StoreHeader() {
           </Link>
 
           <Link
+            to={isLoading ? "/account" : user ? "/account" : "/login"}
+            aria-label={user ? "Account" : "Sign in"}
+            className="relative rounded-full p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary md:hidden"
+          >
+            <span className="material-symbols-outlined text-[24px]">
+              {user?.name ? "account_circle" : "person"}
+            </span>
+          </Link>
+
+          <Link
             to="/cart"
             className="hidden md:flex items-center gap-1 sm:gap-space-sm bg-primary-fixed text-on-primary-fixed hover:bg-primary-fixed-dim px-2 sm:px-space-md py-2 rounded-full transition-all shadow-[0_2px_6px_rgba(11,122,83,0.12)]"
           >

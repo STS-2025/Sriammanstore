@@ -213,11 +213,11 @@ export function CartPage() {
 
       <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
-          {deliverySettingsError && (
+          {/* {deliverySettingsError && (
             <div role="status" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900">
               Delivery settings could not be loaded. The legacy default charges are being shown. {deliverySettingsError}
             </div>
-          )}
+          )} */}
           {guestCartSyncError && (
             <div role="alert" className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-950 sm:flex-row sm:items-center sm:justify-between">
               <p>{guestCartSyncError} Your saved guest cart has not been deleted.</p>

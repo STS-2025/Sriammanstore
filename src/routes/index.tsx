@@ -163,6 +163,7 @@ function HomePage() {
           <div className="relative z-30 mx-4 mb-3 lg:hidden">
             <form onSubmit={handleSearch} className="flex items-center gap-1 rounded-full bg-surface-container-low px-2 py-1 ring-1 ring-outline-variant/30">
               <input
+                id="home-product-search-input"
                 type="search"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}

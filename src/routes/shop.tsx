@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
@@ -20,19 +20,21 @@ export const Route = createFileRoute("/shop")({
     category?: string | undefined;
     subCategory?: string | undefined;
     q?: string | undefined;
+    focusSearch?: boolean | undefined;
     deals?: boolean | undefined;
-    sort?: "popular" | "rating" | "price_asc" | "price_desc" | "discount" | undefined;
+    sort?: "popular" | "rating" | "price_asc" | "price_desc" | "discount" | "newest" | "oldest" | undefined;
   } => ({
     category: (search["category"] as string) || undefined,
     subCategory: (search["subCategory"] as string) || undefined,
     q: (search["q"] as string) || undefined,
+    focusSearch: search["focusSearch"] === true || search["focusSearch"] === "true" || undefined,
     deals: Boolean(search["deals"]) || undefined,
-    sort: (search["sort"] as "popular" | "rating" | "price_asc" | "price_desc" | "discount") || undefined,
+    sort: (search["sort"] as "popular" | "rating" | "price_asc" | "price_desc" | "discount" | "newest" | "oldest") || undefined,
   }),
   head: () => ({
     meta: [
       { title: "Shop Groceries & Wood Pressed Oils — Sri Amman Smart Store" },
-      { name: "description", content: "Explore South Indian organic staples, grains, and oils." },
+      { name: "description", content: "Explore South Indian staples, grains, and oils." },
     ],
   }),
   component: ShopPage,
@@ -40,7 +42,9 @@ export const Route = createFileRoute("/shop")({
 
 function ShopPage() {
   const searchParams = useSearch({ from: "/shop" });
+  const navigate = useNavigate();
   const { t } = useLanguage();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -76,7 +80,7 @@ function ShopPage() {
       : []
   );
   const [sortOption, setSortOption] = useState<
-    "popular" | "rating" | "price_asc" | "price_desc" | "discount"
+    "popular" | "rating" | "price_asc" | "price_desc" | "discount" | "newest" | "oldest"
   >(searchParams.sort || "popular");
   const [onlyDeals, setOnlyDeals] = useState<boolean>(!!searchParams.deals);
   const [searchQuery, setSearchQuery] = useState<string>(searchParams.q || "");
@@ -87,6 +91,20 @@ function ShopPage() {
   const [minDiscount, setMinDiscount] = useState(0);
   const [customPriceRange, setCustomPriceRange] = useState<{ min: number; max: number } | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  useEffect(() => {
+    if (!searchParams.focusSearch) return;
+    const focusTimer = window.setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      searchInputRef.current?.focus({ preventScroll: true });
+      void navigate({
+        to: "/shop",
+        search: (previous) => ({ ...previous, focusSearch: undefined }),
+        replace: true,
+      });
+    }, 100);
+    return () => window.clearTimeout(focusTimer);
+  }, [searchParams.focusSearch, navigate]);
 
   // Sync initial query params from TanStack router
   useEffect(() => {
@@ -327,12 +345,12 @@ function ShopPage() {
     <div className="bg-surface-container-lowest text-on-surface">
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-outline-variant/15 bg-surface-container-lowest px-4 py-3">
         <div>
-          <h2 className="text-sm font-extrabold">Filters</h2>
-          <p className="text-[11px] text-on-surface-variant">{filteredProducts.length} products</p>
+          <h2 className={`${mobile ? "text-base" : "text-sm"} font-extrabold`}>Filters</h2>
+          <p className={`${mobile ? "text-xs" : "text-[11px]"} text-on-surface-variant`}>{filteredProducts.length} products</p>
         </div>
         <div className="flex items-center gap-3">
           {filterCount > 0 && (
-            <button type="button" onClick={handleResetCatalog} className="text-xs font-bold text-primary hover:underline">
+            <button type="button" onClick={handleResetCatalog} className={`${mobile ? "text-sm" : "text-xs"} font-bold text-primary hover:underline`}>
               Clear all
             </button>
           )}
@@ -346,13 +364,13 @@ function ShopPage() {
 
       <div className="divide-y divide-outline-variant/15 px-4">
         <details open className="py-3">
-          <summary className="cursor-pointer list-none text-xs font-extrabold">Categories</summary>
+          <summary className={`cursor-pointer list-none ${mobile ? "text-sm" : "text-xs"} font-extrabold`}>Categories</summary>
           <div className="mt-3 space-y-2">
             {categories.map((category) => {
               const count = categoryProductCounts.get(category.slug) || 0;
               const checked = selectedCategories.includes(category.slug);
               return (
-                <label key={category.slug} className="flex cursor-pointer items-center gap-2 text-xs">
+                <label key={category.slug} className={`flex cursor-pointer items-center gap-2 ${mobile ? "text-sm" : "text-xs"}`}>
                   <input
                     type="checkbox"
                     checked={checked}
@@ -363,7 +381,7 @@ function ShopPage() {
                     className="h-3.5 w-3.5 accent-primary"
                   />
                   <span className="min-w-0 flex-1">{t(category.name, category.tamilName)}</span>
-                  <span className="text-[10px] text-on-surface-variant">{count}</span>
+                  <span className={`${mobile ? "text-xs" : "text-[10px]"} text-on-surface-variant`}>{count}</span>
                 </label>
               );
             })}
@@ -372,10 +390,10 @@ function ShopPage() {
 
         {railSubcategories.length > 0 && (
           <details open className="py-3">
-            <summary className="cursor-pointer list-none text-xs font-extrabold">Aisle / subcategory</summary>
+            <summary className={`cursor-pointer list-none ${mobile ? "text-sm" : "text-xs"} font-extrabold`}>Aisle / subcategory</summary>
             <div className="mt-3 space-y-2">
               {railSubcategories.map((subcategory) => (
-                <label key={subcategory.name} className="flex cursor-pointer items-center gap-2 text-xs">
+                <label key={subcategory.name} className={`flex cursor-pointer items-center gap-2 ${mobile ? "text-sm" : "text-xs"}`}>
                   <input
                     type="checkbox"
                     checked={selectedSubcategories.some((value) => value.toLocaleLowerCase() === subcategory.name.toLocaleLowerCase())}
@@ -383,7 +401,7 @@ function ShopPage() {
                     className="h-3.5 w-3.5 accent-primary"
                   />
                   <span className="min-w-0 flex-1">{subcategory.name}</span>
-                  <span className="text-[10px] text-on-surface-variant">{subcategory.count}</span>
+                  <span className={`${mobile ? "text-xs" : "text-[10px]"} text-on-surface-variant`}>{subcategory.count}</span>
                 </label>
               ))}
             </div>
@@ -391,34 +409,41 @@ function ShopPage() {
         )}
 
         <details open className="py-3">
-          <summary className="cursor-pointer list-none text-xs font-extrabold">Price range</summary>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <label className="text-[10px] font-semibold text-on-surface-variant">
-              Minimum
+          <summary className={`cursor-pointer list-none ${mobile ? "text-sm" : "text-xs"} font-extrabold`}>Price range</summary>
+          <div className="mt-3 space-y-3">
+            <p className={`${mobile ? "text-sm" : "text-xs"} font-semibold text-on-surface`}>
+              ₹{activePriceRange.min} – ₹{activePriceRange.max}
+            </p>
+            <label className={`block ${mobile ? "text-xs" : "text-[10px]"} font-semibold text-on-surface-variant`}>
+              Minimum price
               <input
-                type="number"
+                type="range"
                 min={catalogPriceBounds.min}
-                max={activePriceRange.max}
+                max={catalogPriceBounds.max}
+                step="1"
                 value={activePriceRange.min}
+                aria-label="Minimum price"
                 onChange={(event) => setCustomPriceRange({
-                  min: Math.min(Number(event.target.value) || catalogPriceBounds.min, activePriceRange.max),
+                  min: Math.min(Number(event.target.value), activePriceRange.max),
                   max: activePriceRange.max,
                 })}
-                className="mt-1 w-full rounded-lg border border-outline-variant/25 bg-white px-2 py-1.5 text-xs text-on-surface"
+                className="mt-1 block h-5 w-full cursor-pointer accent-primary"
               />
             </label>
-            <label className="text-[10px] font-semibold text-on-surface-variant">
-              Maximum
+            <label className={`block ${mobile ? "text-xs" : "text-[10px]"} font-semibold text-on-surface-variant`}>
+              Maximum price
               <input
-                type="number"
-                min={activePriceRange.min}
+                type="range"
+                min={catalogPriceBounds.min}
                 max={catalogPriceBounds.max}
+                step="1"
                 value={activePriceRange.max}
+                aria-label="Maximum price"
                 onChange={(event) => setCustomPriceRange({
                   min: activePriceRange.min,
-                  max: Math.max(Number(event.target.value) || catalogPriceBounds.max, activePriceRange.min),
+                  max: Math.max(Number(event.target.value), activePriceRange.min),
                 })}
-                className="mt-1 w-full rounded-lg border border-outline-variant/25 bg-white px-2 py-1.5 text-xs text-on-surface"
+                className="mt-1 block h-5 w-full cursor-pointer accent-primary"
               />
             </label>
           </div>
@@ -427,10 +452,10 @@ function ShopPage() {
 
         {brandOptions.length > 0 && (
           <details open className="py-3">
-            <summary className="cursor-pointer list-none text-xs font-extrabold">Brand</summary>
+            <summary className={`cursor-pointer list-none ${mobile ? "text-sm" : "text-xs"} font-extrabold`}>Brand</summary>
             <div className="mt-3 space-y-2">
               {brandOptions.map(([brand, count]) => (
-                <label key={brand} className="flex cursor-pointer items-center gap-2 text-xs">
+                <label key={brand} className={`flex cursor-pointer items-center gap-2 ${mobile ? "text-sm" : "text-xs"}`}>
                   <input
                     type="checkbox"
                     checked={selectedBrands.includes(brand)}
@@ -438,7 +463,7 @@ function ShopPage() {
                     className="h-3.5 w-3.5 accent-primary"
                   />
                   <span className="min-w-0 flex-1">{brand}</span>
-                  <span className="text-[10px] text-on-surface-variant">{count}</span>
+                  <span className={`${mobile ? "text-xs" : "text-[10px]"} text-on-surface-variant`}>{count}</span>
                 </label>
               ))}
             </div>
@@ -446,32 +471,52 @@ function ShopPage() {
         )}
 
         <details open className="py-3">
-          <summary className="cursor-pointer list-none text-xs font-extrabold">Customer rating</summary>
-          <div className="mt-3 space-y-2">
+          <summary className={`cursor-pointer list-none ${mobile ? "text-sm" : "text-xs"} font-extrabold`}>Customer rating</summary>
+          <div className="mt-3 space-y-1">
+            <p className={`${mobile ? "text-sm" : "text-xs"} font-semibold text-on-surface`}>
+              {minRating === 0 ? "Any rating" : `${minRating}+ stars`}
+            </p>
+            <input
+              type="range"
+              min="0"
+              max="5"
+              step="0.5"
+              value={minRating}
+              aria-label="Minimum customer rating"
+              onChange={(event) => setMinRating(Number(event.target.value))}
+              className="block h-5 w-full cursor-pointer accent-primary"
+            />
+            <div className="flex justify-between text-[10px] text-on-surface-variant">
+              <span>Any</span>
+              <span>3+</span>
+              <span>5 stars</span>
+            </div>
+          </div>
+          <div className="hidden">
             {[4, 3].map((rating) => (
-              <label key={rating} className="flex cursor-pointer items-center gap-2 text-xs">
+              <label key={rating} className={`flex cursor-pointer items-center gap-2 ${mobile ? "text-sm" : "text-xs"}`}>
                 <input type="radio" name={mobile ? "mobile-rating" : "desktop-rating"} checked={minRating === rating} onChange={() => setMinRating(rating)} className="h-3.5 w-3.5 accent-primary" />
                 <span>{rating}+ ★</span>
               </label>
             ))}
-            <button type="button" onClick={() => setMinRating(0)} className={`text-[10px] font-semibold ${minRating === 0 ? "text-primary" : "text-on-surface-variant"}`}>Any rating</button>
+            <button type="button" onClick={() => setMinRating(0)} className={`${mobile ? "text-xs" : "text-[10px]"} font-semibold ${minRating === 0 ? "text-primary" : "text-on-surface-variant"}`}>Any rating</button>
           </div>
         </details>
 
         <details open className="py-3">
-          <summary className="cursor-pointer list-none text-xs font-extrabold">Offers & availability</summary>
+          <summary className={`cursor-pointer list-none ${mobile ? "text-sm" : "text-xs"} font-extrabold`}>Offers & availability</summary>
           <div className="mt-3 space-y-2">
-            <label className="flex cursor-pointer items-center gap-2 text-xs">
+            <label className={`flex cursor-pointer items-center gap-2 ${mobile ? "text-sm" : "text-xs"}`}>
               <input type="checkbox" checked={onlyDeals} onChange={(event) => setOnlyDeals(event.target.checked)} className="h-3.5 w-3.5 accent-primary" />
               <span>Deals and special offers</span>
             </label>
-            <label className="flex cursor-pointer items-center gap-2 text-xs">
+            <label className={`flex cursor-pointer items-center gap-2 ${mobile ? "text-sm" : "text-xs"}`}>
               <input type="checkbox" checked={inStockOnly} onChange={(event) => setInStockOnly(event.target.checked)} className="h-3.5 w-3.5 accent-primary" />
               <span>In stock only</span>
             </label>
-            <label className="flex items-center gap-2 text-xs">
+            <label className={`flex items-center gap-2 ${mobile ? "text-sm" : "text-xs"}`}>
               <span className="text-on-surface-variant">Minimum discount</span>
-              <select value={minDiscount} onChange={(event) => setMinDiscount(Number(event.target.value))} className="ml-auto rounded-md border border-outline-variant/20 bg-white px-1.5 py-1 text-[11px]">
+              <select value={minDiscount} onChange={(event) => setMinDiscount(Number(event.target.value))} className={`ml-auto rounded-md border border-outline-variant/20 bg-white px-1.5 py-1 ${mobile ? "text-xs" : "text-[11px]"}`}>
                 <option value={0}>Any</option><option value={10}>10%+</option><option value={15}>15%+</option><option value={20}>20%+</option><option value={30}>30%+</option>
               </select>
             </label>
@@ -480,10 +525,10 @@ function ShopPage() {
 
         {packSizeOptions.length > 0 && (
           <details className="py-3">
-            <summary className="cursor-pointer list-none text-xs font-extrabold">Pack size</summary>
+            <summary className={`cursor-pointer list-none ${mobile ? "text-sm" : "text-xs"} font-extrabold`}>Pack size</summary>
             <div className="mt-3 space-y-2">
               {packSizeOptions.map(([size, count]) => (
-                <label key={size} className="flex cursor-pointer items-center gap-2 text-xs">
+                <label key={size} className={`flex cursor-pointer items-center gap-2 ${mobile ? "text-sm" : "text-xs"}`}>
                   <input type="checkbox" checked={selectedPackSizes.includes(size)} onChange={() => toggleSelection(selectedPackSizes, size, setSelectedPackSizes)} className="h-3.5 w-3.5 accent-primary" />
                   <span className="min-w-0 flex-1">{size}</span><span className="text-[10px] text-on-surface-variant">{count}</span>
                 </label>
@@ -491,22 +536,7 @@ function ShopPage() {
             </div>
           </details>
         )}
-
-        <div className="py-3">
-          <label htmlFor={mobile ? "mobile-sort" : "desktop-sort"} className="mb-2 block text-xs font-extrabold">Sort by</label>
-          <select
-            id={mobile ? "mobile-sort" : "desktop-sort"}
-            value={sortOption}
-            onChange={(event) => setSortOption(event.target.value as typeof sortOption)}
-            className="w-full rounded-lg border border-outline-variant/25 bg-white px-2.5 py-2 text-xs font-semibold"
-          >
-            <option value="popular">Popularity</option>
-            <option value="rating">Customer rating</option>
-            <option value="price_asc">Price: low to high</option>
-            <option value="price_desc">Price: high to low</option>
-            <option value="discount">Discount</option>
-          </select>
-        </div>
+        
       </div>
       {mobile && (
         <div className="sticky bottom-0 border-t border-outline-variant/15 bg-surface-container-lowest p-3">
@@ -522,8 +552,37 @@ function ShopPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
+      <main className="w-full pt-20 pb-28 bg-surface min-h-[calc(100vh-80px)] md:pb-0">
         <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-md">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void navigate({
+                to: "/shop",
+                search: (previous) => ({ ...previous, q: searchQuery.trim() || undefined }),
+              });
+            }}
+            className="mb-4 flex items-center gap-1 rounded-full bg-surface-container-low px-2 py-1 ring-1 ring-outline-variant/30 md:hidden"
+          >
+            <input
+              id="shop-product-search-input"
+              ref={searchInputRef}
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search products..."
+              aria-label="Search products"
+              className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-on-surface placeholder:text-outline focus:outline-none"
+            />
+            <button
+              type="submit"
+              aria-label="Search the shop"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary"
+            >
+              <span className="material-symbols-outlined text-[18px]">search</span>
+            </button>
+          </form>
+
           {/* 1. Breadcrumbs */}
           <nav
             aria-label="Breadcrumb"
@@ -552,7 +611,7 @@ function ShopPage() {
           </nav>
 
           {/* 2. Heading and advanced-filter access */}
-          <header className="mb-4 flex min-h-10 items-center justify-between gap-3 sm:mb-6">
+          <header className="mb-4 hidden min-h-10 items-center justify-between gap-3 sm:mb-6 md:flex">
             <h1 className="min-w-0 font-headline-lg text-lg font-extrabold tracking-tight text-on-surface sm:text-xl md:text-2xl">
               {activeCategoryTitle}
             </h1>
@@ -688,6 +747,37 @@ function ShopPage() {
               )}
             </section>
           </div>
+        </div>
+
+        <div className="fixed bottom-[calc(3.25rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 flex h-14 items-center gap-3 border-t border-outline-variant/20 bg-surface-container-lowest px-4 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] md:hidden">
+          <label className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="text-xs font-bold text-on-surface">Sort</span>
+            <select
+              aria-label="Sort products"
+              value={sortOption}
+              onChange={(event) => setSortOption(event.target.value as typeof sortOption)}
+              className="h-10 min-w-0 flex-1 rounded-xl border border-outline-variant/25 bg-surface-container-lowest px-2 text-xs font-semibold text-on-surface"
+            >
+              <option value="popular">Popularity</option>
+              <option value="price_asc">Price: low to high</option>
+              <option value="price_desc">Price: high to low</option>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="rating">Top rated</option>
+              <option value="discount">Discount</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-bold text-white"
+          >
+            <span className="material-symbols-outlined text-[18px]">tune</span>
+            Filter
+            {filterCount > 0 && (
+              <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px]">{filterCount}</span>
+            )}
+          </button>
         </div>
       </main>
 

@@ -55,7 +55,7 @@ export interface ProductFilterState {
   minDiscount: number;
   packSizes: string[];
   methods: string[];
-  sort: "popular" | "rating" | "price_asc" | "price_desc" | "discount";
+  sort: "popular" | "rating" | "price_asc" | "price_desc" | "discount" | "newest" | "oldest";
   search: string;
   onlyDeals?: boolean;
 }
@@ -398,6 +398,10 @@ export function filterAndSortProducts(
     sorted.sort((a, b) => b.rating - a.rating);
   } else if (sort === "discount") {
     sorted.sort((a, b) => getProductMaxDiscount(b) - getProductMaxDiscount(a));
+  } else if (sort === "newest") {
+    sorted.sort((a, b) => Number(b.isNew) - Number(a.isNew));
+  } else if (sort === "oldest") {
+    sorted.sort((a, b) => Number(a.isNew) - Number(b.isNew));
   } else {
     // default: "popular"
     sorted.sort((a, b) => b.reviewCount - a.reviewCount);
