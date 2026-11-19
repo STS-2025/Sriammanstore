@@ -1,5 +1,5 @@
 /**
- * Sri Amman Smart Store — Centralized Customer Data Source Resolver
+ * Sriman Smart Store — Centralized Customer Data Source Resolver
  *
  * Provides authoritative, testable routing and identity resolution between
  * migrated `onlineCustomers` documents and legacy `users` records.

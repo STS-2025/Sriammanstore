@@ -155,16 +155,16 @@ export function StoreHeader() {
     <header className="fixed top-0 left-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-md shadow-[0_10px_25px_-5px_rgba(11,122,83,0.06),0_4px_6px_-2px_rgba(15,23,42,0.02)]">
 
       {/* Main Navigation Bar */}
-      <div className="h-20 w-full px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-space-md">
+      <div className="h-19 w-full px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-space-md">
         {/* Brand & Location */}
         <div className="flex items-center gap-space-lg shrink-0">
           <Link to="/" className="flex items-center gap-space-sm group">
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-black text-xl shadow-md group-hover:scale-105 transition-transform">
-              <img src={logo} alt="Sri Amman Smart Store" className="h-full w-full rounded-xl object-contain" />
+              <img src={logo} alt="Sriman Smart Store" className="h-full w-full rounded-xl object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="font-headline-md text-headline-md tracking-tight text-primary font-bold">
-                Sri Amman
+                Sriman
               </span>
               <span className="font-label-badge text-[10px] tracking-wider uppercase text-secondary font-semibold">
                 Smart Store

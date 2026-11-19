@@ -38,13 +38,13 @@ function asEntry(raw: Record<string, unknown>): CustomerWishlistEntry {
   };
 }
 
-function asUiItem(entry: CustomerWishlistEntry): WishlistProduct {
+function asUiItem(entry: CustomerWishlistEntry, wishlistId = "all", userId = ""): WishlistProduct {
   const variantName = entry.variantName ?? "";
   const match = variantName.match(/^(.+?)\s+(g|kg|ml|L|pcs)$/i);
   return {
     id: entry.productId,
-    wishlistId: "all",
-    userId: "",
+    wishlistId,
+    userId,
     productId: entry.productId,
     optionIndex: 0,
     unit: match?.[2] ?? "",
@@ -57,6 +57,32 @@ function asUiItem(entry: CustomerWishlistEntry): WishlistProduct {
     ...(entry.brandName ? { brandName: entry.brandName } : {}),
     ...(entry.variantName ? { variantName: entry.variantName } : {}),
     ...(entry.addedAt !== undefined ? { addedAt: entry.addedAt } : {}),
+  };
+}
+
+function asFolderUiItem(
+  raw: Record<string, unknown>,
+  customerId: string,
+  wishlistId: string,
+): WishlistProduct {
+  const productId = String(raw["productId"] ?? raw["id"] ?? "").trim();
+  const optionIndex = typeof raw["optionIndex"] === "number" ? raw["optionIndex"] : 0;
+  return {
+    id: productId,
+    wishlistId,
+    userId: customerId,
+    productId,
+    optionIndex,
+    unit: String(raw["unit"] ?? ""),
+    unitSize: String(raw["unitSize"] ?? ""),
+    name: String(raw["name"] ?? raw["productName"] ?? "Saved product"),
+    price: Number(raw["price"] ?? raw["sellingPrice"] ?? 0),
+    mrp: Number(raw["mrp"] ?? raw["price"] ?? raw["sellingPrice"] ?? 0),
+    image: String(raw["image"] ?? raw["imageUrl"] ?? ""),
+    isActive: raw["isActive"] !== false,
+    ...(typeof raw["brandName"] === "string" ? { brandName: raw["brandName"] } : {}),
+    ...(typeof raw["variantName"] === "string" ? { variantName: raw["variantName"] } : {}),
+    ...(raw["addedAt"] !== undefined ? { addedAt: raw["addedAt"] } : {}),
   };
 }
 
@@ -108,18 +134,212 @@ async function readEntries(): Promise<CustomerWishlistEntry[]> {
 }
 
 export const wishlistService = {
-  async getWishlists(_userId?: string): Promise<Wishlist[]> { return []; },
-  async createWishlist(_title: string, _description = "", _userId?: string): Promise<Wishlist> { throw new Error("Custom wishlist collections are not available."); },
-  async renameWishlist(_id: string, _title: string, _description?: string): Promise<Wishlist> { throw new Error("Custom wishlist collections are not available."); },
-  async deleteWishlist(_id: string, _userId?: string): Promise<void> { throw new Error("Custom wishlist collections are not available."); },
-  async moveProductToCollection(_id: string, _targetWishlistId: string): Promise<WishlistProduct> { throw new Error("Custom wishlist collections are not available."); },
+  async getWishlists(_userId?: string): Promise<Wishlist[]> {
+    const { customerId, adapter } = await resolveWishlistOwner();
+    try {
+      const rows = await adapter.getCustomerWishlists(customerId);
+      return rows.map((row) => {
+        const createdAt = row["createdAt"];
+        const createdAtText = typeof createdAt === "string"
+          ? createdAt
+          : createdAt && typeof createdAt === "object" && "toDate" in createdAt && typeof createdAt.toDate === "function"
+            ? (createdAt.toDate() as Date).toISOString()
+            : new Date().toISOString();
+        return {
+          id: String(row["id"] ?? "").trim(),
+          userId: customerId,
+          title: String(row["title"] ?? row["name"] ?? "Wishlist").trim(),
+          description: String(row["description"] ?? "").trim(),
+          createdAt: createdAtText,
+        };
+      }).filter((wishlist) => wishlist.id);
+    } catch (error) {
+      throw customerFacingStorageError(error);
+    }
+  },
+  async createWishlist(title: string, description = "", _userId?: string): Promise<Wishlist> {
+    const cleanTitle = title.trim();
+    const cleanDescription = description.trim();
+    if (!cleanTitle || cleanTitle.length > 256) throw new Error("Enter a folder name up to 256 characters.");
+
+    const { customerId, adapter } = await resolveWishlistOwner();
+    const rootEntries = (await adapter.getCustomerWishlistProducts(customerId))
+      .map(asEntry)
+      .filter((entry) => entry.productId && entry.isActive);
+    const catalog = await productService.getProducts();
+    const availableProducts = rootEntries.flatMap((entry) => {
+      const product = catalog.find((candidate) => candidate.id === entry.productId);
+      if (!product || product.isActive === false) return [];
+      const savedVariant = entry.variantName?.trim().toLowerCase();
+      const matchedIndex = product.options.findIndex((option) =>
+        `${option.unitSize} ${option.unit}`.trim().toLowerCase() === savedVariant
+      );
+      const optionIndex = matchedIndex >= 0 ? matchedIndex : 0;
+      const option = product.options[optionIndex];
+      if (!option || option.stock <= 0) return [];
+      const item: Record<string, unknown> = {
+        productId: product.id,
+        optionIndex,
+        unit: option.unit,
+        unitSize: String(option.unitSize),
+        name: product.name,
+        price: option.offerPrice,
+        mrp: option.mrp,
+        image: product.imageUrl || product.images?.[0] || entry.imageUrl || "",
+        isActive: true,
+        variantName: `${option.unitSize} ${option.unit}`.trim(),
+        ...(product.brand ? { brandName: product.brand } : {}),
+      };
+      return [{ productId: product.id, payload: item }];
+    });
+
+    const randomId = globalThis.crypto?.randomUUID?.().replace(/-/g, "") || `${Date.now()}${Math.random().toString(36).slice(2)}`;
+    const id = `wl_${randomId.slice(0, 24)}`;
+    const wishlist: Wishlist = {
+      id,
+      userId: customerId,
+      title: cleanTitle,
+      description: cleanDescription,
+      createdAt: new Date().toISOString(),
+    };
+    const createdProductIds: string[] = [];
+    try {
+      await adapter.createCustomerWishlist(customerId, id, wishlist as unknown as Record<string, unknown>);
+      for (const product of availableProducts) {
+        await adapter.saveCustomerWishlistFolderProduct(customerId, id, product.productId, product.payload);
+        createdProductIds.push(product.productId);
+      }
+      return wishlist;
+    } catch (error) {
+      await Promise.allSettled(createdProductIds.map((productId) =>
+        adapter.deleteCustomerWishlistFolderProduct(customerId, id, productId)
+      ));
+      await Promise.allSettled([adapter.deleteCustomerWishlist(customerId, id)]);
+      throw customerFacingStorageError(error);
+    }
+  },
+  async renameWishlist(id: string, title: string, description = ""): Promise<Wishlist> {
+    const cleanTitle = title.trim();
+    if (!cleanTitle || cleanTitle.length > 256) throw new Error("Enter a folder name up to 256 characters.");
+    const { customerId, adapter } = await resolveWishlistOwner();
+    const updated = { title: cleanTitle, description: description.trim() };
+    try {
+      await adapter.updateCustomerWishlist(customerId, id, updated);
+      return { id, userId: customerId, ...updated, createdAt: new Date().toISOString() };
+    } catch (error) { throw customerFacingStorageError(error); }
+  },
+  async deleteWishlist(id: string, _userId?: string): Promise<void> {
+    const { customerId, adapter } = await resolveWishlistOwner();
+    try {
+      const products = await adapter.getCustomerWishlistFolderProducts(customerId, id);
+      for (const product of products) {
+        const productId = String(product["productId"] ?? product["id"] ?? "");
+        if (!productId) continue;
+        const price = Number(product["price"] ?? product["sellingPrice"] ?? 0);
+        const rootPayload: Record<string, unknown> = {
+          productId,
+          productName: String(product["name"] ?? product["productName"] ?? "Saved product"),
+          sellingPrice: price,
+          mrp: Number(product["mrp"] ?? price),
+          variantName: String(product["variantName"] ?? ""),
+          imageUrl: String(product["image"] ?? product["imageUrl"] ?? ""),
+          isActive: product["isActive"] !== false,
+        };
+        if (typeof product["brandName"] === "string") rootPayload["brandName"] = product["brandName"];
+        await adapter.saveCustomerWishlistProduct(customerId, productId, rootPayload);
+        await adapter.deleteCustomerWishlistFolderProduct(customerId, id, productId);
+      }
+      await adapter.deleteCustomerWishlist(customerId, id);
+    } catch (error) { throw customerFacingStorageError(error); }
+  },
+  async moveProductToCollection(productId: string, targetWishlistId: string, sourceWishlistId = "all"): Promise<WishlistProduct> {
+    const { customerId, adapter } = await resolveWishlistOwner();
+    const sourceId = sourceWishlistId === "wl_default" ? "all" : sourceWishlistId;
+    if (sourceId === targetWishlistId || (sourceId === "all" && targetWishlistId === "all")) {
+      const current = (await this.getWishlistProducts(sourceId)).find((item) => item.productId === productId);
+      if (current) return current;
+      throw new Error("This saved product is no longer available.");
+    }
+
+    let source: Record<string, unknown> | undefined;
+    if (sourceId === "all") {
+      source = (await adapter.getCustomerWishlistProducts(customerId))
+        .map((row) => ({ ...row, ...asEntry(row) }))
+        .find((row) => String(row["productId"] ?? "") === productId);
+    } else {
+      source = (await adapter.getCustomerWishlistFolderProducts(customerId, sourceId))
+        .find((row) => String(row["productId"] ?? row["id"] ?? "") === productId);
+    }
+    if (!source) throw new Error("This saved product is no longer available.");
+
+    const variantName = String(source["variantName"] ?? "").trim();
+    const productName = String(source["productName"] ?? source["name"] ?? "Saved product");
+    const price = Number(source["sellingPrice"] ?? source["price"] ?? 0);
+    const mrp = Number(source["mrp"] ?? price);
+    if (targetWishlistId === "all" || targetWishlistId === "wl_default") {
+      const rootPayload: Record<string, unknown> = {
+        productId,
+        productName,
+        sellingPrice: price,
+        mrp,
+        variantName,
+        imageUrl: String(source["imageUrl"] ?? source["image"] ?? ""),
+        isActive: source["isActive"] !== false,
+      };
+      if (typeof source["brandName"] === "string") rootPayload["brandName"] = source["brandName"];
+      await adapter.saveCustomerWishlistProduct(customerId, productId, rootPayload);
+    } else {
+      const folderPayload: Record<string, unknown> = {
+        productId,
+        optionIndex: typeof source["optionIndex"] === "number" ? source["optionIndex"] : 0,
+        unit: String(source["unit"] ?? ""),
+        unitSize: String(source["unitSize"] ?? ""),
+        name: productName,
+        price,
+        mrp,
+        image: String(source["image"] ?? source["imageUrl"] ?? ""),
+        isActive: source["isActive"] !== false,
+        variantName,
+      };
+      if (typeof source["brandName"] === "string") folderPayload["brandName"] = source["brandName"];
+      await adapter.saveCustomerWishlistFolderProduct(customerId, targetWishlistId, productId, folderPayload);
+    }
+
+    if (sourceId === "all") await adapter.deleteCustomerWishlistProduct(customerId, productId);
+    else await adapter.deleteCustomerWishlistFolderProduct(customerId, sourceId, productId);
+    const saved = targetWishlistId === "all" || targetWishlistId === "wl_default"
+      ? asUiItem(asEntry({ ...source, productId, productName, sellingPrice: price, mrp, variantName, isActive: true }), "all", customerId)
+      : asFolderUiItem({ ...source, productId, name: productName, price, mrp, variantName }, customerId, targetWishlistId);
+    return saved;
+  },
   getEffectiveUserId(userId?: string): string {
     if (!userId?.trim()) return "";
     try { return resolveCustomerDataSource(userId).canonicalCustomerId; }
     catch { return userId.trim(); }
   },
-  async getWishlistProducts(_wishlistId?: string, _userId?: string): Promise<WishlistProduct[]> {
-    return (await readEntries()).map(asUiItem);
+  async getWishlistProducts(wishlistId?: string, _userId?: string): Promise<WishlistProduct[]> {
+    const { customerId, adapter } = await resolveWishlistOwner();
+    try {
+      if (wishlistId && wishlistId !== "all") {
+        const rows = await adapter.getCustomerWishlistFolderProducts(customerId, wishlistId);
+        return rows.map((row) => asFolderUiItem(row, customerId, wishlistId)).filter((item) => item.productId);
+      }
+      const roots = (await adapter.getCustomerWishlistProducts(customerId))
+        .map(asEntry)
+        .filter((entry) => entry.productId)
+        .map((entry) => asUiItem(entry, "all", customerId));
+      if (wishlistId === "all" || typeof adapter.getCustomerWishlists !== "function") return roots;
+      const folders = await adapter.getCustomerWishlists(customerId);
+      const folderItems = await Promise.all(folders.map(async (folder) => {
+        const id = String(folder["id"] ?? "").trim();
+        if (!id || typeof adapter.getCustomerWishlistFolderProducts !== "function") return [];
+        const rows = await adapter.getCustomerWishlistFolderProducts(customerId, id);
+        return rows.map((row) => asFolderUiItem(row, customerId, id)).filter((item) => item.productId);
+      }));
+      return [...roots, ...folderItems.flat()];
+    } catch (error) {
+      throw customerFacingStorageError(error);
+    }
   },
 
   async getCustomerWishlistEntries(): Promise<CustomerWishlistEntry[]> {
@@ -152,12 +372,45 @@ export const wishlistService = {
     };
     try { await adapter.saveCustomerWishlistProduct(customerId, product.id, entry); }
     catch (error) { throw customerFacingStorageError(error); }
-    return { added: true, item: asUiItem(asEntry(entry)) };
+    return { added: true, item: asUiItem(asEntry(entry), "all", customerId) };
   },
 
-  async removeWishlistProduct(productId: string): Promise<void> {
+  async saveProductToWishlistFolder(product: Product, optionIndex: number, wishlistId: string): Promise<void> {
+    if (!product?.id || !product.name || product.isActive === false) throw new Error("This product is unavailable.");
+    const cleanWishlistId = wishlistId.trim();
+    if (!cleanWishlistId || cleanWishlistId === "all" || cleanWishlistId === "wl_default") {
+      throw new Error("Choose a wishlist folder.");
+    }
+    const option = product.options?.[optionIndex] ?? product.options?.[0];
+    if (!option) throw new Error("Product pricing is unavailable.");
     const { customerId, adapter } = await resolveWishlistOwner();
-    try { await adapter.deleteCustomerWishlistProduct(customerId, productId); }
+    const payload: Record<string, unknown> = {
+      productId: product.id,
+      optionIndex,
+      unit: option.unit,
+      unitSize: String(option.unitSize),
+      name: product.name,
+      price: option.offerPrice,
+      mrp: option.mrp,
+      image: product.imageUrl || product.images?.[0] || "/placeholders/spices.svg",
+      isActive: true,
+      variantName: `${option.unitSize} ${option.unit}`.trim(),
+      ...(product.brand ? { brandName: product.brand } : {}),
+    };
+    try {
+      await adapter.saveCustomerWishlistFolderProduct(customerId, cleanWishlistId, product.id, payload);
+    } catch (error) { throw customerFacingStorageError(error); }
+  },
+
+  async removeWishlistProduct(productId: string, wishlistId = "all"): Promise<void> {
+    const { customerId, adapter } = await resolveWishlistOwner();
+    try {
+      if (wishlistId === "all" || wishlistId === "wl_default") {
+        await adapter.deleteCustomerWishlistProduct(customerId, productId);
+      } else {
+        await adapter.deleteCustomerWishlistFolderProduct(customerId, wishlistId, productId);
+      }
+    }
     catch (error) { throw customerFacingStorageError(error); }
   },
 
@@ -166,12 +419,28 @@ export const wishlistService = {
   },
 
   async moveAllInStockToCart(
-    _wishlistId?: string,
+    wishlistId?: string,
     allProducts?: Product[],
     _userId?: string,
     isVIP = false,
   ): Promise<{ addedCount: number; skippedCount: number; unavailableNames: string[] }> {
-    const entries = await readEntries();
+    let entries: CustomerWishlistEntry[];
+    if (wishlistId && wishlistId !== "all" && wishlistId !== "wl_default") {
+      const { customerId, adapter } = await resolveWishlistOwner();
+      const rows = await adapter.getCustomerWishlistFolderProducts(customerId, wishlistId);
+      entries = rows.map((row) => ({
+        productId: String(row["productId"] ?? row["id"] ?? ""),
+        productName: String(row["name"] ?? row["productName"] ?? "Saved product"),
+        ...(typeof row["brandName"] === "string" ? { brandName: row["brandName"] } : {}),
+        ...(typeof row["image"] === "string" ? { imageUrl: row["image"] } : {}),
+        sellingPrice: Number(row["price"] ?? row["sellingPrice"] ?? 0),
+        ...(typeof row["mrp"] === "number" ? { mrp: row["mrp"] } : {}),
+        ...(typeof row["variantName"] === "string" ? { variantName: row["variantName"] } : {}),
+        isActive: row["isActive"] !== false,
+      })).filter((entry) => entry.productId);
+    } else {
+      entries = await readEntries();
+    }
     const catalog = allProducts?.length ? allProducts : await productService.getProducts();
     const { customerId } = await resolveWishlistOwner();
     let addedCount = 0;

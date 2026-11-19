@@ -14,11 +14,11 @@ import { settingsService } from "../services/settingsService";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Sri Amman Smart Store" },
+      { title: "Sriman Smart Store" },
       {
         name: "description",
         content:
-          "Shop South Indian groceries, heritage grains, and everyday essentials from Sri Amman Smart Store.",
+          "Shop South Indian groceries, heritage grains, and everyday essentials from Sriman Smart Store.",
       },
     ],
   }),
@@ -43,7 +43,6 @@ function HomePage() {
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(499);
   const [showAllCategories, setShowAllCategories] = useState(false);
   const categoryScroller = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     let cancelled = false;
     settingsService
@@ -158,8 +157,8 @@ function HomePage() {
   return (
     <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased">
       <StoreHeader />
-      <main className="min-h-[calc(100vh-80px)] w-full overflow-hidden bg-surface pt-20">
-        <div className="w-full pb-24 md:pb-10">
+      <main className="home-page-main min-h-[calc(100vh-80px)] w-full overflow-hidden bg-surface pt-20">
+        <div className="w-full pb-0 md:pb-10">
           <div className="relative z-30 mx-4 mb-3 lg:hidden">
             <form onSubmit={handleSearch} className="flex items-center gap-1 rounded-full bg-surface-container-low px-2 py-1 ring-1 ring-outline-variant/30">
               <input
@@ -242,28 +241,54 @@ function HomePage() {
           <div className="mx-auto mt-7 flex w-full max-w-[1440px] flex-col gap-7 px-4 sm:px-6 lg:mt-9 lg:gap-9 lg:px-8">
             <section
               aria-label="Store benefits"
-              className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3"
+              className="-mx-4 overflow-hidden px-4 sm:mx-0 sm:overflow-visible sm:px-0"
             >
-              <Benefit
-                icon="local_shipping"
-                title={`Free Delivery on ₹${freeDeliveryThreshold}+`}
-                detail="Zero packaging or surge fees"
-              />
-              <Benefit
-                icon="timer"
-                title="60 Min Express Window"
-                detail="Quick dispatch from our hub"
-              />
-              <Benefit
-                icon="verified_user"
-                title="Quality Assured"
-                detail="Doorstep inspection support"
-              />
-              <Benefit
-                icon="monetization_on"
-                title="Earn Smart Coins"
-                detail="Redeem against your basket"
-              />
+              <div className="benefits-track flex w-max sm:w-full">
+                <div className="benefits-group flex w-max gap-2 pr-2 sm:grid sm:w-full sm:grid-cols-4 sm:gap-3 sm:pr-0">
+                  <Benefit
+                    icon="local_shipping"
+                    title={`Free Delivery on ₹${freeDeliveryThreshold}+`}
+                    detail="Zero packaging or surge fees"
+                  />
+                  <Benefit
+                    icon="timer"
+                    title="60 Min Express Window"
+                    detail="Quick dispatch from our hub"
+                  />
+                  <Benefit
+                    icon="verified_user"
+                    title="Quality Assured"
+                    detail="Doorstep inspection support"
+                  />
+                  <Benefit
+                    icon="monetization_on"
+                    title="Earn Smart Coins"
+                    detail="Redeem against your basket"
+                  />
+                </div>
+                <div aria-hidden="true" className="benefits-group flex w-max gap-2 pr-2 sm:hidden">
+                  <Benefit
+                    icon="local_shipping"
+                    title={`Free Delivery on ₹${freeDeliveryThreshold}+`}
+                    detail="Zero packaging or surge fees"
+                  />
+                  <Benefit
+                    icon="timer"
+                    title="60 Min Express Window"
+                    detail="Quick dispatch from our hub"
+                  />
+                  <Benefit
+                    icon="verified_user"
+                    title="Quality Assured"
+                    detail="Doorstep inspection support"
+                  />
+                  <Benefit
+                    icon="monetization_on"
+                    title="Earn Smart Coins"
+                    detail="Redeem against your basket"
+                  />
+                </div>
+              </div>
             </section>
 
             {/* Category Section */}
@@ -376,7 +401,7 @@ function HomePage() {
                 <div className="max-w-2xl">
                   <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#fea619]/20 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#fea619]">
                     <span className="material-symbols-outlined text-base">workspace_premium</span>
-                    Sri Amman VIP Prestige Club
+                    Sriman VIP Prestige Club
                   </div>
                   <h2 className="mb-2 text-xl font-extrabold text-white sm:text-3xl">
                     Unlock Exclusive Member Pricing on Every Order
@@ -519,7 +544,7 @@ function PromotionalBannerCarousel({ banners, loading }: { banners: Banner[]; lo
     >
       <a
         href={bannerHref}
-        aria-label={banner ? `View promotion: ${title}` : "Shop Sri Amman groceries"}
+        aria-label={banner ? `View promotion: ${title}` : "Shop Sriman groceries"}
         className="relative block aspect-[1.7/1] max-h-[440px] min-h-[180px] w-full overflow-hidden sm:aspect-[3.1/1]"
         style={{ backgroundColor: banner?.bannerBackgroundColor || "#f4f4f5" }}
       >
@@ -538,7 +563,7 @@ function PromotionalBannerCarousel({ banners, loading }: { banners: Banner[]; lo
             <source media="(max-width: 640px)" srcSet={mobileImage || imageSrc} />
             <img
               src={imageSrc}
-              alt={title || "Sri Amman Smart Store grocery collection"}
+              alt={title || "Sriman Smart Store grocery collection"}
               className="h-full w-full object-cover"
               fetchPriority="high"
             />
@@ -772,15 +797,15 @@ function ProductCategorySection({
 
 function Benefit({ icon, title, detail }: { icon: string; title: string; detail: string }) {
   return (
-    <div className="group flex min-w-0 items-start gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-2.5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/65 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none sm:items-center sm:gap-3 sm:p-3">
-      <span className="material-symbols-outlined mt-0.5 shrink-0 text-xl text-primary transition-transform duration-200 group-hover:scale-110 sm:mt-0 sm:text-2xl motion-reduce:transform-none motion-reduce:transition-none">
+    <div className="group flex w-[calc(50vw-1.0rem)] max-w-[280px] shrink-0 items-center gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-2.5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-1 hover:border-primary/65 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none sm:w-auto sm:max-w-none sm:min-w-0 sm:shrink sm:gap-3 sm:p-3">
+      <span className="material-symbols-outlined shrink-0 text-xl text-primary transition-transform duration-200 group-hover:scale-110 sm:text-2xl motion-reduce:transform-none motion-reduce:transition-none">
         {icon}
       </span>
       <span className="min-w-0">
-        <span className="block whitespace-normal break-words text-[10px] font-bold leading-snug text-on-surface sm:text-xs">
+        <span className="block whitespace-normal break-words text-[10px] font-bold leading-tight text-on-surface sm:text-xs sm:leading-snug">
           {title}
         </span>
-        <span className="mt-1 block whitespace-normal break-words text-[8px] leading-snug text-on-surface-variant sm:text-[11px]">
+        <span className="mt-1 hidden whitespace-normal break-words text-[8px] leading-snug text-on-surface-variant sm:block sm:text-[11px]">
           {detail}
         </span>
       </span>

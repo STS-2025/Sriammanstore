@@ -24,7 +24,7 @@ import type { User } from "../types";
  * ============================================================================
  * 1. LEGACY IDENTITY CONTRACT (`sri-amman-smart-store`)
  * ============================================================================
- * In the Sri Amman Smart Store Firebase schema, customer documents and all
+ * In the Sriman Smart Store Firebase schema, customer documents and all
  * customer-scoped subcollections (`cart`, `addresses`, `orders`, `coinsHistory`,
  * `refferals`, `wishlists`, `notifications`) are keyed by sequential SASS
  * customer IDs (`SASS0000001`), NOT by Firebase Authentication UIDs:
@@ -825,7 +825,7 @@ export const customerIdentityService = {
   },
 
   /**
-   * Safely resolves a verified Firebase Auth user to their canonical Sri Amman
+   * Safely resolves a verified Firebase Auth user to their canonical Sriman
    * Smart Store `User` profile via the read-only two-step lookup:
    *   `Firebase Auth UID -> usersByUid/{uid} -> { userDocId, uid } -> users/{userDocId}`
    *
@@ -884,7 +884,7 @@ export const customerIdentityService = {
         userDocId: null,
         profile: null,
         requiresRegistration: true,
-        message: `No linked Sri Amman Smart Store customer profile found for Firebase UID "${uid}". New customer registration or phone-verified account linking is required.`,
+        message: `No linked Sriman Smart Store customer profile found for Firebase UID "${uid}". New customer registration or phone-verified account linking is required.`,
       };
     }
 

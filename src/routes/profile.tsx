@@ -11,7 +11,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
-      { title: "Profile Information | Sri Amman Smart Store" },
+      { title: "Profile Information | Sriman Smart Store" },
       { name: "description", content: "Review and update your customer profile information." },
     ],
   }),
@@ -123,10 +123,10 @@ function ProfilePage() {
         </ol>
       </nav>
 
-      <section className="rounded-3xl border border-outline-variant/20 bg-white p-4 shadow-sm sm:p-7">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-emerald-50 text-lg font-black text-primary ring-1 ring-primary/10">
+      <section className="rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-7">
+        <div className="mb-4 flex items-center justify-between gap-2 sm:mb-6 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-emerald-50 text-base font-black text-primary ring-1 ring-primary/10 sm:h-12 sm:w-12 sm:rounded-2xl sm:text-lg">
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
@@ -134,24 +134,24 @@ function ProfilePage() {
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-extrabold text-on-surface sm:text-2xl">Profile Information</h1>
-              <p className="mt-1 text-sm text-on-surface-variant">Review and manage your personal details.</p>
+              <h1 className="!text-base !leading-tight font-extrabold text-on-surface sm:!text-2xl">Profile Information</h1>
+              <p className="mt-1 hidden text-sm text-on-surface-variant sm:block">Review and manage your personal details.</p>
             </div>
           </div>
           {!isEditing && (
             <button
               type="button"
               onClick={() => setIsEditing(true)}
-              className="inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-xl bg-surface-container-low px-4 text-sm font-bold text-on-surface hover:bg-surface-container"
+              className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-surface-container-low px-3 text-sm font-bold text-on-surface hover:bg-surface-container sm:gap-2 sm:self-start sm:rounded-xl sm:px-4"
             >
-              <span className="material-symbols-outlined text-[17px]">edit</span>
+              <span className="material-symbols-outlined text-[16px] sm:text-[17px]">edit</span>
               Edit Profile
             </button>
           )}
         </div>
 
         {isEditing ? (
-          <form onSubmit={handleSave} className="space-y-4">
+          <form onSubmit={handleSave} className="space-y-2 sm:space-y-4">
             <ProfileInput label="Full Name" value={name} onChange={setName} />
             <div>
               <div className="mb-1 flex items-center justify-between gap-2">
@@ -177,7 +177,7 @@ function ProfilePage() {
                 <input
                   value={user.phone || "No phone linked"}
                   readOnly
-                  className="min-h-11 min-w-0 flex-1 rounded-xl border border-outline-variant/20 bg-surface-container-low px-3 text-sm text-on-surface-variant"
+                  className="min-h-9 min-w-0 flex-1 rounded-lg border border-outline-variant/20 bg-surface-container-low px-2.5 text-xs text-on-surface-variant sm:min-h-11 sm:rounded-xl sm:px-3 sm:text-sm"
                 />
               </div>
             </div>
@@ -185,32 +185,32 @@ function ProfilePage() {
             <ProfileInput label="Preferred Store Language" value={preferredLanguage} onChange={setPreferredLanguage} />
             <ProfileInput label="Birthday" type="date" value={birthday} onChange={setBirthday} />
             <ProfileInput label="Weekly Grocery Rhythm" value={groceryRhythm} onChange={setGroceryRhythm} />
-            <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+            <div className="flex flex-row gap-2 pt-1 sm:gap-3 sm:pt-2 sm:justify-end">
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="min-h-11 rounded-xl bg-surface-container-low px-5 text-sm font-bold text-on-surface"
+                className="min-h-9 flex-1 rounded-lg bg-surface-container-low px-3 text-xs font-bold text-on-surface sm:min-h-11 sm:flex-none sm:rounded-xl sm:px-5 sm:text-sm"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="min-h-11 rounded-xl bg-primary px-5 text-sm font-bold text-white disabled:opacity-60"
+                className="min-h-9 flex-1 rounded-lg bg-primary px-3 text-xs font-bold text-white disabled:opacity-60 sm:min-h-11 sm:flex-none sm:rounded-xl sm:px-5 sm:text-sm"
               >
                 {isSaving ? "Saving…" : "Save Changes"}
               </button>
             </div>
           </form>
         ) : (
-          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
             {profileFields.map((field) => (
-              <div key={field.label} className="min-w-0 rounded-2xl border border-outline-variant/15 bg-surface-container-low/50 p-3.5">
-                <dt className="mb-2 flex items-center gap-2 text-xs font-semibold text-on-surface-variant">
+              <div key={field.label} className="min-w-0 rounded-xl border border-outline-variant/15 bg-surface-container-low/50 p-3 sm:rounded-2xl sm:p-3.5">
+                <dt className="mb-1.5 flex items-center gap-2 text-xs font-semibold leading-tight text-on-surface-variant sm:mb-2">
                   <span className="material-symbols-outlined text-[16px] text-primary">{field.icon}</span>
                   {field.label}
                 </dt>
-                <dd className="flex flex-wrap items-center justify-between gap-2 text-sm font-bold text-on-surface">
+                <dd className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-sm font-bold leading-tight text-on-surface sm:leading-normal">
                   <span className="min-w-0 break-words">{field.value}</span>
                   {field.label === "Mobile Number" && (
                     <span className="flex shrink-0 items-center gap-2">
@@ -228,7 +228,7 @@ function ProfilePage() {
                       <button
                         type="button"
                         onClick={() => setShowPhoneVerification(true)}
-                        className="inline-flex min-h-8 items-center gap-1 rounded-lg px-1.5 text-[10px] font-bold text-primary hover:bg-primary/5"
+                        className="inline-flex min-h-7 items-center gap-0.5 rounded-lg px-1 text-[9px] font-bold text-primary hover:bg-primary/5 sm:min-h-8 sm:gap-1 sm:px-1.5 sm:text-[10px]"
                       >
                         <span className="material-symbols-outlined text-[14px]">edit</span>
                         {user.phoneVerified ? "Change" : "Verify"}
@@ -276,7 +276,7 @@ function ProfileInput({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-11 w-full rounded-xl border border-outline-variant/20 bg-surface-container-low px-3 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="min-h-9 w-full rounded-lg border border-outline-variant/20 bg-surface-container-low px-2.5 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30 sm:min-h-11 sm:rounded-xl sm:px-3 sm:text-sm"
       />
     </label>
   );
@@ -286,7 +286,7 @@ function PageShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#f8faf8] font-body-md text-on-surface antialiased">
       <StoreHeader />
-      <main className="min-h-[calc(100vh-80px)] px-4 pb-24 pt-24 sm:px-6 lg:px-8">
+      <main className="min-h-[calc(100vh-80px)] px-3 pb-0 pt-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl">{children}</div>
       </main>
       <StoreFooter />

@@ -339,7 +339,7 @@ describe("Amman Coins & VIP Privilege Hub — Test Suite", () => {
       name: "Heritage Wood Churned Groundnut Oil",
       category: "Cold Pressed Oils",
       categorySlug: "cold-pressed-oils",
-      brand: "Sri Amman Heritage",
+      brand: "Sriman Heritage",
       description: "Traditional wood churned groundnut oil.",
       tags: ["COLD-PRESSED", "ORGANIC"],
       rating: 4.9,

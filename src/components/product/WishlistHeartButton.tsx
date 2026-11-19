@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 interface WishlistHeartButtonProps {
   active: boolean;
-  onToggle: () => Promise<boolean> | boolean;
+  onToggle: () => Promise<boolean | undefined> | boolean | undefined;
   className?: string;
   size?: "sm" | "md" | "lg";
   label?: string;

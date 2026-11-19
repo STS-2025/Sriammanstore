@@ -33,7 +33,7 @@ export const Route = createFileRoute("/shop")({
   }),
   head: () => ({
     meta: [
-      { title: "Shop Groceries & Wood Pressed Oils — Sri Amman Smart Store" },
+      { title: "Shop Groceries & Wood Pressed Oils — Sriman Smart Store" },
       { name: "description", content: "Explore South Indian staples, grains, and oils." },
     ],
   }),
@@ -91,6 +91,20 @@ function ShopPage() {
   const [minDiscount, setMinDiscount] = useState(0);
   const [customPriceRange, setCustomPriceRange] = useState<{ min: number; max: number } | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const mobileFiltersHistoryRef = useRef(false);
+  const [isMobileRailCollapsed, setIsMobileRailCollapsed] = useState(false);
+  const [activeRailItem, setActiveRailItem] = useState("all");
+  const [isAllItemsView, setIsAllItemsView] = useState(true);
+  const [isOfferZoneSelected, setIsOfferZoneSelected] = useState(false);
+  const productListRef = useRef<HTMLElement>(null);
+
+  const closeMobileFilters = useCallback(() => {
+    if (mobileFiltersHistoryRef.current) {
+      mobileFiltersHistoryRef.current = false;
+      window.history.back();
+    }
+    setMobileFiltersOpen(false);
+  }, []);
 
   useEffect(() => {
     if (!searchParams.focusSearch) return;
@@ -191,15 +205,23 @@ function ShopPage() {
     if (!mobileFiltersOpen) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMobileFiltersOpen(false);
+      if (event.key === "Escape") closeMobileFilters();
+    };
+    const closeOnBack = () => {
+      mobileFiltersHistoryRef.current = false;
+      setMobileFiltersOpen(false);
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("popstate", closeOnBack);
+    window.history.pushState(window.history.state, "", window.location.href);
+    mobileFiltersHistoryRef.current = true;
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("popstate", closeOnBack);
     };
-  }, [mobileFiltersOpen]);
+  }, [mobileFiltersOpen, closeMobileFilters]);
 
   const catalogPriceBounds = useMemo(() => getCatalogPriceBounds(allProducts), [allProducts]);
   const activePriceRange = customPriceRange || catalogPriceBounds;
@@ -226,6 +248,34 @@ function ShopPage() {
     }
     return counts;
   }, [allProducts]);
+  const railCategories = useMemo(() => {
+    const items = categories
+      .map((category) => ({
+        slug: category.slug,
+        name: category.name,
+        tamilName: category.tamilName,
+        image: category.image,
+        count: categoryProductCounts.get(category.slug) || 0,
+      }))
+      .filter((category) => category.count > 0);
+    const knownSlugs = new Set(items.map((category) => category.slug));
+    for (const product of allProducts) {
+      if (knownSlugs.has(product.categorySlug)) continue;
+      knownSlugs.add(product.categorySlug);
+      items.push({
+        slug: product.categorySlug,
+        name: product.category,
+        tamilName: product.tamilName,
+        image: product.imageUrl || "/placeholders/grocery.svg",
+        count: categoryProductCounts.get(product.categorySlug) || 0,
+      });
+    }
+    return items;
+  }, [allProducts, categories, categoryProductCounts]);
+  const offerProductCount = useMemo(
+    () => allProducts.filter((product) => product.isOffer === true).length,
+    [allProducts],
+  );
   const filterCount = selectedCategories.length + selectedSubcategories.length + selectedBrands.length +
     selectedPackSizes.length + (onlyDeals ? 1 : 0) + (inStockOnly ? 1 : 0) +
     (minRating ? 1 : 0) + (minDiscount ? 1 : 0) + (customPriceRange ? 1 : 0);
@@ -268,12 +318,6 @@ function ShopPage() {
       })
       .filter((subcategory) => subcategory.count > 0);
   }, [allProducts, categories, selectedCategories]);
-  const categoryScopeProductCount = useMemo(
-    () => selectedCategories.length
-      ? allProducts.filter((product) => selectedCategories.includes(product.categorySlug)).length
-      : allProducts.length,
-    [allProducts, selectedCategories],
-  );
   const currentFilterState = useMemo(() => ({
     categories: selectedCategories,
     subcategories: selectedSubcategories,
@@ -305,6 +349,49 @@ function ShopPage() {
   const filteredProducts = useMemo(() => {
     return filterAndSortProducts(allProducts, currentFilterState, catalogPriceBounds);
   }, [allProducts, currentFilterState, catalogPriceBounds]);
+  const offerZoneProducts = useMemo(
+    () => filteredProducts.filter((product) => product.isOffer === true),
+    [filteredProducts],
+  );
+  const visibleRailProducts = isOfferZoneSelected ? offerZoneProducts : filteredProducts;
+  const productSections = useMemo(() => {
+    if (isOfferZoneSelected) {
+      return visibleRailProducts.length > 0
+        ? [{ slug: "offers", name: "Offer Zone", tamilName: undefined, products: visibleRailProducts }]
+        : [];
+    }
+
+    return railCategories
+      .map((category) => ({
+        slug: category.slug,
+        name: category.name,
+        tamilName: category.tamilName,
+        products: visibleRailProducts.filter((product) => product.categorySlug === category.slug),
+      }))
+      .filter((section) => section.products.length > 0);
+  }, [isOfferZoneSelected, railCategories, visibleRailProducts]);
+  const mixedAllItemsProducts = useMemo(() => {
+    if (sortOption !== "popular") return filteredProducts;
+
+    const productsByCategory = railCategories
+      .map((category) => filteredProducts.filter((product) => product.categorySlug === category.slug))
+      .filter((products) => products.length > 0);
+    const mixedProducts: Product[] = [];
+    const longestCategory = Math.max(0, ...productsByCategory.map((products) => products.length));
+    for (let productIndex = 0; productIndex < longestCategory; productIndex += 1) {
+      for (const products of productsByCategory) {
+        const product = products[productIndex];
+        if (product) mixedProducts.push(product);
+      }
+    }
+    return mixedProducts;
+  }, [filteredProducts, railCategories, sortOption]);
+  const categoryScopeProductCount = useMemo(
+    () => selectedCategories.length
+      ? allProducts.filter((product) => selectedCategories.includes(product.categorySlug)).length
+      : allProducts.length,
+    [allProducts, selectedCategories],
+  );
 
   // Reset browse/search state when the current selection has no products.
   const handleResetCatalog = () => {
@@ -319,6 +406,10 @@ function ShopPage() {
     setMinRating(0);
     setMinDiscount(0);
     setCustomPriceRange(null);
+    setIsOfferZoneSelected(false);
+    setActiveRailItem("all");
+    setIsAllItemsView(true);
+    setIsMobileRailCollapsed(false);
   };
 
   const toggleSelection = (items: string[], item: string, setter: (next: string[]) => void) => {
@@ -327,6 +418,67 @@ function ShopPage() {
 
   const handleSelectRailSubcategory = (subcategory?: string) => {
     setSelectedSubcategories(subcategory ? [subcategory] : []);
+  };
+
+  const scrollProductListTo = (sectionSlug?: string) => {
+    const productList = productListRef.current;
+    if (!productList) return;
+    if (!sectionSlug) {
+      productList.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    const section = document.getElementById(`shop-category-${sectionSlug}`);
+    if (!section) return;
+    const targetTop = section.getBoundingClientRect().top - productList.getBoundingClientRect().top + productList.scrollTop;
+    productList.scrollTo({ top: targetTop, behavior: "smooth" });
+  };
+
+  const handleSelectRailCategory = (categorySlug: string) => {
+    setSelectedCategories([]);
+    setSelectedSubcategories([]);
+    setIsOfferZoneSelected(false);
+    setIsAllItemsView(false);
+    setActiveRailItem(categorySlug);
+    window.requestAnimationFrame(() => scrollProductListTo(categorySlug));
+  };
+
+  const handleSelectOfferZone = () => {
+    setSelectedCategories([]);
+    setSelectedSubcategories([]);
+    setOnlyDeals(false);
+    setIsOfferZoneSelected(true);
+    setIsAllItemsView(false);
+    setActiveRailItem("offers");
+    scrollProductListTo();
+  };
+
+  const handleSelectAllItems = () => {
+    setSelectedCategories([]);
+    setSelectedSubcategories([]);
+    setIsOfferZoneSelected(false);
+    setIsAllItemsView(true);
+    setActiveRailItem("all");
+    setIsMobileRailCollapsed(true);
+    scrollProductListTo();
+  };
+
+  const handleProductListScroll = () => {
+    if (isOfferZoneSelected) return;
+    const productList = productListRef.current;
+    if (!productList) return;
+
+    const listTop = productList.getBoundingClientRect().top + 24;
+    const sections = Array.from(productList.querySelectorAll<HTMLElement>("[data-shop-category-section]"));
+    let activeSlug = sections[0]?.dataset["shopCategorySection"];
+    for (const section of sections) {
+      if (section.getBoundingClientRect().top <= listTop) {
+        activeSlug = section.dataset["shopCategorySection"];
+      } else {
+        break;
+      }
+    }
+    if (activeSlug) setActiveRailItem(activeSlug);
   };
 
   // Active category display title
@@ -349,13 +501,13 @@ function ShopPage() {
           <p className={`${mobile ? "text-xs" : "text-[11px]"} text-on-surface-variant`}>{filteredProducts.length} products</p>
         </div>
         <div className="flex items-center gap-3">
-          {filterCount > 0 && (
+          {!mobile && filterCount > 0 && (
             <button type="button" onClick={handleResetCatalog} className={`${mobile ? "text-sm" : "text-xs"} font-bold text-primary hover:underline`}>
               Clear all
             </button>
           )}
           {mobile && (
-            <button type="button" onClick={() => setMobileFiltersOpen(false)} aria-label="Close filters" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-container-low">
+            <button type="button" onClick={closeMobileFilters} aria-label="Close filters" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-surface-container-low">
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
           )}
@@ -390,7 +542,7 @@ function ShopPage() {
 
         {railSubcategories.length > 0 && (
           <details open className="py-3">
-            <summary className={`cursor-pointer list-none ${mobile ? "text-sm" : "text-xs"} font-extrabold`}>Aisle / subcategory</summary>
+            <summary className={`cursor-pointer list-none ${mobile ? "text-sm" : "text-xs"} font-extrabold`}>Subcategory</summary>
             <div className="mt-3 space-y-2">
               {railSubcategories.map((subcategory) => (
                 <label key={subcategory.name} className={`flex cursor-pointer items-center gap-2 ${mobile ? "text-sm" : "text-xs"}`}>
@@ -539,8 +691,13 @@ function ShopPage() {
         
       </div>
       {mobile && (
-        <div className="sticky bottom-0 border-t border-outline-variant/15 bg-surface-container-lowest p-3">
-          <button type="button" onClick={() => setMobileFiltersOpen(false)} className="w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white">
+        <div className="sticky bottom-0 flex items-center gap-2 border-t border-outline-variant/15 bg-surface-container-lowest p-3">
+          {filterCount > 0 && (
+            <button type="button" onClick={handleResetCatalog} className="shrink-0 rounded-xl border border-outline-variant/25 px-3 py-2.5 text-sm font-bold text-primary">
+              Clear
+            </button>
+          )}
+          <button type="button" onClick={closeMobileFilters} className="min-w-0 flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-white">
             Show {filteredProducts.length} results
           </button>
         </div>
@@ -626,34 +783,56 @@ function ShopPage() {
             </div>
           </header>
 
-          {/* 3. Image subcategory sidebar and product results share a top edge */}
-          <div className="grid grid-cols-[64px_minmax(0,1fr)] items-start gap-2 sm:grid-cols-[76px_minmax(0,1fr)] sm:gap-3 md:grid-cols-[96px_minmax(0,1fr)] md:gap-4 lg:grid-cols-[112px_minmax(0,1fr)] lg:gap-5">
-            <aside aria-label="Shop by subcategory" className="sticky top-[88px] flex max-h-[calc(100dvh-100px)] flex-col gap-1 overflow-y-auto overscroll-contain pb-2 pr-1 scrollbar-none md:top-[100px] md:max-h-[calc(100dvh-112px)] md:gap-2 md:pr-2">
+          {/* Category navigation and products scroll independently on mobile. */}
+          <div className={`grid h-[calc(100dvh-280px)] min-h-[280px] items-stretch gap-2 overflow-hidden md:h-auto md:min-h-0 md:overflow-visible md:gap-4 lg:gap-5 ${isMobileRailCollapsed ? "grid-cols-[24px_minmax(0,1fr)] sm:grid-cols-[24px_minmax(0,1fr)] md:grid-cols-[96px_minmax(0,1fr)] lg:grid-cols-[112px_minmax(0,1fr)]" : "grid-cols-[64px_minmax(0,1fr)] sm:grid-cols-[76px_minmax(0,1fr)] md:grid-cols-[96px_minmax(0,1fr)] lg:grid-cols-[112px_minmax(0,1fr)]"}`}>
+            {isMobileRailCollapsed && (
               <button
                 type="button"
-                aria-pressed={selectedSubcategories.length === 0}
-                onClick={() => handleSelectRailSubcategory()}
-                className={`flex w-full flex-col items-center gap-1 rounded-xl p-1 text-center transition-colors md:gap-1.5 md:p-2 ${selectedSubcategories.length === 0 ? "bg-primary/10 text-primary ring-1 ring-primary/25" : "text-on-surface-variant hover:bg-surface-container-low"}`}
+                aria-label="Open category menu"
+                onClick={() => setIsMobileRailCollapsed(false)}
+                className="sticky top-3 flex h-20 w-6 self-start items-center justify-center rounded-full border border-outline-variant/20 bg-surface-container-lowest text-primary shadow-sm md:hidden"
+              >
+                <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+              </button>
+            )}
+            <aside aria-label="Shop by category" className={`${isMobileRailCollapsed ? "hidden" : "flex"} h-full min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain pb-2 pr-1 scrollbar-none md:hidden`}>
+              <button
+                type="button"
+                aria-pressed={activeRailItem === "offers"}
+                onClick={handleSelectOfferZone}
+                className={`flex w-full flex-col items-center gap-1 rounded-xl p-1 text-center transition-colors md:gap-1.5 md:p-2 ${activeRailItem === "offers" ? "bg-primary/10 text-primary ring-1 ring-primary/25" : "text-on-surface-variant hover:bg-surface-container-low"}`}
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-tertiary-container text-on-tertiary-container md:h-14 md:w-14">
+                  <span className="material-symbols-outlined text-[22px] md:text-[26px]">local_offer</span>
+                </span>
+                <span className="line-clamp-2 text-[9px] font-bold leading-tight md:text-[11px]">Offer Zone</span>
+                <span className="text-[9px] text-on-surface-variant md:text-[10px]">{offerProductCount}</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={activeRailItem === "all"}
+                onClick={handleSelectAllItems}
+                className={`flex w-full flex-col items-center gap-1 rounded-xl p-1 text-center transition-colors md:gap-1.5 md:p-2 ${activeRailItem === "all" ? "bg-primary/10 text-primary ring-1 ring-primary/25" : "text-on-surface-variant hover:bg-surface-container-low"}`}
               >
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-container-low text-primary md:h-14 md:w-14">
                   <span className="material-symbols-outlined text-[22px] md:text-[26px]">apps</span>
                 </span>
                 <span className="line-clamp-2 text-[9px] font-bold leading-tight md:text-[11px]">All items</span>
-                <span className="text-[9px] text-on-surface-variant md:text-[10px]">{categoryScopeProductCount}</span>
+                <span className="text-[9px] text-on-surface-variant md:text-[10px]">{allProducts.length}</span>
               </button>
-              {railSubcategories.map((subcategory) => {
-                const isActive = selectedSubcategories.some((selected) => selected.toLocaleLowerCase() === subcategory.name.toLocaleLowerCase());
+              {railCategories.map((category) => {
+                const isActive = activeRailItem === category.slug;
                 return (
                   <button
-                    key={subcategory.name}
+                    key={category.slug}
                     type="button"
                     aria-pressed={isActive}
-                    onClick={() => handleSelectRailSubcategory(subcategory.name)}
+                    onClick={() => handleSelectRailCategory(category.slug)}
                     className={`flex w-full flex-col items-center gap-1 rounded-xl p-1 text-center transition-colors md:gap-1.5 md:p-2 ${isActive ? "bg-primary/10 text-primary ring-1 ring-primary/25" : "text-on-surface-variant hover:bg-surface-container-low"}`}
                   >
                     <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-surface-container-low md:h-14 md:w-14">
                       <img
-                        src={subcategory.image}
+                        src={category.image}
                         alt=""
                         loading="lazy"
                         className="h-full w-full object-cover"
@@ -663,8 +842,41 @@ function ShopPage() {
                         }}
                       />
                     </span>
-                    <span className="line-clamp-2 text-[9px] font-semibold leading-tight md:text-[11px]">{subcategory.name}</span>
-                    <span className="text-[9px] text-on-surface-variant md:text-[10px]">{subcategory.count}</span>
+                    <span className="line-clamp-2 text-[9px] font-semibold leading-tight md:text-[11px]">{t(category.name, category.tamilName)}</span>
+                    <span className="text-[9px] text-on-surface-variant md:text-[10px]">{category.count}</span>
+                  </button>
+                );
+              })}
+            </aside>
+
+            <aside aria-label="Shop by subcategory" className="hidden max-h-[calc(100dvh-112px)] flex-col gap-2 overflow-y-auto overscroll-contain pb-2 pr-2 scrollbar-none md:sticky md:top-[100px] md:flex">
+              <button
+                type="button"
+                aria-pressed={selectedSubcategories.length === 0}
+                onClick={() => handleSelectRailSubcategory()}
+                className={`flex w-full flex-col items-center gap-1.5 rounded-xl p-2 text-center transition-colors ${selectedSubcategories.length === 0 ? "bg-primary/10 text-primary ring-1 ring-primary/25" : "text-on-surface-variant hover:bg-surface-container-low"}`}
+              >
+                <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-surface-container-low text-primary">
+                  <span className="material-symbols-outlined text-[26px]">apps</span>
+                </span>
+                <span className="line-clamp-2 text-[11px] font-bold leading-tight">All items</span>
+                <span className="text-[10px] text-on-surface-variant">{categoryScopeProductCount}</span>
+              </button>
+              {railSubcategories.map((subcategory) => {
+                const isActive = selectedSubcategories.some((selected) => selected.toLocaleLowerCase() === subcategory.name.toLocaleLowerCase());
+                return (
+                  <button
+                    key={subcategory.name}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => handleSelectRailSubcategory(subcategory.name)}
+                    className={`flex w-full flex-col items-center gap-1.5 rounded-xl p-2 text-center transition-colors ${isActive ? "bg-primary/10 text-primary ring-1 ring-primary/25" : "text-on-surface-variant hover:bg-surface-container-low"}`}
+                  >
+                    <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-surface-container-low">
+                      <img src={subcategory.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    </span>
+                    <span className="line-clamp-2 text-[11px] font-semibold leading-tight">{subcategory.name}</span>
+                    <span className="text-[10px] text-on-surface-variant">{subcategory.count}</span>
                   </button>
                 );
               })}
@@ -672,14 +884,14 @@ function ShopPage() {
 
             {mobileFiltersOpen && (
               <div className="fixed inset-0 z-[70]" role="dialog" aria-modal="true" aria-label="Product filters">
-                <button type="button" aria-label="Close filters" onClick={() => setMobileFiltersOpen(false)} className="absolute inset-0 h-full w-full bg-black/40" />
-                <aside className="absolute inset-y-0 right-0 h-dvh w-[min(92vw,400px)] overflow-y-auto overscroll-contain bg-surface-container-lowest shadow-2xl">
+                <button type="button" aria-label="Close filters" onClick={closeMobileFilters} className="absolute inset-0 h-full w-full bg-black/40" />
+                <aside className="absolute right-0 top-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] h-auto w-[min(60vw,320px)] overflow-y-auto overscroll-contain bg-surface-container-lowest shadow-2xl">
                   {renderFilterPanel(true)}
                 </aside>
               </div>
             )}
 
-            <section className="flex min-w-0 flex-col gap-4">
+            <section ref={productListRef} onScroll={handleProductListScroll} className="h-full min-h-0 min-w-0 overflow-y-auto overscroll-contain md:h-auto md:overflow-visible">
               {loading ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                   {[...Array(6)].map((_, i) => (
@@ -710,16 +922,18 @@ function ShopPage() {
                     </button>
                   </div>
                 </div>
-              ) : filteredProducts.length === 0 ? (
+              ) : visibleRailProducts.length === 0 ? (
                 <div className="bg-surface-container-lowest rounded-3xl p-12 text-center max-w-lg mx-auto border border-outline-variant/20 my-8 shadow-sm">
                   <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center text-3xl mx-auto mb-4">
                     🌾
                   </div>
                   <h3 className="font-headline-lg text-lg font-bold text-on-surface mb-2">
-                    No Harvest Items Found
+                    {isOfferZoneSelected ? "No Offers Available" : "No Harvest Items Found"}
                   </h3>
                   <p className="font-body-sm text-xs text-on-surface-variant mb-6">
-                  We couldn't find products in this selection. Try another aisle or clear your search.
+                    {isOfferZoneSelected
+                      ? "There are no offer zone products in this selection. Try another category or clear your filters."
+                      : "We couldn't find products in this selection. Try another aisle or clear your search."}
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-3">
                     <button
@@ -733,16 +947,53 @@ function ShopPage() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                    {filteredProducts.map((product) => (
-                      <ProductCard
-                        key={product.id}
-                        product={product}
-                        readOnly={false}
-                        compactAddToCart
-                      />
-                    ))}
-                  </div>
+                <div className="space-y-5 pb-3 md:hidden">
+                  {isAllItemsView ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {mixedAllItemsProducts.map((product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          readOnly={false}
+                          compactAddToCart
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    productSections.map((section) => (
+                      <div
+                        key={section.slug}
+                        id={`shop-category-${section.slug}`}
+                        data-shop-category-section={section.slug}
+                        className="scroll-mt-2"
+                      >
+                        <h2 className="mb-2 text-sm font-extrabold text-on-surface sm:text-base">
+                          {t(section.name, section.tamilName)}
+                        </h2>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          {section.products.map((product) => (
+                            <ProductCard
+                              key={product.id}
+                              product={product}
+                              readOnly={false}
+                              compactAddToCart
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="hidden grid-cols-3 gap-3 md:grid lg:grid-cols-4 xl:grid-cols-6">
+                  {visibleRailProducts.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      readOnly={false}
+                      compactAddToCart
+                    />
+                  ))}
+                </div>
                 </>
               )}
             </section>

@@ -27,7 +27,7 @@ export const Route = createFileRoute("/addresses")({
   }),
   head: () => ({
     meta: [
-      { title: "Saved Addresses — Sri Amman Smart Store" },
+      { title: "Saved Addresses — Sriman Smart Store" },
       { name: "description", content: "Manage delivery addresses and check geofence coverage." },
     ],
   }),

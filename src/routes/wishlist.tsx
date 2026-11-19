@@ -18,7 +18,7 @@ import { authManager } from "../services/authAdapter";
 export const Route = createFileRoute("/wishlist")({
   head: () => ({
     meta: [
-      { title: "Wishlist & Curated Collections — Sri Amman Smart Store" },
+      { title: "Wishlist & Curated Collections — Sriman Smart Store" },
       {
         name: "description",
         content:
@@ -70,6 +70,7 @@ export function WishlistPage() {
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
   const [createDesc, setCreateDesc] = useState("");
 
@@ -109,16 +110,14 @@ export function WishlistPage() {
   // Filter items by active collection folder
   const currentFolderItems = useMemo(() => {
     if (activeWishlistId === "all") {
-      return wishlistItems;
+      return wishlistItems.filter((item) => item.wishlistId === "all");
     }
     return wishlistItems.filter((i) => i.wishlistId === activeWishlistId);
   }, [wishlistItems, activeWishlistId]);
 
-  // Collection counts mapping for badges
+  // Collection counts mapping for folder badges
   const collectionCounts = useMemo(() => {
-    const map: Record<string, number> = {
-      all: wishlistItems.length,
-    };
+    const map: Record<string, number> = {};
     for (const wl of wishlists) {
       map[wl.id] = wishlistItems.filter((i) => i.wishlistId === wl.id).length;
     }
@@ -288,6 +287,7 @@ export function WishlistPage() {
   const handleCreateCollection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createTitle.trim()) return;
+    setIsCreatingCollection(true);
     try {
       const created = await createCollection(createTitle.trim(), createDesc.trim());
       setActiveWishlistId(created.id);
@@ -297,6 +297,8 @@ export function WishlistPage() {
       toast.success(`Created collection "${created.title}"!`);
     } catch (err: any) {
       toast.error(err.message || "Failed to create collection");
+    } finally {
+      setIsCreatingCollection(false);
     }
   };
 
@@ -329,7 +331,7 @@ export function WishlistPage() {
 
   const handleMoveProduct = async (itemId: string, targetId: string) => {
     try {
-      await moveItemToCollection(itemId, targetId);
+      await moveItemToCollection(itemId, targetId, activeWishlistId);
       setMovingItemId(null);
       const targetName =
         targetId === "wl_default"
@@ -343,7 +345,7 @@ export function WishlistPage() {
 
   const handleRemoveItem = async (id: string, name: string): Promise<boolean> => {
     try {
-      await removeWishlistItem(id);
+      await removeWishlistItem(id, activeWishlistId);
       toast.info(`Removed ${name} from saved staples`);
       return false;
     } catch (err: any) {
@@ -424,17 +426,10 @@ export function WishlistPage() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
             <div>
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <div className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-                  <span>💚</span>
-                  <span>Personal Sourcing Vault</span>
-                </div>
               </div>
               <h1 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-on-surface tracking-tight">
                 My Wishlist
               </h1>
-              <p className="text-xs md:text-sm text-on-surface-variant mt-1 max-w-2xl">
-                Save your staples and seasonal produce for frictionless replenishment and rapid 60-min delivery.
-              </p>
             </div>
 
             {/* VIP Member Savings Badge Card */}
@@ -455,32 +450,9 @@ export function WishlistPage() {
             </div>
           </div>
 
-          {/* Customer wishlist has one saved-products list. */}
+          {/* Wishlist folders */}
           <div className="flex items-center justify-between gap-3 overflow-x-auto pb-3 mb-6 scrollbar-none border-b border-outline-variant/15">
             <div className="flex items-center gap-2 shrink-0">
-              {/* All Saved Staples Tab */}
-              <button
-                type="button"
-                onClick={() => setActiveWishlistId("all")}
-                className={`px-4 py-2 rounded-full font-headline-sm text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  activeWishlistId === "all"
-                    ? "bg-[#005f3f] text-white shadow-sm"
-                    : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
-                }`}
-              >
-                <span className="material-symbols-outlined text-[16px]">bookmark</span>
-                <span>All Saved Staples</span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
-                    activeWishlistId === "all"
-                      ? "bg-white/20 text-white"
-                      : "bg-surface-container text-on-surface"
-                  }`}
-                >
-                  {collectionCounts["all"] ?? 0}
-                </span>
-              </button>
-
               {/* Dynamic User Collections */}
               {wishlists.map((wl) => (
                 <button
@@ -511,7 +483,14 @@ export function WishlistPage() {
                 </button>
               ))}
             </div>
-
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-3 py-2 font-headline-sm text-xs font-bold text-primary transition-colors hover:bg-primary/10"
+            >
+              <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
+              <span>Create Folder</span>
+            </button>
           </div>
 
           {/* Active Custom Collection Controls (Rename / Delete) */}
@@ -882,6 +861,7 @@ export function WishlistPage() {
                             onToggle={async () => {
                               try {
                                 const added = await toggleWishlist(prod, 0);
+                                if (added === undefined) return false;
                                 if (added) toast.success("Saved to your wishlist");
                                 else toast.info("Removed from wishlist");
                                 return added;
@@ -996,7 +976,7 @@ export function WishlistPage() {
           <div className="bg-surface-container-lowest rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-outline-variant/20 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-headline-lg text-base font-bold text-on-surface">
-                Create New Collection
+                Create Wishlist Folder
               </h4>
               <button
                 type="button"
@@ -1008,7 +988,7 @@ export function WishlistPage() {
             </div>
             <form onSubmit={handleCreateCollection} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-on-surface block mb-1">Collection Title</label>
+                <label className="font-bold text-on-surface block mb-1">Folder Name</label>
                 <input
                   type="text"
                   required
@@ -1028,6 +1008,9 @@ export function WishlistPage() {
                   className="w-full bg-surface-container-low px-3 py-2 rounded-xl border border-outline-variant/25 focus:ring-2 focus:ring-primary focus:outline-none"
                 />
               </div>
+              <p className="text-[11px] leading-relaxed text-on-surface-variant">
+                Currently available saved products will be added to this folder.
+              </p>
               <div className="pt-2 flex gap-2">
                 <button
                   type="button"
@@ -1038,9 +1021,10 @@ export function WishlistPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl font-bold bg-[#005f3f] text-white shadow-md hover:bg-[#004e33]"
+                  disabled={isCreatingCollection}
+                  className="flex-1 py-2.5 rounded-xl font-bold bg-[#005f3f] text-white shadow-md hover:bg-[#004e33] disabled:cursor-wait disabled:opacity-60"
                 >
-                  Create
+                  {isCreatingCollection ? "Creating..." : "Create Folder"}
                 </button>
               </div>
             </form>
@@ -1115,7 +1099,7 @@ export function WishlistPage() {
               Delete Collection?
             </h4>
             <p className="text-xs text-on-surface-variant mb-5 leading-relaxed">
-              Items in this collection will not be lost. They will be safely preserved in your &ldquo;All Saved Staples&rdquo; list.
+              Items in this folder will be preserved in your saved products when it is deleted.
             </p>
             <div className="flex gap-2 text-xs">
               <button

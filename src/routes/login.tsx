@@ -47,7 +47,7 @@ export const Route = createFileRoute("/login")({
   },
   head: () => ({
     meta: [
-      { title: "Sign In & OTP Verification — Sri Amman Smart Store" },
+      { title: "Sign In & OTP Verification — Sriman Smart Store" },
       {
         name: "description",
         content: "Sign in with your mobile number or email to access your account and rewards.",
@@ -496,11 +496,11 @@ export function LoginPage() {
         navigatePostLogin();
       } else if (resolution.status === "unlinked") {
         toast.warning(
-          "Email verified, but no linked Sri Amman Smart Store customer account was found.",
+          "Email verified, but no linked Sriman Smart Store customer account was found.",
         );
       } else {
         const notice = describeIdentityResolutionState(resolution);
-        toast.error(notice?.title || "Could not load your Sri Amman Smart Store customer profile.");
+        toast.error(notice?.title || "Could not load your Sriman Smart Store customer profile.");
       }
     } catch (err: unknown) {
       if (err instanceof EmailLinkAuthError && err.requiresEmailInput) {
@@ -999,7 +999,7 @@ export function LoginPage() {
           </div>
 
           <p className="mt-4 text-center text-[11px] text-on-surface-variant sm:mt-6">
-            By continuing, you agree to the Sri Amman Smart Store{" "}
+            By continuing, you agree to the Sriman Smart Store{" "}
             <Link to="/policies" className="font-bold text-primary underline-offset-4 hover:underline">
               Terms of Service
             </Link>{" "}

@@ -8,8 +8,8 @@ import { authManager } from "../services/authAdapter";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Reset Password | Sri Amman Smart Store" },
-      { name: "description", content: "Request a password reset link for your Sri Amman Smart Store account." },
+      { title: "Reset Password | Sriman Smart Store" },
+      { name: "description", content: "Request a password reset link for your Sriman Smart Store account." },
     ],
   }),
   component: ResetPasswordPage,
@@ -42,7 +42,7 @@ function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-surface text-on-surface antialiased">
       <StoreHeader />
-      <main className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+      <main className="mx-auto flex min-h-[70vh] max-w-6xl items-center justify-center px-4 pt-20 pb-12 sm:px-6 lg:px-8">
         <section className="w-full max-w-md rounded-[28px] border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-[0_24px_60px_rgba(17,24,39,0.08)] sm:p-8">
           <Link to="/login" className="text-sm font-semibold text-primary hover:underline">
             ← Back to sign in

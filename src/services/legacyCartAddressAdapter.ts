@@ -10,7 +10,7 @@ export const CANONICAL_SASS_ID_RE = /^SASS\d{6,7}$/i;
 export const CANONICAL_CUSTOMER_ID_RE = /^(ONCUS\d{6,7}|SASS\d{6,7})$/i;
 
 /**
- * Validates whether a given string is a canonical Sri Amman Smart Store customer ID
+ * Validates whether a given string is a canonical Sriman Smart Store customer ID
  * (either modern "ONCUS..." or legacy "SASS...").
  * Examples: "ONCUS000010", "ONCUS000021", "SASS0000001", "SASS0000021".
  * Rejects Firebase UIDs, guest sessions, and empty strings.
@@ -21,7 +21,7 @@ export function isValidCustomerId(value: unknown): value is string {
 }
 
 /**
- * Validates whether a given string is a canonical Sri Amman Smart Store customer ID.
+ * Validates whether a given string is a canonical Sriman Smart Store customer ID.
  * Examples: "SASS0000001", "SASS0000021", "SASS9999901".
  * Rejects Firebase UIDs, guest sessions, and empty strings.
  */

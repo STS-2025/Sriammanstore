@@ -104,7 +104,7 @@ describe("Rewards Page Loading Lifecycle & Terminal State Verification", () => {
   ];
 
   const mockStore: StoreInfo = {
-    storeName: "Sri Amman Smart Store",
+    storeName: "Sriman Smart Store",
     coinValueInRupees: 0.05,
     vipSpendingThreshold: 5000,
   } as StoreInfo;

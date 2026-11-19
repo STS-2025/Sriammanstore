@@ -72,7 +72,7 @@ describe("Feature 4: Simple UPI Payment Option Integration", () => {
     const config = await settingsService.getPaymentConfiguration();
     expect(config.upiEnabled).toBe(true);
     expect(config.merchantUpiId).toBe("sriammansmartstore@okaxis");
-    expect(config.merchantName).toBe("Sri Amman Smart Store");
+    expect(config.merchantName).toBe("Sriman Smart Store");
     expect(config.codEnabled).toBe(true);
   });
 
@@ -80,7 +80,7 @@ describe("Feature 4: Simple UPI Payment Option Integration", () => {
     const customSettings: StorePaymentSettings = {
       upiEnabled: true,
       merchantUpiId: "customstore@icici",
-      merchantName: "Sri Amman Premium Store",
+      merchantName: "Sriman Premium Store",
       codEnabled: false,
     };
 
@@ -91,7 +91,7 @@ describe("Feature 4: Simple UPI Payment Option Integration", () => {
 
     const config = await settingsService.getPaymentConfiguration();
     expect(config.merchantUpiId).toBe("customstore@icici");
-    expect(config.merchantName).toBe("Sri Amman Premium Store");
+    expect(config.merchantName).toBe("Sriman Premium Store");
 
     spy.mockRestore();
   });

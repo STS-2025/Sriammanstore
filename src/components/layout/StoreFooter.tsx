@@ -5,23 +5,23 @@ export function StoreFooter() {
   return (
     <footer className="bg-surface-container-low text-on-surface border-t border-outline-variant/20 pt-8 pb-24 md:pb-8">
       <div className="max-w-[1320px] mx-auto px-margin-desktop">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
+        <div className="grid grid-cols-1 justify-items-center gap-8 mb-12 text-center md:grid-cols-2 md:justify-items-stretch md:text-left lg:grid-cols-5">
           {/* Brand Info */}
-          <div className="lg:col-span-2 flex flex-col gap-4">
+          <div className="flex flex-col items-center gap-4 text-center md:items-start md:text-left lg:col-span-2">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-black text-xl shadow-md">
-                <img src={logo} alt="Sri Amman Smart Store" className="h-full w-full rounded-xl object-contain" />
+                <img src={logo} alt="Sriman Smart Store" className="h-full w-full rounded-xl object-contain" />
               </div>
               <div>
                 <span className="font-headline-md text-headline-md font-bold text-primary block">
-                  Sri Amman
+                  Sriman
                 </span>
                 <span className="font-label-badge text-[10px] tracking-wider uppercase text-secondary font-semibold">
                   Smart Store
                 </span>
               </div>
             </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant max-w-sm leading-relaxed">
+            <p className="mx-auto max-w-sm font-body-sm text-body-sm leading-relaxed text-on-surface-variant md:mx-0">
               South India's most authentic grains, spices, masalas, refined oil delivered with single-store purity in 60 minutes.
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -79,7 +79,7 @@ export function StoreFooter() {
           </div> */}
 
           {/* Customer Care */}
-          <div>
+          <div className="text-center md:text-left">
             <h4 className="font-headline-sm text-sm font-bold text-on-surface mb-3 uppercase tracking-wider">
               Customer Hub
             </h4>
@@ -113,7 +113,7 @@ export function StoreFooter() {
           </div>
 
           {/* Trust & Legal */}
-          <div>
+          <div className="text-center md:text-left">
             <h4 className="font-headline-sm text-sm font-bold text-on-surface mb-3 uppercase tracking-wider">
               Policies
             </h4>
@@ -159,8 +159,8 @@ export function StoreFooter() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-outline-variant/20 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-on-surface-variant">
-          <p>© 2026 Sri Amman Smart Store. Single-store purity guaranteed. FSSAI Reg: #12421008000412</p>
+        <div className="pt-8 border-t border-outline-variant/20 flex flex-col md:flex-row items-center justify-between gap-4 text-center text-xs text-on-surface-variant md:text-left">
+          <p>© 2026 Sriman Smart Store. Single-store purity guaranteed. FSSAI Reg: #12421008000412</p>
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 md:justify-end">
             <span className="flex items-center gap-1 text-primary font-semibold">
               <span className="material-symbols-outlined text-[16px]">verified</span>

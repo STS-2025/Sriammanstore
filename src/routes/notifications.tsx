@@ -12,7 +12,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/notifications")({
   head: () => ({
     meta: [
-      { title: "Notifications & Store Updates — Sri Amman Smart Store" },
+      { title: "Notifications & Store Updates — Sriman Smart Store" },
       {
         name: "description",
         content:
@@ -43,7 +43,6 @@ export function NotificationsPage() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [displayLimit, setDisplayLimit] = useState<number>(5);
   const [showMobileActionsSidebar, setShowMobileActionsSidebar] = useState(false);
-  const [expandedMobileNotifId, setExpandedMobileNotifId] = useState<string | null>(null);
   const [showAlertSettingsModal, setShowAlertSettingsModal] = useState(false);
   // Alert Settings form state
   const [inAppAlerts, setInAppAlerts] = useState(preferences.inAppAlerts);
@@ -103,6 +102,32 @@ export function NotificationsPage() {
       return "Recently";
     }
   };
+
+  const formatMobileTimestamp = (isoString: string) => {
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return "Recently";
+
+    const now = new Date();
+    const dateDay = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+    const todayDay = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    const daysAgo = Math.floor((todayDay - dateDay) / (24 * 60 * 60 * 1000));
+
+    if (daysAgo === 0) {
+      return date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+    }
+    if (daysAgo === 1) return "Yesterday";
+    if (daysAgo > 1 && daysAgo < 7) {
+      return date.toLocaleDateString("en-IN", { weekday: "short" });
+    }
+    return date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" as const } : {}),
+    });
+  };
+
+  const mobileMessagePreview = (message: string) =>
+    message.length > 35 ? `${message.slice(0, 35).trimEnd()}...` : message;
 
   const navigateToNotificationTarget = (targetUrl?: string, orderId?: string) => {
     if (!targetUrl && orderId) {
@@ -467,7 +492,7 @@ export function NotificationsPage() {
                       <div className="flex items-start gap-3 sm:gap-4">
                         {/* Icon Circle */}
                         <div
-                          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+                          className={`hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-xs sm:flex sm:h-11 sm:w-11 ${
                             isOrder
                               ? "bg-emerald-50 text-[#005f3f]"
                               : isHarvest
@@ -491,7 +516,7 @@ export function NotificationsPage() {
                         {/* Card Content Area */}
                         <div className="flex-1 min-w-0">
                           {/* Top Badge & Timestamp Row */}
-                          <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                          <div className="hidden items-center justify-between gap-2 flex-wrap mb-1.5 sm:flex">
                             <span
                               className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
                                 isOrder
@@ -512,35 +537,31 @@ export function NotificationsPage() {
                             </div>
                           </div>
 
-                          {/* Title */}
-                          <h3 className="font-headline-sm text-sm font-black text-on-surface leading-snug">
+                          {/* Mobile message row */}
+                          <div className="mb-1 flex items-baseline justify-between gap-2 sm:hidden">
+                            <h3 className="min-w-0 flex-1 truncate font-headline-sm text-sm font-black leading-snug text-on-surface">
+                              {notif.title}
+                            </h3>
+                            <span className="shrink-0 text-[10px] font-medium text-on-surface-variant">
+                              {formatMobileTimestamp(notif.timestamp)}
+                            </span>
+                          </div>
+
+                          {/* Desktop title */}
+                          <h3 className="hidden font-headline-sm text-sm font-black leading-snug text-on-surface sm:block">
                             {notif.title}
                           </h3>
 
-                          {/* Description */}
-                          <p className={`text-xs text-on-surface-variant mt-1 leading-relaxed ${
-                            expandedMobileNotifId === notif.id ? "" : "line-clamp-2 sm:line-clamp-none"
-                          }`}>
+                          {/* Mobile preview and full desktop description */}
+                          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant sm:hidden">
+                            {mobileMessagePreview(notif.message)}
+                          </p>
+                          <p className="mt-1 hidden text-xs leading-relaxed text-on-surface-variant sm:block">
                             {notif.message}
                           </p>
 
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setExpandedMobileNotifId((current) => current === notif.id ? null : notif.id);
-                            }}
-                            aria-expanded={expandedMobileNotifId === notif.id}
-                            className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-[#005f3f] sm:hidden"
-                          >
-                            {expandedMobileNotifId === notif.id ? "Show less" : "More details"}
-                            <span className="material-symbols-outlined text-[14px]">
-                              {expandedMobileNotifId === notif.id ? "expand_less" : "expand_more"}
-                            </span>
-                          </button>
-
                           {/* Extra Contextual Strips & Snippets */}
-                          <div className={expandedMobileNotifId === notif.id ? "mt-3 space-y-2" : "hidden sm:block mt-3 space-y-2"}>
+                          <div className="mt-3 hidden space-y-2 sm:block">
                           {/* 1. Live Driver Context Strip */}
                           {notif.driverName && (
                             <div className="mt-3 p-3 bg-surface-container-low/70 border border-outline-variant/15 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">

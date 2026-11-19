@@ -21,7 +21,7 @@ describe("Phase 7.2.1: Rewards Page Conversion Rate Regression & Protection Suit
     it("reproduces obsolete 0.50 rate from store settings and proves it is strictly overridden by 0.05", async () => {
       // Mock store settings returning the legacy 0.5 rate (the exact bug condition)
       settingsService.getStoreInfo = vi.fn().mockResolvedValue({
-        storeName: "Sri Amman Smart Store",
+        storeName: "Sriman Smart Store",
         coinValueInRupees: 0.5, // Legacy obsolete rate
         vipSpendingThreshold: 5000,
       } as StoreInfo);
@@ -36,7 +36,7 @@ describe("Phase 7.2.1: Rewards Page Conversion Rate Regression & Protection Suit
 
     it("accepts valid custom rate if explicitly configured different from legacy 0.50", async () => {
       settingsService.getStoreInfo = vi.fn().mockResolvedValue({
-        storeName: "Sri Amman Smart Store",
+        storeName: "Sriman Smart Store",
         coinValueInRupees: 0.05,
         vipSpendingThreshold: 5000,
       } as StoreInfo);
@@ -56,7 +56,7 @@ describe("Phase 7.2.1: Rewards Page Conversion Rate Regression & Protection Suit
 
     it("falls back to OFFICIAL_COIN_CONVERSION_RATE when store settings has null/undefined/invalid rate", async () => {
       settingsService.getStoreInfo = vi.fn().mockResolvedValue({
-        storeName: "Sri Amman Smart Store",
+        storeName: "Sriman Smart Store",
         coinValueInRupees: undefined,
       } as any);
 

@@ -14,7 +14,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/account")({
   head: () => ({
     meta: [
-      { title: "My Account | Sri Amman Smart Store" },
+      { title: "My Account | Sriman Smart Store" },
       { name: "description", content: "Choose an account page to manage your orders, profile, addresses, and preferences." },
     ],
   }),

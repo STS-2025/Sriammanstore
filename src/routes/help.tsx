@@ -17,7 +17,7 @@ export const Route = createFileRoute("/help")({
   }),
   head: () => ({
     meta: [
-      { title: "Help & Customer Support — Sri Amman Smart Store" },
+      { title: "Help & Customer Support — Sriman Smart Store" },
       { name: "description", content: "Report issues, request products, or reach our customer care." },
     ],
   }),

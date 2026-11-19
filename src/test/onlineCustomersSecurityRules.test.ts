@@ -408,7 +408,7 @@ describe("Production Firestore Security Rules Proposal (onlineCustomers Migratio
   let evaluator: FirestoreProductionRulesEvaluator;
 
   beforeEach(() => {
-    // Seed canonical state representing Sri Amman Smart Store production migration
+    // Seed canonical state representing Sriman Smart Store production migration
     dbState = {
       usersByUid: {
         [CUSTOMER_1_PRIMARY_UID]: {

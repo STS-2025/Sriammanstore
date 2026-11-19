@@ -228,7 +228,7 @@ export function OrderBillSummary({
               <span className="material-symbols-outlined text-[15px] text-primary">
                 storefront
               </span>
-              <span>Sri Amman Local Store Fulfillment Guarantee</span>
+              <span>Sriman Local Store Fulfillment Guarantee</span>
             </div>
           </div>
         ) : (

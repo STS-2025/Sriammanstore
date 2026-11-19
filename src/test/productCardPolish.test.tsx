@@ -52,7 +52,7 @@ const verifiedMockProduct: Product = {
   tamilName: "மரச்செக்கு கடலை எண்ணெய்",
   category: "Cold Pressed Oils",
   categorySlug: "cold-pressed-oils",
-  brand: "Sri Amman Organics",
+  brand: "Sriman Organics",
   rating: 4.9,
   reviewCount: 1842,
   description: "Wood churned groundnut oil extracted using traditional methods.",

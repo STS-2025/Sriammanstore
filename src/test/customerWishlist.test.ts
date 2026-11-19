@@ -7,7 +7,7 @@ import type { Product } from "../types";
 
 const product: Product = {
   id: "catalog-product-42", name: "Cold Pressed Groundnut Oil", category: "Oils",
-  categorySlug: "oils", brand: "Sri Amman", rating: 0, reviewCount: 0,
+  categorySlug: "oils", brand: "Sriman", rating: 0, reviewCount: 0,
   description: "", imageUrl: "/images/oil.png", images: ["/images/oil.png"],
   tags: [], isActive: true,
   options: [{ unit: "ml", unitSize: "500", mrp: 250, offerPrice: 220, stock: 8 }],

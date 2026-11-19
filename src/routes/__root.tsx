@@ -85,9 +85,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Sri Amman Smart Store" },
+      { title: "Sriman Smart Store" },
       { name: "description", content: "Farm-fresh groceries and wood-pressed oils delivered in 60 minutes." },
-            { property: "og:title", content: "Sri Amman Smart Store" },
+            { property: "og:title", content: "Sriman Smart Store" },
       { property: "og:description", content: "Farm-fresh groceries delivered in 60 minutes." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

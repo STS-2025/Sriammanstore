@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import type { RefObject } from "react";
 import { createFileRoute, useSearch, Link } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/product")({
   }),
   head: () => ({
     meta: [
-      { title: "Product Details — Sri Amman Smart Store" },
+      { title: "Product Details — Sriman Smart Store" },
       { name: "description", content: "Farm-fresh groceries and wood-pressed oils." },
     ],
   }),
@@ -47,6 +48,7 @@ function ProductDetailsPage() {
   const [selectedOptIndex, setSelectedOptIndex] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
+  const productImageBoxRef = useRef<HTMLDivElement>(null);
   const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
   const pinchDistanceRef = useRef<number | null>(null);
@@ -216,6 +218,7 @@ function ProductDetailsPage() {
   const handleToggleWishlist = async () => {
     try {
       const added = await toggleWishlist(product, selectedOptIndex);
+      if (added === undefined) return false;
       if (added) {
         toast.success("Saved to your wishlist");
       } else {
@@ -276,7 +279,7 @@ function ProductDetailsPage() {
         <section className="max-w-[1240px] w-full mx-auto px-margin-desktop py-4 sm:py-6">
           <div className="grid grid-cols-2 sm:grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-5 items-start">
             {/* Gallery Column */}
-            <div className="lg:col-span-6 flex flex-col lg:flex-row items-stretch lg:items-start gap-2 sm:gap-3">
+            <div className="relative lg:col-span-6 flex flex-col lg:flex-row items-stretch lg:items-start gap-2 sm:gap-3">
               <div className="order-1 lg:order-2 relative min-w-0 w-full lg:flex-1 bg-surface-container-lowest rounded-3xl shadow-sm overflow-hidden group border border-outline-variant/20">
                 <WishlistHeartButton
                   active={wishlisted}
@@ -289,7 +292,8 @@ function ProductDetailsPage() {
 
                 {/* Main Large Image */}
                 <div
-                  className="relative w-full aspect-square flex items-center justify-center p-1.5 sm:p-6 bg-surface-container-low transition-all overflow-hidden cursor-zoom-in [touch-action:pan-y]"
+                  ref={productImageBoxRef}
+                  className="relative w-full aspect-square flex items-center justify-center p-1.5 sm:p-6 bg-white transition-all overflow-hidden cursor-zoom-in [touch-action:pan-y]"
                   role="button"
                   tabIndex={0}
                   aria-label={`Open ${product.name} image zoom`}
@@ -332,7 +336,7 @@ function ProductDetailsPage() {
                     <img
                       src={activeImage}
                       alt={product.name}
-                      className="w-[96%] h-[96%] object-contain transition-transform duration-300 ease-out drop-shadow-md select-none pointer-events-none"
+                      className="w-full h-full object-contain transition-transform duration-300 ease-out drop-shadow-md select-none pointer-events-none lg:w-[96%] lg:h-[96%]"
                       onError={() => setImageError(true)}
                     />
                   ) : (
@@ -350,7 +354,7 @@ function ProductDetailsPage() {
 
               {/* Front/back and alternate image switcher */}
               {images.length > 1 && (
-                <div className="order-2 lg:order-1 w-full lg:w-16 shrink-0 flex flex-row lg:flex-col gap-2 sm:gap-3 overflow-x-auto lg:overflow-visible scrollbar-none">
+                <div className="absolute bottom-0 left-1/2 z-10 order-2 flex max-w-[calc(100%-1rem)] -translate-x-1/2 flex-row gap-1.5 overflow-x-auto rounded-xl bg-surface-container-lowest/75 p-1 shadow-sm backdrop-blur-sm scrollbar-none lg:static lg:left-auto lg:order-1 lg:w-16 lg:max-w-none lg:shrink-0 lg:translate-x-0 lg:flex-col lg:gap-3 lg:overflow-visible lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none">
                   {images.map((img, idx) => (
                     <button
                       key={idx}
@@ -361,7 +365,7 @@ function ProductDetailsPage() {
                       }}
                       aria-label={`Show product image ${idx + 1}${idx === 0 ? " (front)" : idx === 1 ? " (back)" : ""}`}
                       aria-pressed={activeImageIndex === idx}
-                      className={`relative aspect-square w-12 sm:w-14 lg:w-full shrink-0 rounded-xl sm:rounded-2xl bg-surface-container-lowest p-1 sm:p-2 shadow-sm transition-all overflow-hidden flex items-center justify-center cursor-pointer border border-outline-variant/20 ${
+                      className={`relative aspect-square w-10 sm:w-11 lg:w-full shrink-0 rounded-xl sm:rounded-2xl bg-surface-container-lowest p-1 sm:p-2 shadow-sm transition-all overflow-hidden flex items-center justify-center cursor-pointer border border-outline-variant/20 ${
                         activeImageIndex === idx
                           ? "ring-2 ring-primary bg-primary/5"
                           : "hover:bg-surface-container opacity-70"
@@ -383,16 +387,16 @@ function ProductDetailsPage() {
               {/* Brand & Title */}
               <div className="col-start-2 row-start-1 flex flex-col gap-1.5 sm:col-auto sm:row-auto">
                 <div className="flex flex-wrap items-center justify-between gap-1">
-                  <span className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded-full bg-primary/10 text-primary font-headline-sm text-[9px] sm:text-xs font-bold uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded-full bg-primary/10 text-primary font-headline-sm text-[10px] sm:text-xs font-bold uppercase tracking-wider">
                     {product.brand}
                   </span>
                   {currentOption.stock > 0 ? (
-                    <span className="text-[9px] sm:text-xs font-semibold text-primary flex items-center gap-1">
+                    <span className="text-[10px] sm:text-xs font-semibold text-primary flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
                       In Stock ({currentOption.stock} available)
                     </span>
                   ) : (
-                    <span className="text-[9px] sm:text-xs font-semibold text-outline flex items-center gap-1">
+                    <span className="text-[10px] sm:text-xs font-semibold text-outline flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-outline"></span>
                       Out of Stock
                     </span>
@@ -402,9 +406,10 @@ function ProductDetailsPage() {
                 <h1 className="font-headline-lg text-[30px] sm:text-xl md:text-2xl text-on-surface font-extrabold tracking-tight leading-tight">
                   {t(product.name, product.tamilName)}
                 </h1>
-                <p className="font-body-md text-[10px] sm:text-sm text-on-surface-variant leading-relaxed">
-                  {product.description}
-                </p>
+                <MobileExpandableDescription
+                  description={product.description}
+                  imageBoxRef={productImageBoxRef}
+                />
 
                 {/* Rating Badge (Hidden when unverified) */}
                 {typeof product.rating === "number" &&
@@ -431,18 +436,18 @@ function ProductDetailsPage() {
                     </span>
                   </div>
                 )}
+
               </div>
 
               {/* Pack Size / Variant Selector */}
-              <div className="col-span-2 row-start-3 flex flex-col gap-2 sm:col-auto sm:row-auto">
+              <div className="col-span-2 row-start-4 flex flex-col gap-2 sm:col-auto sm:row-auto">
                 <div className="flex items-center justify-between">
-                  <label className="font-headline-sm text-[10px] sm:text-xs font-bold text-on-surface uppercase tracking-wider">
-                    Select Pack Size:
+                  <label className="font-headline-sm text-[11px] sm:text-xs font-bold text-on-surface uppercase tracking-wider">
+                    Selected Pack Size: <span className="text-[11px] sm:text-xs text-primary font-bold text-transform: lowercase">
+                                        {currentOption.unitSize}
+                                        {currentOption.unit}
+                                      </span>
                   </label>
-                  <span className="text-[10px] sm:text-xs text-primary font-semibold text-right">
-                    {currentOption.unitSize}
-                    {currentOption.unit} Selected
-                  </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {product.options.map((opt, idx) => (
@@ -450,7 +455,7 @@ function ProductDetailsPage() {
                       key={idx}
                       type="button"
                       onClick={() => setSelectedOptIndex(idx)}
-                      className={`w-[58px] sm:w-[124px] min-h-[42px] sm:min-h-[58px] text-center p-2 sm:p-2.5 rounded-xl transition-all flex flex-col justify-center shadow-sm cursor-pointer border ${
+                      className={`w-12 sm:w-[124px] min-h-11 sm:min-h-[58px] text-center p-2 sm:p-2.5 rounded-xl transition-all flex flex-col justify-center shadow-sm cursor-pointer border ${
                         selectedOptIndex === idx
                           ? "bg-primary/10 border-primary ring-2 ring-primary"
                           : "bg-surface-container-lowest border-outline-variant/20 hover:bg-surface-container"
@@ -465,20 +470,38 @@ function ProductDetailsPage() {
               </div>
 
               {/* Price Card */}
-              <div className="col-span-2 row-start-2 bg-surface-container-lowest p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm flex flex-col gap-1.5 border border-outline-variant/20 sm:col-auto sm:row-auto">
-                <div className="flex flex-wrap items-baseline gap-space-sm">
+              <div className="col-span-2 row-start-2 flex flex-col gap-1 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-1.5 shadow-sm sm:col-auto sm:row-auto sm:gap-1.5 sm:rounded-3xl sm:p-5">
+                <div className="flex h-4 w-full items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-space-sm">
                   {currentOption.mrp > currentOption.offerPrice && (
-                    <span className="font-price-mrp text-[16px] sm:text-sm text-outline line-through">
+                    <span className="font-price-mrp text-[14px] sm:text-sm text-outline line-through">
                       MRP ₹{currentOption.mrp}
                     </span>
                   )}
-                  <span className="font-price-hero text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
+                  <span className="font-price-hero text-[15px] sm:text-2xl font-extrabold text-on-surface tracking-tight">
                     ₹{currentPrice}
                   </span>
-                  {discountPercent > 0 && (
-                    <span className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full bg-tertiary-container text-on-tertiary-container font-label-badge text-[10px] sm:text-xs font-bold">
-                      {discountPercent}% OFF (Save ₹{currentOption.mrp - currentPrice})
-                    </span>
+                  </div>
+                  {currentOption.stock > 0 && (
+                    <div className="flex shrink-0 translate-y-2 items-center justify-center gap-1 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-0.5 shadow-sm sm:hidden">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                        aria-label="Decrease quantity"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-container-low text-on-surface"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">remove</span>
+                      </button>
+                      <span className="w-7 text-center text-lg font-extrabold text-on-surface">{quantity}</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity((q) => Math.min(currentOption.stock, q + 1))}
+                        aria-label="Increase quantity"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-container-low text-on-surface"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">add</span>
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -493,7 +516,7 @@ function ProductDetailsPage() {
                       </div>
                       <div>
                         <div className="font-headline-sm text-xs font-bold leading-tight">
-                          Sri Amman VIP Price: ₹{currentOption.specialPrice}
+                          Sriman VIP Price: ₹{currentOption.specialPrice}
                         </div>
                         <div className="text-[11px] text-on-secondary-fixed-variant">
                           {isVip
@@ -512,6 +535,13 @@ function ProductDetailsPage() {
                     )}
                   </div>
                 )}
+
+                {discountPercent > 0 && (
+                  <span className="inline-flex w-fit items-center rounded-full bg-tertiary-container px-2 py-0.5 font-label-badge text-[8px] font-bold text-on-tertiary-container sm:px-2.5 sm:text-xs">
+                    {discountPercent}% OFF (Save ₹{currentOption.mrp - currentPrice})
+                  </span>
+                )}
+
               </div>
 
               
@@ -537,11 +567,11 @@ function ProductDetailsPage() {
               </div>
 
               {/* Quantity Stepper & Add to Cart Buttons */}
-              <div className="col-span-2 row-start-4 flex flex-col gap-2 pt-0.5 sm:col-auto sm:row-auto">
-                <div className="flex items-center gap-2">
+              <div className="col-span-2 row-start-3 flex flex-row gap-2 pt-0.5 sm:col-auto sm:row-auto sm:flex-col sm:gap-2">
+                <div className="contents sm:flex sm:items-center sm:gap-2">
                   {/* Stepper (only when in stock) */}
                   {currentOption.stock > 0 && (
-                    <div className="flex items-center bg-surface-container-lowest rounded-2xl p-1 shadow-sm border border-outline-variant/20 shrink-0">
+                    <div className="hidden items-center rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-1 shadow-sm sm:flex">
                       <button
                         type="button"
                         onClick={() => setQuantity((q) => Math.max(1, q - 1))}
@@ -569,17 +599,18 @@ function ProductDetailsPage() {
                     <button
                       type="button"
                       onClick={handleAddToCart}
-                      className="flex-1 bg-primary hover:bg-primary-container text-on-primary py-2.5 px-2 sm:px-4 rounded-xl sm:rounded-2xl font-headline-sm text-[10px] sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                      className="flex min-h-10 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-xl bg-primary px-1.5 py-2.5 font-headline-sm text-[10px] font-bold text-on-primary shadow-md transition-all hover:bg-primary-container hover:shadow-lg active:scale-[0.98] cursor-pointer sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm sm:gap-2"
                     >
-                      <span className="material-symbols-outlined text-[18px] sm:text-[20px]">
+                      <span className="material-symbols-outlined text-[15px] sm:text-[20px]">
                         shopping_bag
                       </span>
-                      <span>Add to Cart • ₹{currentPrice * quantity}</span>
+                      <span className="sm:hidden">Add to Cart</span>
+                      <span className="hidden sm:inline">Add to Cart • ₹{currentPrice * quantity}</span>
                     </button>
                   ) : (
                     <button
                       disabled
-                      className="flex-1 bg-surface-container text-outline py-2.5 px-2 sm:px-4 rounded-xl sm:rounded-2xl font-headline-sm text-[10px] sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 border border-outline-variant/30 cursor-not-allowed select-none whitespace-nowrap"
+                      className="flex min-h-10 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-xl border border-outline-variant/30 bg-surface-container px-1.5 py-2.5 font-headline-sm text-[9px] font-bold text-outline cursor-not-allowed select-none sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm sm:gap-2"
                     >
                       <span className="material-symbols-outlined text-[20px]">block</span>
                       <span>Currently Out of Stock</span>
@@ -590,10 +621,11 @@ function ProductDetailsPage() {
                 {currentOption.stock > 0 && (
                   <Link
                     to="/checkout"
-                    className="w-full bg-on-surface hover:bg-inverse-surface text-on-primary py-2.5 px-4 rounded-xl sm:rounded-2xl font-headline-sm text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] text-center"
+                    className="flex min-h-10 w-full flex-1 items-center justify-center gap-1 rounded-xl bg-on-surface px-1.5 py-2.5 text-center font-headline-sm text-[10px] font-bold text-on-primary shadow-sm transition-all hover:bg-inverse-surface active:scale-[0.98] sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm sm:gap-2"
                   >
-                    <span className="material-symbols-outlined text-[20px]">bolt</span>
-                    <span>Instant Express Checkout</span>
+                    <span className="material-symbols-outlined text-[15px] sm:text-[20px]">bolt</span>
+                    <span className="sm:hidden">Express Checkout</span>
+                    <span className="hidden sm:inline">Instant Express Checkout</span>
                   </Link>
                 )}
               </div>
@@ -823,7 +855,7 @@ function ProductDetailsPage() {
                       Unbeatable natural aroma for dosas & sambar!
                     </h5>
                     <p className="text-xs text-on-surface-variant leading-relaxed">
-                      Been ordering regularly from Sri Amman Smart Store. When you temper mustard seeds, the entire kitchen fills with the nostalgic aroma of old village cooking. Authentic unrefined taste with pure sedimentation at the bottom.
+                      Been ordering regularly from Sriman Smart Store. When you temper mustard seeds, the entire kitchen fills with the nostalgic aroma of old village cooking. Authentic unrefined taste with pure sedimentation at the bottom.
                     </p>
                   </div>
                 </div>
@@ -957,5 +989,75 @@ function ProductDetailsPage() {
       <StoreFooter />
       <BottomNav />
     </div>
+  );
+}
+
+function MobileExpandableDescription({
+  description,
+  imageBoxRef,
+}: {
+  description: string;
+  imageBoxRef: RefObject<HTMLDivElement | null>;
+}) {
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
+  const [availableHeight, setAvailableHeight] = useState(0);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    const imageBox = imageBoxRef.current;
+    const descriptionElement = descriptionRef.current;
+    if (!imageBox || !descriptionElement) return;
+
+    const updateMeasurements = () => {
+      const imageBottom = imageBox.getBoundingClientRect().bottom;
+      const descriptionTop = descriptionElement.getBoundingClientRect().top;
+      const remainingImageHeight = Math.max(0, imageBottom - descriptionTop);
+      setAvailableHeight(remainingImageHeight);
+      setIsOverflowing(descriptionElement.scrollHeight > remainingImageHeight + 1);
+    };
+
+    updateMeasurements();
+    const observer = new ResizeObserver(updateMeasurements);
+    observer.observe(imageBox);
+    observer.observe(descriptionElement);
+    return () => observer.disconnect();
+  }, [description, imageBoxRef]);
+
+  useEffect(() => {
+    setIsExpanded(false);
+  }, [description]);
+
+  return (
+    <>
+      <div className="relative sm:hidden">
+        <div
+          className="overflow-hidden transition-[max-height] duration-200"
+          style={{ maxHeight: isExpanded ? undefined : availableHeight || undefined }}
+        >
+          <p
+            ref={descriptionRef}
+            className="font-body-md text-[11px] text-on-surface-variant leading-relaxed"
+          >
+            {description}
+          </p>
+        </div>
+        {isOverflowing && (
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            onClick={() => setIsExpanded((expanded) => !expanded)}
+            className={`px-1 font-body-md text-[11px] font-bold leading-relaxed text-primary ${
+              isExpanded ? "relative ml-auto mt-1 block" : "absolute bottom-0 right-0 bg-surface"
+            }`}
+          >
+            {isExpanded ? "Show less" : "..."}
+          </button>
+        )}
+      </div>
+      <p className="hidden font-body-md text-sm text-on-surface-variant leading-relaxed sm:block">
+        {description}
+      </p>
+    </>
   );
 }

@@ -16,7 +16,7 @@ export const Route = createFileRoute("/policies")({
   }),
   head: () => ({
     meta: [
-      { title: "Legal Policies & Terms — Sri Amman Smart Store" },
+      { title: "Legal Policies & Terms — Sriman Smart Store" },
       { name: "description", content: "Review our privacy, shipping, return, and service terms." },
     ],
   }),
@@ -44,7 +44,7 @@ function PoliciesPage() {
               Legal Disclosures & Policies
             </h1>
             <p className="text-sm text-on-surface-variant mt-2">
-              Sri Amman Smart Store compliance, delivery terms, and customer rights
+              Sriman Smart Store compliance, delivery terms, and customer rights
             </p>
           </div>
 
@@ -119,7 +119,7 @@ function PoliciesPage() {
                   Customer Privacy Policy
                 </h2>
                 <p>
-                  At Sri Amman Smart Store, we respect your personal privacy. We collect your mobile number, delivery address, and order transaction details solely to fulfill grocery orders, deliver 60-minute express groceries, and track your Amman loyalty coins.
+                  At Sriman Smart Store, we respect your personal privacy. We collect your mobile number, delivery address, and order transaction details solely to fulfill grocery orders, deliver 60-minute express groceries, and track your Amman loyalty coins.
                 </p>
                 <h3 className="font-headline-sm text-base font-bold text-on-surface">
                   Data Security & Sharing
@@ -136,7 +136,7 @@ function PoliciesPage() {
                   Terms of Service
                 </h2>
                 <p>
-                  By accessing the Sri Amman Smart Store customer application, you agree to comply with our community terms. All items sold are subject to harvest availability. We reserve the right to refuse orders placed with fraudulent details or outside our permissible delivery boundaries.
+                  By accessing the Sriman Smart Store customer application, you agree to comply with our community terms. All items sold are subject to harvest availability. We reserve the right to refuse orders placed with fraudulent details or outside our permissible delivery boundaries.
                 </p>
                 <h3 className="font-headline-sm text-base font-bold text-on-surface">
                   Pricing & FSSAI Compliance
@@ -153,7 +153,7 @@ function PoliciesPage() {
                   Shipping & Geofence Policy
                 </h2>
                 <p>
-                  Sri Amman Store operates with a strict single-store basis. To ensure dairy, oil, soaps, packed masasla and spices arrive within 60 minutes, our deliveries are restricted to a maximum radius of <strong>50.0 kilometers</strong> from our store hub at Gobichettipalayam, Erode district (Coordinates: 11.459319, 77.333565).
+                  Sriman Store operates with a strict single-store basis. To ensure dairy, oil, soaps, packed masasla and spices arrive within 60 minutes, our deliveries are restricted to a maximum radius of <strong>50.0 kilometers</strong> from our store hub at Gobichettipalayam, Erode district (Coordinates: 11.459319, 77.333565).
                 </p>
                 <h3 className="font-headline-sm text-base font-bold text-on-surface">
                   Delivery Slots & Free Shipping Threshold

@@ -84,7 +84,7 @@ export function mapFirebaseAuthError(error: unknown): string {
     case "auth/invalid-email":
       return "Please enter a valid email address.";
     case "auth/user-disabled":
-      return "This customer account has been disabled. Please contact Sri Amman Smart Store support.";
+      return "This customer account has been disabled. Please contact Sriman Smart Store support.";
     case "auth/too-many-requests":
       return "Access to this account has been temporarily disabled due to many failed login attempts. Please try again later or reset your password.";
     case "auth/network-request-failed":

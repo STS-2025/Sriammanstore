@@ -123,7 +123,7 @@ describe("Production Notifications Integration Suite", () => {
           id: "emu_notif_1",
           userId: "SASS0000104",
           category: "account",
-          title: "Welcome to Sri Amman Store",
+          title: "Welcome to Sriman Store",
           message: "Thank you for creating an account with us.",
           timestamp: "2026-10-01T12:00:00Z",
           read: true,

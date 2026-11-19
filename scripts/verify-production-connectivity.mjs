@@ -488,7 +488,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       console.log(
         "\n================================================================================"
       );
-      console.log(" SRI AMMAN SMART STORE — PRODUCTION PRODUCT PREVIEW (Strictly Read-Only)");
+      console.log(" SRIMAN SMART STORE — PRODUCTION PRODUCT PREVIEW (Strictly Read-Only)");
       console.log(
         "================================================================================"
       );
@@ -541,7 +541,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
           console.log(
             "\n================================================================================"
           );
-          console.log(" SRI AMMAN SMART STORE — PRODUCTION CONNECTIVITY DIAGNOSTIC");
+          console.log(" SRIMAN SMART STORE — PRODUCTION CONNECTIVITY DIAGNOSTIC");
           console.log(
             "================================================================================"
           );

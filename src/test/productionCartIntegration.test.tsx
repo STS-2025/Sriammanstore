@@ -377,7 +377,7 @@ describe("Production Cart Integration & Read-Only Communication", () => {
       images: ["https://example.com/turmeric.jpg"],
       tags: ["turmeric", "organic"],
       isActive: true,
-      brand: "Sri Amman",
+      brand: "Sriman",
       rating: 4.8,
       reviewCount: 25,
       options: [
@@ -486,7 +486,7 @@ describe("Production Cart Integration & Read-Only Communication", () => {
           images: ["https://example.com/catalog-oil.jpg"],
           tags: ["oil", "sesame"],
           isActive: true,
-          brand: "Sri Amman",
+          brand: "Sriman",
           rating: 4.9,
           reviewCount: 42,
           options: [

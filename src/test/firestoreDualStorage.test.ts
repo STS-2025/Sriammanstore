@@ -144,7 +144,7 @@ describe("Firestore Emulator + JSON Server Dual-Storage Architecture", () => {
       );
       expect(deliverySingleton?.docId).toBe("default");
       expect(storeSingleton?.docId).toBe("default");
-      expect(storeSingleton?.payload["storeName"]).toBe("Sri Amman Smart Store");
+      expect(storeSingleton?.payload["storeName"]).toBe("Sriman Smart Store");
     });
 
     it("chunks batch writes safely within Firestore's 500-operation limit", () => {
@@ -308,7 +308,7 @@ describe("Firestore Emulator + JSON Server Dual-Storage Architecture", () => {
       const storeInfo = await settingsService.getStoreInfo();
       expect(storeInfo).toBeDefined();
       expect(Array.isArray(storeInfo)).toBe(false);
-      expect(storeInfo.storeName).toBe("Sri Amman Smart Store");
+      expect(storeInfo.storeName).toBe("Sriman Smart Store");
       expect(storeInfo.centerLat).toBeCloseTo(11.459319, 5);
       expect(storeInfo.maxRadiusKm).toBe(6);
       expect(storeInfo.coinValueInRupees).toBe(0.05);
@@ -731,7 +731,7 @@ describe("Firestore Emulator + JSON Server Dual-Storage Architecture", () => {
     it("preserves compatibility with tests that spy on or mock apiClient methods", async () => {
       const getSpy = vi.spyOn(apiClient, "get");
       const storeInfo = await settingsService.getStoreInfo();
-      expect(storeInfo.storeName).toBe("Sri Amman Smart Store");
+      expect(storeInfo.storeName).toBe("Sriman Smart Store");
       expect(getSpy).toHaveBeenCalledWith("/storeInfo");
     });
   });

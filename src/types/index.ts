@@ -33,7 +33,7 @@ export interface ProductNutrition {
 }
 
 /**
- * Canonical Product domain model for the new Sri Amman Smart Store customer frontend.
+ * Canonical Product domain model for the new Sriman Smart Store customer frontend.
  * Normalized from either the production 41-field Firestore schema or local mock fixtures.
  * Sensitive merchant data (e.g. purchasePrice) and POS supply chain tracking are strictly omitted.
  */

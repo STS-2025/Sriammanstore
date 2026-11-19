@@ -108,7 +108,7 @@ export const Route = createFileRoute("/checkout")({
   },
   head: () => ({
     meta: [
-      { title: "Checkout — Sri Amman Smart Store" },
+      { title: "Checkout — Sriman Smart Store" },
       { name: "description", content: "Complete your farm grocery order safely." },
     ],
   }),
@@ -572,7 +572,7 @@ export function CheckoutPage() {
             key: razorpayKey,
             amount: Math.round(finalTotal * 100),
             currency: "INR",
-            name: "Sri Amman Smart Store",
+            name: "Sriman Smart Store",
             description: `Order Payment (${items.length} items)`,
             handler: async function () {
               try {

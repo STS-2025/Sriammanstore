@@ -47,7 +47,7 @@ export function BottomNav() {
     <>
       {/* Floating cart teaser pill if cart has items and not currently on cart/checkout */}
       {cartCount > 0 && !currentPath.includes("/cart") && !currentPath.includes("/checkout") && (
-        <div className={`fixed ${currentPath === "/shop" ? "bottom-[calc(10rem+env(safe-area-inset-bottom))]" : "bottom-[calc(4.25rem+env(safe-area-inset-bottom))]"} left-0 right-0 z-40 px-4 md:hidden`}>
+        <div className={`fixed ${currentPath === "/shop" ? "bottom-[calc(7rem+env(safe-area-inset-bottom))]" : "bottom-[calc(4.25rem+env(safe-area-inset-bottom))]"} left-0 right-0 z-40 px-4 md:hidden`}>
           <Link
             to="/cart"
             className="flex items-center justify-between bg-primary text-on-primary px-4 py-3 rounded-2xl shadow-xl animate-fade-in"
@@ -67,7 +67,7 @@ export function BottomNav() {
         </div>
       )}
 
-      {/* 5-Tab Mobile Bottom Navigation */}
+      {/* 5-Tab & Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface-container-lowest border-t border-outline-variant/20 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))] md:hidden shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
         <div className="grid grid-cols-5 items-center">
           <Link
@@ -80,7 +80,7 @@ export function BottomNav() {
               className="material-symbols-outlined text-[22px]"
               style={isActive("/") ? { fontVariationSettings: "'FILL' 1" } : {}}
             >
-              home
+              Home
             </span>
             <span className="text-[10px] font-medium mt-0.5">Home</span>
           </Link>
@@ -111,6 +111,22 @@ export function BottomNav() {
           </button>
 
           <Link
+            to="/wishlist"
+            search={{} as any}
+            className={`flex min-h-11 flex-col items-center py-1 transition-colors ${
+              isActive("/wishlist") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
+            }`}
+          >
+            <span
+              className="material-symbols-outlined text-[22px]"
+              style={isActive("/wishlist") ? { fontVariationSettings: "'FILL' 1" } : {}}
+            >
+              favorite
+            </span>
+            <span className="text-[10px] font-medium mt-0.5">Wishlist</span>
+          </Link>
+
+          <Link
             to="/cart"
             className={`relative flex min-h-11 flex-col items-center py-1 transition-colors ${
               isActive("/cart") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
@@ -137,21 +153,7 @@ export function BottomNav() {
             <span className="text-[10px] font-medium mt-0.5">Cart</span>
           </Link>
 
-          <Link
-            to="/orders"
-            search={{} as any}
-            className={`flex min-h-11 flex-col items-center py-1 transition-colors ${
-              isActive("/orders") ? "text-primary font-bold" : "text-on-surface-variant hover:text-primary"
-            }`}
-          >
-            <span
-              className="material-symbols-outlined text-[22px]"
-              style={isActive("/orders") ? { fontVariationSettings: "'FILL' 1" } : {}}
-            >
-              receipt_long
-            </span>
-            <span className="text-[10px] font-medium mt-0.5">Orders</span>
-          </Link>
+          
 
         </div>
       </nav>

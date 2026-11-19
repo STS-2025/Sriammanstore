@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useId, useState } from "react";
+import { Mail, MessageCircle } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import type { Product } from "../../types";
 import { useAuth } from "../../context/AuthContext";
@@ -19,6 +20,53 @@ interface ProductCardProps {
   compactAddToCart?: boolean;
 }
 
+function ShareOptionIcon({ name }: { name: string }) {
+  if (name === "WhatsApp") {
+    return (
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white">
+        <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="currentColor" aria-hidden="true">
+          <path d="M12.04 2a9.94 9.94 0 0 0-8.52 15.06L2.2 22l5.08-1.29A10 10 0 1 0 12.04 2Zm0 18.18a8.1 8.1 0 0 1-4.13-1.13l-.3-.18-3.02.77.8-2.94-.2-.31a8.17 8.17 0 1 1 6.85 3.79Zm4.48-6.12c-.25-.12-1.48-.73-1.71-.81-.23-.08-.4-.12-.57.12-.17.25-.65.81-.8.98-.14.16-.29.18-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.48-1.38-1.73-.15-.25-.02-.39.1-.51.1-.1.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.57-1.37-.78-1.88-.2-.49-.41-.42-.57-.43h-.49c-.17 0-.43.06-.66.31-.23.25-.87.85-.87 2.08s.89 2.41 1.01 2.58c.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.53.59.19 1.12.16 1.55.1.47-.07 1.48-.61 1.69-1.2.21-.59.21-1.1.15-1.2-.06-.1-.23-.16-.48-.29Z" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (name === "Telegram") {
+    return (
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#229ED9] text-white">
+        <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="currentColor" aria-hidden="true">
+          <path d="m21.7 4.35-3.27 15.42c-.25 1.09-.89 1.36-1.81.85l-5-3.69-2.41 2.32c-.27.27-.5.5-1.02.5l.36-5.09 9.26-8.37c.4-.36-.09-.56-.62-.2L5.74 13.31.8 11.77c-1.07-.34-1.09-1.07.22-1.59L20.34 2.8c.9-.33 1.68.21 1.36 1.55Z" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (name === "Facebook") {
+    return (
+      <span className="flex h-7 w-7 shrink-0 items-end justify-center overflow-hidden rounded-full bg-[#0866FF] text-white">
+        <span className="translate-y-0.5 text-[25px] font-black leading-none" aria-hidden="true">f</span>
+      </span>
+    );
+  }
+
+  if (name === "X") {
+    return (
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-white">
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+          <path d="M18.9 2H22l-6.78 7.75L23.2 22h-6.25l-4.9-7.56L5.44 22H2.3l7.25-8.28L1.8 2h6.4l4.43 6.96L18.9 2Zm-1.1 18h1.73L7.26 3.89H5.4L17.8 20Z" />
+        </svg>
+      </span>
+    );
+  }
+
+  const Icon = name === "Email" ? Mail : MessageCircle;
+  return (
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-container text-primary">
+      <Icon size={17} strokeWidth={2} aria-hidden="true" />
+    </span>
+  );
+}
+
 export function ProductCard({
   product,
   className = "",
@@ -26,6 +74,7 @@ export function ProductCard({
   compact = false,
   compactAddToCart = false,
 }: ProductCardProps) {
+  const shareDialogTitleId = useId();
   const { user, isLoading: isAuthLoading } = useAuth();
   const { addToCart, updateQty, getItemQuantity } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
@@ -34,6 +83,8 @@ export function ProductCard({
   const [optIndex, setOptIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
   const currentOption = product.options[optIndex] || product.options[0];
   if (!currentOption) return null;
 
@@ -97,6 +148,7 @@ export function ProductCard({
     }
     try {
       const added = await toggleWishlist(product, optIndex);
+      if (added === undefined) return false;
       if (added) {
         toast.success("Saved to your wishlist");
       } else {
@@ -108,6 +160,36 @@ export function ProductCard({
       return false;
     }
   };
+
+  const handleShare = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const url = new URL("/product", window.location.origin);
+    url.searchParams.set("id", product.id);
+    setShareUrl(url.toString());
+    setShowShareDialog(true);
+  };
+
+  const handleCopyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success("Product link copied");
+      setShowShareDialog(false);
+    } catch (err: any) {
+      toast.error(err?.message || "Could not copy the product link");
+    }
+  };
+
+  const shareMessage = `Check out ${product.name}: ${shareUrl}`;
+  const shareOptions = [
+    { name: "WhatsApp", href: `https://wa.me/?text=${encodeURIComponent(shareMessage)}` },
+    { name: "Telegram", href: `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`Check out ${product.name}`)}` },
+    { name: "Facebook", href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}` },
+    { name: "X", href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out ${product.name}`)}&url=${encodeURIComponent(shareUrl)}` },
+    { name: "Email", href: `mailto:?subject=${encodeURIComponent(product.name)}&body=${encodeURIComponent(shareMessage)}` },
+    { name: "SMS", href: `sms:?body=${encodeURIComponent(shareMessage)}` },
+  ];
 
   const isVipCustomer = !!user?.isVIP;
   const showVipPrice =
@@ -126,26 +208,47 @@ export function ProductCard({
       data-product-card-root
       className={`rounded-2xl ${compact ? "p-1.5 sm:p-space-md" : "p-2 sm:p-space-md"} flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow relative group border border-outline-variant/15 ${className}`}
     >
+      {!readOnly && (
+        <div className="pointer-events-none absolute inset-x-1 top-1 z-20 flex items-center justify-between">
+          <WishlistHeartButton
+            active={wishlisted}
+            onToggle={handleToggleWishlist}
+            className={`pointer-events-auto h-8 w-8 rounded-full bg-surface-container-lowest/90 text-on-surface-variant shadow-sm ${wishlisted ? "text-rose-600" : "hover:text-rose-600"}`}
+            size="sm"
+          />
+          <button
+            type="button"
+            onClick={handleShare}
+            aria-label={`Share ${product.name}`}
+            title="Share product"
+            className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-surface-container-lowest/90 text-on-surface-variant shadow-sm transition-colors hover:text-primary"
+          >
+            <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+              share
+            </span>
+          </button>
+        </div>
+      )}
       <div>
         {/* Product Image & Badges */}
-        <div data-product-image-container className={`relative ${compact ? "mx-auto w-[88%] sm:mx-0 sm:w-full" : "w-full"} aspect-square rounded-2xl overflow-hidden mb-2 sm:mb-space-md flex items-center justify-center p-1 sm:p-3 border border-outline-variant/10`}>
+        <div data-product-image-container className={`relative ${compact ? "mx-auto w-[88%] sm:mx-0 sm:w-full" : "w-full"} aspect-square rounded-2xl overflow-hidden mb-2 sm:mb-space-md flex items-center justify-center border border-outline-variant/10`}>
           {product.imageUrl && !imageError ? (
             readOnly ? (
-              <div className="flex items-center justify-center w-full h-full cursor-default">
+              <div className="absolute inset-0 flex items-center justify-center cursor-default sm:inset-3">
                 <img
                   src={product.imageUrl}
                   alt={product.name}
-                  className={`${compact ? "max-w-[88%] max-h-[88%] sm:max-w-full sm:max-h-full" : "max-w-full max-h-full"} scale-105 object-contain select-none sm:scale-100`}
+                  className="h-full w-full scale-105 object-cover object-center select-none sm:scale-100 sm:object-contain"
                   loading="lazy"
                   onError={() => setImageError(true)}
                 />
               </div>
             ) : (
-              <Link to="/product" search={{ id: product.id } as any} className="flex items-center justify-center w-full h-full">
+              <Link to="/product" search={{ id: product.id } as any} className="absolute inset-0 flex items-center justify-center sm:inset-3">
                 <img
                   src={product.imageUrl}
                   alt={product.name}
-                  className={`${compact ? "max-w-[88%] max-h-[88%] sm:max-w-full sm:max-h-full" : "max-w-full max-h-full"} scale-105 object-contain group-hover:scale-110 transition-transform duration-300 drop-shadow-sm select-none sm:scale-100 sm:group-hover:scale-105`}
+                  className="h-full w-full scale-105 object-cover object-center group-hover:scale-110 transition-transform duration-300 drop-shadow-sm select-none sm:scale-100 sm:object-contain sm:group-hover:scale-105"
                   loading="lazy"
                   onError={() => setImageError(true)}
                 />
@@ -174,15 +277,6 @@ export function ProductCard({
             </span>
           )}
 
-          {/* Quick Wishlist Heart (Omitted in Read-Only Preview) */}
-          {!readOnly && (
-            <WishlistHeartButton
-              active={wishlisted}
-              onToggle={handleToggleWishlist}
-              className={`absolute top-2 right-2 z-20 w-8 h-8 rounded-full bg-surface-container-lowest/90 text-on-surface-variant shadow-sm ${wishlisted ? "text-rose-600" : "hover:text-rose-600"}`}
-              size="sm"
-            />
-          )}
         </div>
 
         {(readOnly || product.isNew === true || product.isBestSeller === true || product.isFeatured === true) && (
@@ -284,17 +378,17 @@ export function ProductCard({
 
         {/* Prices & Savings */}
         <div className="flex flex-wrap items-baseline gap-x-space-xs gap-y-1 mb-2 sm:mb-space-md">
-          {currentOption.mrp > currentOption.offerPrice && (
-            <span className="font-price-mrp text-xs text-outline line-through">
-              ₹{currentOption.mrp}
-            </span>
-          )}
           <span className="font-price-card text-price-card text-on-surface font-black text-sm sm:text-base">
             ₹
             {isVipCustomer && currentOption.specialPrice
               ? currentOption.specialPrice
               : currentOption.offerPrice}
           </span>
+          {currentOption.mrp > currentOption.offerPrice && (
+            <span className="font-price-mrp text-xs text-outline line-through">
+              ₹{currentOption.mrp}
+            </span>
+          )}
           {currentOption.mrp > currentOption.offerPrice && (
             <span className="font-body-sm text-[11px] text-primary font-bold ml-auto">
               Save ₹{currentOption.mrp - currentOption.offerPrice}
@@ -387,6 +481,74 @@ export function ProductCard({
                 Go to Login
               </Link>
             </div>
+          </section>
+        </div>
+      )}
+
+      {showShareDialog && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/45 px-4 py-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowShareDialog(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setShowShareDialog(false);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={shareDialogTitleId}
+            className="w-full max-w-sm rounded-3xl bg-surface-container-lowest p-5 text-on-surface shadow-2xl sm:p-6"
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 id={shareDialogTitleId} className="text-lg font-bold">
+                  Share product
+                </h2>
+                <p className="mt-1 truncate text-sm text-on-surface-variant">{product.name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowShareDialog(false)}
+                aria-label="Close share options"
+                className="-mr-1 -mt-1 rounded-full p-2 text-on-surface-variant hover:bg-surface-container-low"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {shareOptions.map((option) => (
+                <a
+                  key={option.name}
+                  href={option.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setShowShareDialog(false);
+                  }}
+                  className="flex min-h-12 items-center gap-2.5 rounded-xl border border-outline-variant/25 px-3 py-2.5 text-sm font-semibold transition-colors hover:bg-surface-container-low"
+                >
+                  <ShareOptionIcon name={option.name} />
+                  {option.name}
+                </a>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void handleCopyShareLink();
+              }}
+              className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-on-primary transition-colors hover:bg-primary/90"
+            >
+              <span className="material-symbols-outlined text-[18px]" aria-hidden="true">content_copy</span>
+              Copy link
+            </button>
           </section>
         </div>
       )}

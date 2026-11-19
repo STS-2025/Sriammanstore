@@ -3,7 +3,7 @@ export const STORE_COORDINATES = {
   lng: 77.333565,
   maxRadiusKm: 6.0,
   deliveryRadiusKm: 50.0,
-  storeName: "Sri Amman Smart Store",
+  storeName: "Sriman Smart Store",
   locationName: "Gobichettipalayam, Erode",
   storeAddress: "Kasipalayam, Gobichettipalayam, Erode, Tamil Nadu 638454",
   serviceAreaDistrict: "Erode",

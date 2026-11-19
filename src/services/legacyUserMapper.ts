@@ -4,13 +4,13 @@ import { normalizeDobString } from "../lib/dateUtils";
 /**
  * Pure, Read-Only Legacy Customer Profile Mapper
  *
- * Translates legacy Sri Amman Smart Store Firestore user documents (`users/{userDocId}`)
+ * Translates legacy Sriman Smart Store Firestore user documents (`users/{userDocId}`)
  * into the frontend's canonical `User` customer profile model (`src/types/index.ts`).
  *
  * ============================================================================
  * IDENTITY & AUTHENTICATION BOUNDARY (FUTURE FIREBASE AUTH INTEGRATION NOTE)
  * ============================================================================
- * In the legacy Sri Amman Smart Store Firebase project (`sri-amman-smart-store`),
+ * In the legacy Sriman Smart Store Firebase project (`sri-amman-smart-store`),
  * the customer identity relationship is two-step:
  *
  *   Firebase Auth UID (`auth.currentUser.uid`)

@@ -1843,6 +1843,102 @@ export class FirestoreAdapter {
     return `onlineCustomers/${id}/wishlistProducts`;
   }
 
+  private customerWishlistsCollectionPath(customerId: string): string {
+    const id = customerId.trim();
+    if (!/^ONCUS\d{6,7}$/i.test(id)) {
+      throw new StorageAdapterError("Wishlist access requires a resolved online customer identity.", {
+        status: 403, code: "permission-denied", category: "permission",
+      });
+    }
+    return `onlineCustomers/${id}/wishlists`;
+  }
+
+  private customerWishlistFolderProductsPath(customerId: string, wishlistId: string): string {
+    const folderId = wishlistId.trim();
+    if (!/^wl_[a-zA-Z0-9_-]{8,}$/.test(folderId)) {
+      throw new StorageAdapterError("Wishlist folder ID is invalid.", {
+        status: 400, code: "invalid-argument", category: "validation",
+      });
+    }
+    return `${this.customerWishlistsCollectionPath(customerId)}/${folderId}/products`;
+  }
+
+  public async getCustomerWishlists(customerId: string): Promise<Record<string, unknown>[]> {
+    return this.driver.queryCollection(this.customerWishlistsCollectionPath(customerId), {});
+  }
+
+  public async createCustomerWishlist(
+    customerId: string,
+    wishlistId: string,
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const cleanId = wishlistId.trim();
+    if (!/^wl_[a-zA-Z0-9_-]{8,}$/.test(cleanId) || typeof payload["title"] !== "string" || !String(payload["title"]).trim()) {
+      throw new StorageAdapterError("Wishlist folder details are invalid.", {
+        status: 400, code: "invalid-argument", category: "validation",
+      });
+    }
+    return this.driver.setDoc(
+      this.customerWishlistsCollectionPath(customerId),
+      cleanId,
+      { ...payload, id: cleanId },
+      false,
+    );
+  }
+
+  public async updateCustomerWishlist(
+    customerId: string,
+    wishlistId: string,
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    return this.driver.updateDoc(this.customerWishlistsCollectionPath(customerId), wishlistId, payload);
+  }
+
+  public async deleteCustomerWishlist(customerId: string, wishlistId: string): Promise<void> {
+    return this.driver.deleteDoc(this.customerWishlistsCollectionPath(customerId), wishlistId);
+  }
+
+  public async getCustomerWishlistFolderProducts(
+    customerId: string,
+    wishlistId: string,
+  ): Promise<Record<string, unknown>[]> {
+    return this.driver.queryCollection(this.customerWishlistFolderProductsPath(customerId, wishlistId), {});
+  }
+
+  public async saveCustomerWishlistFolderProduct(
+    customerId: string,
+    wishlistId: string,
+    productId: string,
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const cleanId = productId.trim();
+    if (!cleanId || payload["productId"] !== cleanId) {
+      throw new StorageAdapterError("Wishlist product ID is invalid.", {
+        status: 400, code: "invalid-argument", category: "validation",
+      });
+    }
+    return this.driver.setDoc(
+      this.customerWishlistFolderProductsPath(customerId, wishlistId),
+      cleanId,
+      { ...payload, productId: cleanId, wishlistId, userId: customerId, addedAt: serverTimestamp() },
+      false,
+    );
+  }
+
+  public async deleteCustomerWishlistFolderProduct(
+    customerId: string,
+    wishlistId: string,
+    productId: string,
+  ): Promise<void> {
+    const cleanId = productId.trim();
+    if (!cleanId) {
+      throw new StorageAdapterError("Wishlist product ID is invalid.", {
+        status: 400, code: "invalid-argument", category: "validation",
+      });
+    }
+    return this.driver.deleteDoc(this.customerWishlistFolderProductsPath(customerId, wishlistId), cleanId);
+  }
+
   public async getCustomerWishlistProducts(customerId: string): Promise<Record<string, unknown>[]> {
     return this.driver.queryCollection(this.customerWishlistCollectionPath(customerId), {});
   }

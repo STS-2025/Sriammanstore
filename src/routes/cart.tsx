@@ -20,7 +20,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/cart")({
   head: () => ({
     meta: [
-      { title: "Review Cart — Sri Amman Smart Store" },
+      { title: "Review Cart — Sriman Smart Store" },
       { name: "description", content: "Review your farm fresh items before checkout." },
     ],
   }),
@@ -133,6 +133,7 @@ export function CartPage() {
       const p = await productService.getProductById(item.productId);
       if (p) {
         const added = await addToWishlist(p, item.optionIndex || 0);
+        if (added === undefined) return false;
         if (added) toast.success(`Saved ${item.name} to your wishlist`);
         else toast.info(`Removed ${item.name} from your wishlist`);
         return added;

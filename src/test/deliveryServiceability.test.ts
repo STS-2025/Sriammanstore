@@ -20,7 +20,7 @@ describe("Delivery Serviceability (50 km Radius) Integration Test Suite", () => 
     it("uses confirmed store coordinates in Kasipalayam, Gobichettipalayam, Erode", () => {
       expect(STORE_COORDINATES.lat).toBeCloseTo(11.459319, 5);
       expect(STORE_COORDINATES.lng).toBeCloseTo(77.333565, 5);
-      expect(STORE_COORDINATES.storeName).toBe("Sri Amman Smart Store");
+      expect(STORE_COORDINATES.storeName).toBe("Sriman Smart Store");
       expect(STORE_COORDINATES.serviceAreaDistrict).toBe("Erode");
       expect(STORE_COORDINATES.serviceAreaState).toBe("Tamil Nadu");
     });

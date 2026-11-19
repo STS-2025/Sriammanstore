@@ -24,7 +24,7 @@ import { authManager } from "../services/authAdapter";
 export const Route = createFileRoute("/rewards")({
   head: () => ({
     meta: [
-      { title: "Smart Coins & VIP Privilege Hub — Sri Amman Smart Store" },
+      { title: "Smart Coins & VIP Privilege Hub — Sriman Smart Store" },
       {
         name: "description",
         content:
@@ -228,7 +228,7 @@ export function RewardsPage() {
       return;
     }
     const text = encodeURIComponent(
-      `Hey! Order authentic cold-pressed oils, organic grains & heirloom spices from Sri Amman Smart Store. Use my code ${code} to get ₹100 off your first cart! https://sriammanstore.com/shop?ref=${code}`
+      `Hey! Order authentic cold-pressed oils, organic grains & heirloom spices from Sriman Smart Store. Use my code ${code} to get ₹100 off your first cart! https://sriammanstore.com/shop?ref=${code}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
   };
@@ -919,12 +919,12 @@ export function RewardsPage() {
             </div>
           </section>
 
-          {/* Section: Sri Amman VIP Privilege Framework (Preserves strict binary ₹5,000 rule) */}
+          {/* Section: Sriman VIP Privilege Framework (Preserves strict binary ₹5,000 rule) */}
           <div className="bg-surface-container-lowest rounded-3xl p-6 md:p-8 border border-outline-variant/20 shadow-sm mb-12">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-headline-lg text-lg font-bold text-on-surface">
-                  Sri Amman VIP Privilege Framework
+                  Sriman VIP Privilege Framework
                 </h3>
                 <p className="text-xs text-on-surface-variant mt-0.5">
                   Transparent qualification standards based strictly on verified delivered grocery orders.

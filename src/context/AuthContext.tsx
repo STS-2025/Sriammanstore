@@ -52,7 +52,7 @@ export function describeIdentityResolutionState(
         code: result.code,
         title: "Customer Account Not Linked",
         userMessage:
-          "Firebase authenticated this sign-in, but no Sri Amman Smart Store customer account is linked to it yet. Accounts are never linked by email or phone alone, and no profile was created automatically. Please sign out or contact support while secure registration is pending.",
+          "Firebase authenticated this sign-in, but no Sriman Smart Store customer account is linked to it yet. Accounts are never linked by email or phone alone, and no profile was created automatically. Please sign out or contact support while secure registration is pending.",
         isRetryable: false,
       };
     case "missing_profile":
@@ -61,7 +61,7 @@ export function describeIdentityResolutionState(
         code: result.code,
         title: "Customer Profile Record Not Found",
         userMessage:
-          "Your sign-in is linked to a customer record that could not be found in the store database. Please sign out and contact Sri Amman Smart Store support for assistance.",
+          "Your sign-in is linked to a customer record that could not be found in the store database. Please sign out and contact Sriman Smart Store support for assistance.",
         isRetryable: false,
       };
     case "malformed_mapping":
@@ -511,7 +511,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         throw new Error(
           resolution.message ||
-            "Authenticated with Firebase, but no linked Sri Amman Smart Store customer profile was found.",
+            "Authenticated with Firebase, but no linked Sriman Smart Store customer profile was found.",
         );
       } finally {
         if (isMountedRef.current) {

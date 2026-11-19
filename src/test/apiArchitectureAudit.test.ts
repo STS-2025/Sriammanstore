@@ -281,7 +281,7 @@ describe("API-Only Data Access Architecture Audit", () => {
     it("successfully retrieves store info directly from running JSON Server REST API", async () => {
       const store = await settingsService.getStoreInfo();
       expect(store).toBeDefined();
-      expect(store.storeName).toBe("Sri Amman Smart Store");
+      expect(store.storeName).toBe("Sriman Smart Store");
       expect(store.centerLat).toBeCloseTo(11.459319, 5);
       expect(store.centerLng).toBeCloseTo(77.333565, 5);
       expect(store.maxRadiusKm).toBe(6.0);

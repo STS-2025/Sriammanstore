@@ -44,7 +44,7 @@ export interface StorePaymentSettings {
 export const DEFAULT_PAYMENT_SETTINGS: StorePaymentSettings = {
   upiEnabled: true,
   merchantUpiId: "sriammansmartstore@okaxis",
-  merchantName: "Sri Amman Smart Store",
+  merchantName: "Sriman Smart Store",
   codEnabled: true,
   maxCodAmount: 3000,
 };

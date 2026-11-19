@@ -91,7 +91,7 @@ describe("Login UI: restored app-shell layout", () => {
       );
     });
 
-    expect(screen.getByText("Sign in to Sri Amman")).toBeDefined();
+    expect(screen.getByText("Sign in to Sriman")).toBeDefined();
     expect(screen.getByText("Choose your preferred sign-in method.")).toBeDefined();
     // Tabs must be completely removed
     expect(screen.queryByRole("tab")).toBeNull();
@@ -115,7 +115,7 @@ describe("Login UI: restored app-shell layout", () => {
       );
     });
 
-    expect(screen.getByText("Sign in to Sri Amman")).toBeDefined();
+    expect(screen.getByText("Sign in to Sriman")).toBeDefined();
     expect(screen.queryByText(/Existing Customer Production Login/i)).toBeNull();
     expect(screen.queryByText(/Safe Read-Only Verification/i)).toBeNull();
     // Both authentication buttons visible simultaneously without switching tabs

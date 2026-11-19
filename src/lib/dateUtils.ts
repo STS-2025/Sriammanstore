@@ -1,5 +1,5 @@
 /**
- * Date and DOB utilities for Sri Amman Smart Store.
+ * Date and DOB utilities for Sriman Smart Store.
  *
  * Prevents timezone-related off-by-one day shifts when parsing, converting,
  * and displaying customer Date of Birth (DOB) values.

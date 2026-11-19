@@ -7,7 +7,7 @@ import type { Product } from "../types";
 
 const product: Product = {
   id: "catalog-product-42", name: "Groundnut Oil", category: "Oils", categorySlug: "oils",
-  brand: "Sri Amman", rating: 0, reviewCount: 0, description: "", imageUrl: "/oil.png",
+  brand: "Sriman", rating: 0, reviewCount: 0, description: "", imageUrl: "/oil.png",
   images: ["/oil.png"], tags: [], isActive: true,
   options: [{ unit: "ml", unitSize: "500", mrp: 250, offerPrice: 220, stock: 2 }],
 };

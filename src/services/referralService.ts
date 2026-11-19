@@ -126,7 +126,7 @@ export const referralService = {
   buildShareMessage(referralCode: string, origin?: string): string {
     const link = this.buildReferralLink(referralCode, origin);
     const cleanCode = (referralCode || "").trim();
-    return `Shop wood-pressed Mara Chekku oils, organic staples, and farm-fresh groceries at Sri Amman Smart Store! Register with my referral code ${cleanCode} to claim your welcome bonus Smart Coins: ${link}`;
+    return `Shop wood-pressed Mara Chekku oils, organic staples, and farm-fresh groceries at Sriman Smart Store! Register with my referral code ${cleanCode} to claim your welcome bonus Smart Coins: ${link}`;
   },
 
   buildWhatsAppShareUrl(referralCode: string, origin?: string): string {

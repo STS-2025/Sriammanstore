@@ -466,6 +466,13 @@ service cloud.firestore {
         allow delete: if isAuthorizedOnlineCustomer(customerId);
       }
 
+      match /wishlistProducts/{productId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow create, update: if isAuthorizedOnlineCustomer(customerId) &&
+                                 isValidWishlistProduct(request.resource.data);
+        allow delete: if isAuthorizedOnlineCustomer(customerId);
+      }
+
       match /wishlists/{wishlistId} {
         allow read: if isAuthorizedOnlineCustomer(customerId);
         allow create, update: if isAuthorizedOnlineCustomer(customerId) &&

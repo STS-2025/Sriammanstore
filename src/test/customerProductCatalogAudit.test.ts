@@ -109,7 +109,7 @@ describe("Customer Product Catalog Audit & Production Schema Validation", () => 
     productName: "Erode Pure Sambar Powder",
     categoryName: "Organic Spices",
     subCategory: "Spice Powders",
-    brandName: "Sri Amman Farms",
+    brandName: "Sriman Farms",
     options: [
       {
         unit: "g",

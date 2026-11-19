@@ -8,8 +8,8 @@ export const Route = createFileRoute("/sign-up")({
   },
   head: () => ({
     meta: [
-      { title: "Create a Customer Account — Sri Amman Smart Store" },
-      { name: "description", content: "Create a Sri Amman Smart Store customer account." },
+      { title: "Create a Customer Account — Sriman Smart Store" },
+      { name: "description", content: "Create a Sriman Smart Store customer account." },
     ],
   }),
   component: SignUpPage,
@@ -32,7 +32,7 @@ export function SignUpPage() {
             <p className="text-sm leading-relaxed text-on-surface-variant">
               {redirect?.startsWith("/checkout")
                 ? "Create your account to continue checkout. Your selected cart items are saved and will be ready when you return."
-                : "Create your customer account with email and password to start shopping at Sri Amman Smart Store."}
+                : "Create your customer account with email and password to start shopping at Sriman Smart Store."}
             </p>
           </div>
 

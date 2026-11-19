@@ -22,11 +22,11 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/refer")({
   head: () => ({
     meta: [
-      { title: "Refer & Earn — Sri Amman Smart Store" },
+      { title: "Refer & Earn — Sriman Smart Store" },
       {
         name: "description",
         content:
-          "Invite friends to Sri Amman Smart Store with your personal referral code and earn Smart Coins on their first completed order.",
+          "Invite friends to Sriman Smart Store with your personal referral code and earn Smart Coins on their first completed order.",
       },
     ],
   }),
@@ -181,7 +181,7 @@ export function ReferPage() {
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({
-          title: "Sri Amman Smart Store — Community Referral Invite",
+          title: "Sriman Smart Store — Community Referral Invite",
           text: shareText,
           url: inviteLink,
         });
@@ -336,7 +336,7 @@ export function ReferPage() {
               <p className="text-xs sm:text-sm text-on-surface-variant mt-3 leading-relaxed">
                 Invite your friends and neighbors to{" "}
                 <strong className="text-on-surface font-semibold">
-                  {storeInfo?.storeName || "Sri Amman Smart Store"}
+                  {storeInfo?.storeName || "Sriman Smart Store"}
                 </strong>
                 . Friends who register with your referral code receive{" "}
                 <strong className="text-on-surface font-semibold">

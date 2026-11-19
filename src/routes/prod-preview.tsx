@@ -18,7 +18,7 @@ import {
 export const Route = createFileRoute("/prod-preview")({
   head: () => ({
     meta: [
-      { title: "Production Product Visual Preview — Sri Amman Smart Store" },
+      { title: "Production Product Visual Preview — Sriman Smart Store" },
       {
         name: "description",
         content:
@@ -898,7 +898,7 @@ function ProductionProductPreviewPage() {
           {/* Footer Back Link */}
           <div className="mt-16 pt-6 border-t border-outline-variant/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-on-surface-variant">
             <span>
-              Sri Amman Smart Store &copy; 2026 &bull; Isolated Production Diagnostic Sandbox
+              Sriman Smart Store &copy; 2026 &bull; Isolated Production Diagnostic Sandbox
             </span>
             <div className="flex items-center gap-4">
               <Link to="/" className="text-primary font-bold hover:underline">
