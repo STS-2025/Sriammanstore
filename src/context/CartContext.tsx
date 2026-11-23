@@ -90,7 +90,7 @@ interface CartContextType {
   addToCart: (product: Product, optionIndex?: number, quantity?: number) => Promise<void>;
   updateQty: (cartKey: string, quantity: number) => Promise<void>;
   removeFromCart: (cartKey: string) => Promise<void>;
-  clearCart: () => Promise<void>;
+  clearCart: (options?: { skipRemote?: boolean }) => Promise<void>;
   refreshCart: () => Promise<void>;
   revalidateCartItems: () => Promise<CartItem[]>;
   getItemQuantity: (cartKey: string) => number;
@@ -107,6 +107,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartSyncAttemptedCustomerId, setCartSyncAttemptedCustomerId] = useState<string | null>(null);
   const [guestCartSyncError, setGuestCartSyncError] = useState<string | null>(null);
   const cartMutationVersionRef = useRef(0);
+  const quantityMutationVersionsRef = useRef(new Map<string, number>());
+  const quantityWriteQueuesRef = useRef(new Map<string, Promise<void>>());
 
   // Scoped storage keys based on user ID
   const storageUserKey = user?.id || "guest";
@@ -257,7 +259,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCartError(null);
     try {
       const cartItems = await cartService.getCart(user?.id, user?.legacySassId);
-      if (cartMutationVersionRef.current === requestVersion) setItems(cartItems || []);
+      if (
+        cartMutationVersionRef.current === requestVersion &&
+        quantityWriteQueuesRef.current.size === 0
+      ) {
+        setItems(cartItems || []);
+      }
     } catch (err: unknown) {
       console.error("Failed to load cart items:", err);
       const msg = err instanceof Error ? err.message : "Failed to load cart items";
@@ -338,6 +345,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateQty = async (cartKey: string, quantity: number) => {
+    const previousItem = items.find((item) => item.id === cartKey || item.cartKey === cartKey);
     const otherQuantity = items.reduce(
       (sum, item) =>
         item.id === cartKey || item.cartKey === cartKey
@@ -351,38 +359,128 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       );
       return;
     }
-    const updatedItem = await cartService.updateQuantity(
-      cartKey,
-      quantity,
-      guestCartSyncError ? "guest_session" : user?.id,
-    );
+
+    if (!previousItem) return;
+
+    const nextVersion = (quantityMutationVersionsRef.current.get(cartKey) || 0) + 1;
+    quantityMutationVersionsRef.current.set(cartKey, nextVersion);
     cartMutationVersionRef.current += 1;
     setItems((currentItems) => {
-      if (!updatedItem) {
-        return currentItems.filter((item) => item.id !== cartKey && item.cartKey !== cartKey);
-      }
-      const updatedKey = updatedItem.cartKey || updatedItem.id;
-      const existingIndex = currentItems.findIndex(
-        (item) => item.id === cartKey || item.cartKey === cartKey || item.id === updatedKey || item.cartKey === updatedKey,
-      );
-      if (existingIndex < 0) return [...currentItems, updatedItem];
-      return currentItems.map((item, index) =>
-        index === existingIndex ? { ...item, ...updatedItem } : item,
+      if (quantity <= 0) return currentItems.filter((item) => item.id !== cartKey && item.cartKey !== cartKey);
+      return currentItems.map((item) =>
+        item.id === cartKey || item.cartKey === cartKey ? { ...item, quantity } : item,
       );
     });
     setCartError(null);
     setIsLoading(false);
+
+    const previousWrite = quantityWriteQueuesRef.current.get(cartKey) || Promise.resolve();
+    const write = previousWrite.catch(() => undefined).then(async () => {
+      try {
+        const updatedItem = await cartService.updateQuantity(
+          cartKey,
+          quantity,
+          guestCartSyncError ? "guest_session" : user?.id,
+        );
+
+        if (quantityMutationVersionsRef.current.get(cartKey) === nextVersion) {
+          setItems((currentItems) => {
+            if (!updatedItem) {
+              return currentItems.filter((item) => item.id !== cartKey && item.cartKey !== cartKey);
+            }
+            const updatedKey = updatedItem.cartKey || updatedItem.id;
+            return currentItems.map((item) =>
+              item.id === cartKey || item.cartKey === cartKey || item.id === updatedKey || item.cartKey === updatedKey
+                ? { ...item, ...updatedItem }
+                : item,
+            );
+          });
+        }
+      } catch (error) {
+        if (quantityMutationVersionsRef.current.get(cartKey) === nextVersion) {
+          setItems((currentItems) => {
+            const exists = currentItems.some(
+              (item) => item.id === cartKey || item.cartKey === cartKey,
+            );
+            if (quantity <= 0) return exists ? currentItems : [...currentItems, previousItem];
+            return exists
+              ? currentItems.map((item) =>
+                  item.id === cartKey || item.cartKey === cartKey
+                    ? { ...item, quantity: previousItem.quantity }
+                    : item,
+                )
+              : [...currentItems, previousItem];
+          });
+          toast.error(error instanceof Error ? error.message : "Could not save the cart quantity. Please try again.");
+        }
+      } finally {
+        cartMutationVersionRef.current += 1;
+        if (quantityMutationVersionsRef.current.get(cartKey) === nextVersion) {
+          quantityWriteQueuesRef.current.delete(cartKey);
+        }
+      }
+    });
+    quantityWriteQueuesRef.current.set(cartKey, write);
+    void write;
   };
 
   const removeFromCart = async (cartKey: string) => {
-    await cartService.removeFromCart(cartKey, guestCartSyncError ? "guest_session" : user?.id);
-    if (guestCartSyncError) setItems(await cartService.getGuestCart(!!user?.isVIP));
-    else await refreshCart();
+    const previousItem = items.find((item) => item.id === cartKey || item.cartKey === cartKey);
+    if (!previousItem) return;
+
+    const nextVersion = (quantityMutationVersionsRef.current.get(cartKey) || 0) + 1;
+    quantityMutationVersionsRef.current.set(cartKey, nextVersion);
+    cartMutationVersionRef.current += 1;
+    setItems((currentItems) => currentItems.filter(
+      (item) => item.id !== cartKey && item.cartKey !== cartKey,
+    ));
+    setIsLoading(false);
+
+    const previousWrite = quantityWriteQueuesRef.current.get(cartKey) || Promise.resolve();
+    const write = previousWrite.catch(() => undefined).then(async () => {
+      try {
+        await cartService.removeFromCart(
+          cartKey,
+          guestCartSyncError ? "guest_session" : user?.id,
+        );
+      } catch (error) {
+        if (quantityMutationVersionsRef.current.get(cartKey) === nextVersion) {
+          setItems((currentItems) => [...currentItems, previousItem]);
+          toast.error(error instanceof Error ? error.message : "Could not remove this item from your cart.");
+        }
+      } finally {
+        cartMutationVersionRef.current += 1;
+        if (quantityMutationVersionsRef.current.get(cartKey) === nextVersion) {
+          quantityWriteQueuesRef.current.delete(cartKey);
+        }
+      }
+    });
+    quantityWriteQueuesRef.current.set(cartKey, write);
+    void write;
   };
 
-  const clearCart = async () => {
-    await cartService.clearCart(guestCartSyncError ? "guest_session" : user?.id);
+  const clearCart = async (options: { skipRemote?: boolean } = {}) => {
+    const previousItems = items;
+    for (const item of previousItems) {
+      const key = item.cartKey || item.id;
+      quantityMutationVersionsRef.current.set(key, (quantityMutationVersionsRef.current.get(key) || 0) + 1);
+    }
+    cartMutationVersionRef.current += 1;
     setItems([]);
+    setIsLoading(false);
+    if (options.skipRemote) return;
+    void (async () => {
+      try {
+        await Promise.all([...quantityWriteQueuesRef.current.values()]);
+        quantityWriteQueuesRef.current.clear();
+        await cartService.clearCart(guestCartSyncError ? "guest_session" : user?.id);
+      } catch (error) {
+        setItems(previousItems);
+        toast.error(error instanceof Error ? error.message : "Could not clear your cart. Please try again.");
+      } finally {
+        cartMutationVersionRef.current += 1;
+      }
+    })();
   };
 
   const revalidateCartItems = async () => {

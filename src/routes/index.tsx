@@ -10,6 +10,7 @@ import { productService } from "../services/productService";
 import type { Announcement, Banner, Product, Category } from "../types";
 import { useLanguage } from "../context/LanguageContext";
 import { settingsService } from "../services/settingsService";
+import { VoiceSearchButton } from "../components/search/VoiceSearchButton";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -30,7 +31,7 @@ const BANNER_INTERVAL_MS = 6000;
 const BANNER_DATA_REFRESH_MS = 15_000;
 
 function HomePage() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
@@ -172,6 +173,7 @@ function HomePage() {
                 aria-expanded={Boolean(searchQuery.trim())}
                 className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-on-surface placeholder:text-outline focus:outline-none"
               />
+              <VoiceSearchButton language={language} onTranscript={setSearchQuery} />
               <button
                 type="submit"
                 aria-label="Submit search"
@@ -472,6 +474,8 @@ function OffersScroller({ announcements }: { announcements: Announcement[] }) {
 function PromotionalBannerCarousel({ banners, loading }: { banners: Banner[]; loading: boolean }) {
   const { language } = useLanguage();
   const [activeIndex, setActiveIndex] = useState(0);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressClickUntilRef = useRef(0);
   useEffect(() => {
     if (banners.length < 2) return;
     const timer = window.setInterval(
@@ -480,6 +484,27 @@ function PromotionalBannerCarousel({ banners, loading }: { banners: Banner[]; lo
     );
     return () => window.clearInterval(timer);
   }, [banners.length]);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (!event.isPrimary || event.button !== 0) return;
+    pointerStartRef.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLElement>) => {
+    const start = pointerStartRef.current;
+    pointerStartRef.current = null;
+    if (!start || banners.length < 2) return;
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    if (Math.abs(deltaX) < 40 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+
+    suppressClickUntilRef.current = Date.now() + 500;
+    setActiveIndex((current) =>
+      (current + (deltaX < 0 ? 1 : -1) + banners.length) % banners.length,
+    );
+  };
+
   const banner = banners[activeIndex];
   const mobileImage = banner?.mobileImageUrl;
   const categorySlug = banner?.categorySlug;
@@ -540,10 +565,19 @@ function PromotionalBannerCarousel({ banners, loading }: { banners: Banner[]; lo
   return (
     <section
       aria-label="Promotions"
-      className="relative w-full overflow-hidden bg-surface-container-lowest shadow-sm"
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={() => { pointerStartRef.current = null; }}
+      className="relative w-full touch-pan-y overflow-hidden bg-surface-container-lowest shadow-sm"
     >
       <a
         href={bannerHref}
+        onClick={(event) => {
+          if (Date.now() < suppressClickUntilRef.current) {
+            event.preventDefault();
+            suppressClickUntilRef.current = 0;
+          }
+        }}
         aria-label={banner ? `View promotion: ${title}` : "Shop Sriman groceries"}
         className="relative block aspect-[1.7/1] max-h-[440px] min-h-[180px] w-full overflow-hidden sm:aspect-[3.1/1]"
         style={{ backgroundColor: banner?.bannerBackgroundColor || "#f4f4f5" }}
@@ -665,7 +699,14 @@ function PromotionalBannerCarousel({ banners, loading }: { banners: Banner[]; lo
               type="button"
               aria-label={`Show promotion ${index + 1}`}
               aria-current={index === activeIndex}
-              onClick={() => setActiveIndex(index)}
+              onClick={(event) => {
+                if (Date.now() < suppressClickUntilRef.current) {
+                  event.preventDefault();
+                  suppressClickUntilRef.current = 0;
+                  return;
+                }
+                setActiveIndex(index);
+              }}
               className={`h-2 rounded-full transition-all ${index === activeIndex ? "w-6 bg-primary" : "w-2 bg-white/80"}`}
             />
           ))}

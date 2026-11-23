@@ -403,8 +403,13 @@ export function filterAndSortProducts(
   } else if (sort === "oldest") {
     sorted.sort((a, b) => Number(a.isNew) - Number(b.isNew));
   } else {
-    // default: "popular"
-    sorted.sort((a, b) => b.reviewCount - a.reviewCount);
+    // default: "popular". Use the catalogue score when present, with review
+    // count as a fallback for older product records that do not have one.
+    sorted.sort((a, b) => {
+      const aScore = a.rankingScore ?? a.reviewCount;
+      const bScore = b.rankingScore ?? b.reviewCount;
+      return bScore - aScore || b.reviewCount - a.reviewCount;
+    });
   }
 
   return sorted;

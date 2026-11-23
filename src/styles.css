@@ -1,6 +1,16 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "leaflet/dist/leaflet.css";
+
+.location-pin-marker {
+  background: transparent;
+  border: 0;
+  color: #b42318;
+  font-size: 38px;
+  line-height: 38px;
+  text-shadow: 0 2px 3px rgb(0 0 0 / 35%);
+}
 
 @keyframes product-name-slide {
   0%, 33.333% { transform: translateX(0); }

@@ -14,6 +14,7 @@ import type { Address } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { findDeliveryLocation, getDeliveryAreaSuggestions } from "../lib/deliveryLocations";
+import { LocationPinPicker } from "../components/location/LocationPinPicker";
 
 export const Route = createFileRoute("/addresses")({
   validateSearch: (
@@ -46,6 +47,7 @@ export function AddressesPage() {
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [tag, setTag] = useState<"Home" | "Work" | "Other">("Home");
   const [name, setName] = useState(user?.name || "");
   const [phone, setPhone] = useState(user?.phone || "");
@@ -58,6 +60,7 @@ export function AddressesPage() {
   const [lng, setLng] = useState(0);
 
   const handleOpenAddModal = () => {
+    setEditingAddress(null);
     setName(user?.name || "");
     setPhone(user?.phone || "");
     setHouseNo("");
@@ -65,7 +68,24 @@ export function AddressesPage() {
     setLandmark("");
     setCity(deliveryConfig.serviceAreaDistrict);
     setPincode("");
+    setLat(0);
+    setLng(0);
     setTag("Home");
+    setShowModal(true);
+  };
+
+  const handleOpenEditModal = (address: Address) => {
+    setEditingAddress(address);
+    setTag(address.tag);
+    setName(address.name);
+    setPhone(address.phone);
+    setHouseNo(address.houseNo);
+    setStreet(address.street);
+    setLandmark(address.landmark || "");
+    setCity(address.city);
+    setPincode(address.pincode);
+    setLat(address.lat || 0);
+    setLng(address.lng || 0);
     setShowModal(true);
   };
 
@@ -141,24 +161,6 @@ export function AddressesPage() {
     }
   };
 
-  const handleSimulateGPS = () => {
-    // Use an admin-managed zone to demonstrate an eligible address.
-    const firstZone = deliveryConfig.deliveryZones[0];
-    const location = firstZone
-      ? findDeliveryLocation(firstZone, deliveryConfig.deliveryZones)
-      : undefined;
-    setLat(0);
-    setLng(0);
-    setCity(location?.city || deliveryConfig.serviceAreaDistrict);
-    setPincode(location?.pincode || "");
-    setStreet(firstZone || "");
-    toast.info(
-      firstZone
-        ? `Address set inside the ${firstZone} delivery zone.`
-        : "Enter an address inside the service area."
-    );
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -167,8 +169,7 @@ export function AddressesPage() {
       return;
     }
     try {
-      await addressService.addAddress({
-        userId: user.id,
+      const addressData = {
         tag,
         name,
         phone,
@@ -179,18 +180,34 @@ export function AddressesPage() {
         pincode,
         lat,
         lng,
-        isDefault: addresses.length === 0,
-      });
+      };
+
+      if (editingAddress) {
+        const updated = await addressService.updateAddress(editingAddress.id, {
+          ...addressData,
+          userId: user.id,
+        });
+        setAddresses((current) => current.map((address) => address.id === updated.id ? updated : address));
+        toast.success("Address updated successfully!");
+      } else {
+        await addressService.addAddress({
+          ...addressData,
+          userId: user.id,
+          isDefault: addresses.length === 0,
+        });
+        toast.success("Address added successfully!");
+      }
+
       setShowModal(false);
+      setEditingAddress(null);
       setHouseNo("");
       setStreet("");
       setLandmark("");
-      toast.success("Address added successfully!");
-      if (searchParams.redirect) {
+      if (!editingAddress && searchParams.redirect) {
         navigate({ to: searchParams.redirect as any });
         return;
       }
-      await loadAddresses();
+      if (!editingAddress) await loadAddresses();
     } catch (err: any) {
       toast.error(err.message || "Failed to add address");
     }
@@ -265,7 +282,7 @@ export function AddressesPage() {
                 Saved Delivery Addresses
               </h1>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
-                <p className="text-xs text-on-surface-variant">
+                <p className="hidden text-xs text-on-surface-variant sm:block">
                   {deliveryConfig.storeName}: {deliveryConfig.storeAddress}
                   {deliveryConfig.deliveryZones.length > 0
                     ? ` • Zones: ${deliveryConfig.deliveryZones.join(", ")}`
@@ -330,7 +347,7 @@ export function AddressesPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
               {addresses.map((addr) => {
                 const geo = addressService.validateDeliveryServiceability(
                   addr,
@@ -339,10 +356,10 @@ export function AddressesPage() {
                 return (
                   <div
                     key={addr.id}
-                    className="bg-surface-container-lowest p-6 rounded-3xl border border-outline-variant/20 shadow-sm flex flex-col justify-between"
+                    className="flex flex-col justify-between rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:rounded-3xl sm:p-6"
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="mb-2 flex items-center justify-between sm:mb-3">
                         <span className="font-headline-sm text-xs font-bold bg-surface-container px-2.5 py-1 rounded-lg text-on-surface">
                           {addr.tag}
                         </span>
@@ -361,19 +378,19 @@ export function AddressesPage() {
                         )}
                       </div>
 
-                      <h4 className="font-headline-sm text-base font-bold text-on-surface">
+                      <h4 className="font-headline-sm text-sm font-bold text-on-surface sm:text-base">
                         {addr.name}
                       </h4>
                       <p className="text-xs text-on-surface-variant font-medium mt-0.5">
                         {addr.phone}
                       </p>
-                      <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">
+                      <p className="mt-1.5 text-[11px] leading-relaxed text-on-surface-variant sm:mt-2 sm:text-xs">
                         {addr.houseNo}, {addr.street}, {addr.landmark && `${addr.landmark}, `}
                         {addr.city} - {addr.pincode}
                       </p>
 
                       {/* Geofence Eligibility Pill */}
-                      <div className="mt-4 pt-3 border-t border-outline-variant/15 flex items-center justify-between text-xs">
+                      <div className="mt-3 flex items-center justify-between border-t border-outline-variant/15 pt-2 text-xs sm:mt-4 sm:pt-3">
                         <span
                           className={`font-semibold flex items-center gap-1 text-[11px] ${
                             geo.eligible ? "text-primary" : "text-tertiary"
@@ -392,7 +409,16 @@ export function AddressesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-6 pt-3 border-t border-outline-variant/15 flex justify-end">
+                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-outline-variant/15 pt-2 sm:mt-6 sm:pt-3">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(addr)}
+                        aria-label={`Edit ${addr.tag.toLowerCase()} address`}
+                        className="flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">edit</span>
+                        <span>Edit</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(addr.id)}
@@ -413,10 +439,10 @@ export function AddressesPage() {
       {/* Add New Address Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface-container-lowest rounded-3xl p-6 max-w-md w-full shadow-2xl border border-outline-variant/20">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-headline-lg text-base font-bold text-on-surface">
-                Add New Delivery Location
+                {editingAddress ? "Edit Delivery Address" : "Add New Delivery Location"}
               </h4>
               <button
                 type="button"
@@ -427,22 +453,13 @@ export function AddressesPage() {
               </button>
             </div>
 
-            {/* GPS Auto Detect simulation */}
-            <div className="mb-4 p-3 rounded-2xl bg-primary-fixed/20 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-on-primary-fixed">
-                <span className="material-symbols-outlined text-primary text-[20px]">
-                  my_location
-                </span>
-                <span>Use Current GPS Location</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleSimulateGPS}
-                className="px-3 py-1 bg-primary text-white font-bold rounded-lg text-xs"
-              >
-                Auto Detect
-              </button>
-            </div>
+            <LocationPinPicker
+              position={lat !== 0 || lng !== 0 ? { lat, lng } : null}
+              onChange={(position) => {
+                setLat(position.lat);
+                setLng(position.lng);
+              }}
+            />
 
             <form onSubmit={handleSave} className="space-y-3 text-xs">
               <div>
@@ -569,7 +586,7 @@ export function AddressesPage() {
                   type="submit"
                   className="flex-1 py-2.5 rounded-xl font-bold bg-primary text-white shadow-md hover:bg-primary-container cursor-pointer"
                 >
-                  Save Location
+                  {editingAddress ? "Save Changes" : "Save Location"}
                 </button>
               </div>
             </form>

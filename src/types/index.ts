@@ -56,6 +56,8 @@ export interface Product {
   rating: number;
   /** Verified review count (strictly 0 when unrated) */
   reviewCount: number;
+  /** Optional catalogue ranking score used for popularity ordering */
+  rankingScore?: number;
   /** Product description copy */
   description: string;
   /** Primary display image URL or Base64 data URI */

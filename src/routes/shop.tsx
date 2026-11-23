@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { ProductCard } from "../components/product/ProductCard";
+import { VoiceSearchButton } from "../components/search/VoiceSearchButton";
 import { productService } from "../services/productService";
 import type { Product, Category } from "../types";
 import { useLanguage } from "../context/LanguageContext";
@@ -43,7 +44,7 @@ export const Route = createFileRoute("/shop")({
 function ShopPage() {
   const searchParams = useSearch({ from: "/shop" });
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -97,6 +98,7 @@ function ShopPage() {
   const [isAllItemsView, setIsAllItemsView] = useState(true);
   const [isOfferZoneSelected, setIsOfferZoneSelected] = useState(false);
   const productListRef = useRef<HTMLElement>(null);
+  const mobileCategoryRailRef = useRef<HTMLElement>(null);
 
   const closeMobileFilters = useCallback(() => {
     if (mobileFiltersHistoryRef.current) {
@@ -349,6 +351,27 @@ function ShopPage() {
   const filteredProducts = useMemo(() => {
     return filterAndSortProducts(allProducts, currentFilterState, catalogPriceBounds);
   }, [allProducts, currentFilterState, catalogPriceBounds]);
+  const matchingProducts = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) return [];
+
+    return allProducts
+      .filter((product) => {
+        if (!product.isActive) return false;
+        const searchableText = [
+          product.name,
+          product.tamilName,
+          product.brand,
+          product.category,
+          ...product.tags,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase();
+        return searchableText.includes(query);
+      })
+      .slice(0, 6);
+  }, [allProducts, searchQuery]);
   const offerZoneProducts = useMemo(
     () => filteredProducts.filter((product) => product.isOffer === true),
     [filteredProducts],
@@ -463,16 +486,38 @@ function ShopPage() {
     scrollProductListTo();
   };
 
+  useEffect(() => {
+    if (isMobileRailCollapsed) return;
+
+    const rail = mobileCategoryRailRef.current;
+    const activeItem = Array.from(
+      rail?.querySelectorAll<HTMLButtonElement>("[data-shop-rail-item]") || [],
+    ).find((item) => item.dataset.shopRailItem === activeRailItem);
+    if (!rail || !activeItem) return;
+
+    const railBounds = rail.getBoundingClientRect();
+    const itemBounds = activeItem.getBoundingClientRect();
+    if (itemBounds.top < railBounds.top || itemBounds.bottom > railBounds.bottom) {
+      rail.scrollTo({
+        top: rail.scrollTop + itemBounds.top - railBounds.top - (rail.clientHeight - activeItem.offsetHeight) / 2,
+        behavior: "smooth",
+      });
+    }
+  }, [activeRailItem, isMobileRailCollapsed]);
+
   const handleProductListScroll = () => {
     if (isOfferZoneSelected) return;
     const productList = productListRef.current;
     if (!productList) return;
 
     const listTop = productList.getBoundingClientRect().top + 24;
+    // Switch categories as the next heading and its first product enter the
+    // visible reading area, instead of waiting for the heading to reach the top.
+    const categoryActivationLine = listTop + productList.clientHeight * 0.5;
     const sections = Array.from(productList.querySelectorAll<HTMLElement>("[data-shop-category-section]"));
     let activeSlug = sections[0]?.dataset["shopCategorySection"];
     for (const section of sections) {
-      if (section.getBoundingClientRect().top <= listTop) {
+      if (section.getBoundingClientRect().top <= categoryActivationLine) {
         activeSlug = section.dataset["shopCategorySection"];
       } else {
         break;
@@ -719,7 +764,7 @@ function ShopPage() {
                 search: (previous) => ({ ...previous, q: searchQuery.trim() || undefined }),
               });
             }}
-            className="mb-4 flex items-center gap-1 rounded-full bg-surface-container-low px-2 py-1 ring-1 ring-outline-variant/30 md:hidden"
+            className="relative z-30 mb-4 flex items-center gap-1 rounded-full bg-surface-container-low px-2 py-1 ring-1 ring-outline-variant/30 md:hidden"
           >
             <input
               id="shop-product-search-input"
@@ -729,8 +774,11 @@ function ShopPage() {
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search products..."
               aria-label="Search products"
+              aria-controls="shop-product-search-results"
+              aria-expanded={Boolean(searchQuery.trim())}
               className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-sm text-on-surface placeholder:text-outline focus:outline-none"
             />
+            <VoiceSearchButton language={language} onTranscript={setSearchQuery} />
             <button
               type="submit"
               aria-label="Search the shop"
@@ -738,6 +786,58 @@ function ShopPage() {
             >
               <span className="material-symbols-outlined text-[18px]">search</span>
             </button>
+            {searchQuery.trim() && (
+              <div
+                id="shop-product-search-results"
+                role="listbox"
+                aria-label="Matching products"
+                className="absolute left-0 right-0 top-full z-50 mt-2 max-h-80 overflow-y-auto rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-1 shadow-xl"
+              >
+                {matchingProducts.length > 0 ? (
+                  matchingProducts.map((product) => (
+                    <Link
+                      key={product.id}
+                      to="/product"
+                      search={{ id: product.id } as any}
+                      role="option"
+                      aria-selected="false"
+                      className="flex items-center gap-3 rounded-xl p-2 text-left hover:bg-surface-container-low"
+                    >
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt=""
+                          className="h-12 w-12 shrink-0 rounded-lg bg-surface-container-low object-cover"
+                        />
+                      ) : (
+                        <span className="material-symbols-outlined flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-container-low text-on-surface-variant">
+                          image
+                        </span>
+                      )}
+                      <span className="min-w-0 truncate text-sm font-semibold text-on-surface">
+                        {t(product.name, product.tamilName)}
+                      </span>
+                    </Link>
+                  ))
+                ) : loading ? (
+                  <p className="px-3 py-4 text-sm text-on-surface-variant">Loading products...</p>
+                ) : (
+                  <>
+                    <p className="px-3 py-2 text-center text-sm text-on-surface-variant">
+                      No results found.
+                    </p>
+                    <Link
+                      to="/help"
+                      search={{ tab: "request", product: searchQuery.trim() } as any}
+                      className="flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-center text-sm font-semibold text-primary hover:bg-surface-container-low"
+                    >
+                      <span>Request the product you want?</span>
+                      <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                    </Link>
+                  </>
+                )}
+              </div>
+            )}
           </form>
 
           {/* 1. Breadcrumbs */}
@@ -795,9 +895,10 @@ function ShopPage() {
                 <span className="material-symbols-outlined text-[20px]">chevron_right</span>
               </button>
             )}
-            <aside aria-label="Shop by category" className={`${isMobileRailCollapsed ? "hidden" : "flex"} h-full min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain pb-2 pr-1 scrollbar-none md:hidden`}>
+            <aside ref={mobileCategoryRailRef} aria-label="Shop by category" className={`${isMobileRailCollapsed ? "hidden" : "flex"} h-full min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain pb-2 pr-1 scrollbar-none md:hidden`}>
               <button
                 type="button"
+                data-shop-rail-item="offers"
                 aria-pressed={activeRailItem === "offers"}
                 onClick={handleSelectOfferZone}
                 className={`flex w-full flex-col items-center gap-1 rounded-xl p-1 text-center transition-colors md:gap-1.5 md:p-2 ${activeRailItem === "offers" ? "bg-primary/10 text-primary ring-1 ring-primary/25" : "text-on-surface-variant hover:bg-surface-container-low"}`}
@@ -810,6 +911,7 @@ function ShopPage() {
               </button>
               <button
                 type="button"
+                data-shop-rail-item="all"
                 aria-pressed={activeRailItem === "all"}
                 onClick={handleSelectAllItems}
                 className={`flex w-full flex-col items-center gap-1 rounded-xl p-1 text-center transition-colors md:gap-1.5 md:p-2 ${activeRailItem === "all" ? "bg-primary/10 text-primary ring-1 ring-primary/25" : "text-on-surface-variant hover:bg-surface-container-low"}`}
@@ -826,6 +928,7 @@ function ShopPage() {
                   <button
                     key={category.slug}
                     type="button"
+                    data-shop-rail-item={category.slug}
                     aria-pressed={isActive}
                     onClick={() => handleSelectRailCategory(category.slug)}
                     className={`flex w-full flex-col items-center gap-1 rounded-xl p-1 text-center transition-colors md:gap-1.5 md:p-2 ${isActive ? "bg-primary/10 text-primary ring-1 ring-primary/25" : "text-on-surface-variant hover:bg-surface-container-low"}`}
@@ -928,12 +1031,12 @@ function ShopPage() {
                     🌾
                   </div>
                   <h3 className="font-headline-lg text-lg font-bold text-on-surface mb-2">
-                    {isOfferZoneSelected ? "No Offers Available" : "No Harvest Items Found"}
+                    {isOfferZoneSelected ? "No Offers Available" : "No Items Found"}
                   </h3>
                   <p className="font-body-sm text-xs text-on-surface-variant mb-6">
                     {isOfferZoneSelected
                       ? "There are no offer zone products in this selection. Try another category or clear your filters."
-                      : "We couldn't find products in this selection. Try another aisle or clear your search."}
+                      : "We couldn't find products in this selection. Try another product or clear your search."}
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-3">
                     <button
@@ -1032,7 +1135,9 @@ function ShopPage() {
         </div>
       </main>
 
-      <StoreFooter />
+      <div className="hidden md:block">
+        <StoreFooter />
+      </div>
       <BottomNav />
     </div>
   );

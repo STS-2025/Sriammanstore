@@ -5,6 +5,7 @@ import { BottomNav } from "../components/layout/BottomNav";
 import { StoreFooter } from "../components/layout/StoreFooter";
 import { CheckoutProgressBar } from "../components/checkout/CheckoutProgressBar";
 import { OrderBillSummary } from "../components/checkout/OrderBillSummary";
+import { CartDiscountControls } from "../components/checkout/CartDiscountControls";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
@@ -23,6 +24,7 @@ import type { Address, DeliverySlot } from "../types";
 import { toast } from "sonner";
 import { PhoneVerificationModal } from "../components/auth/PhoneVerificationModal";
 import { findDeliveryLocation, getDeliveryAreaSuggestions } from "../lib/deliveryLocations";
+import { LocationPinPicker } from "../components/location/LocationPinPicker";
 
 /**
  * Safely normalizes and humanizes checkout errors so that internal Firestore
@@ -89,18 +91,24 @@ export function formatCheckoutError(err: unknown): string {
   return "Order placement failed. Your cart has been preserved.";
 }
 
+function normalizePhoneForComparison(phone?: string): string {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("0")) return digits.slice(1);
+  return digits;
+}
+
 export const Route = createFileRoute("/checkout")({
   validateSearch: (
     search: Record<string, unknown>
   ): {
-    step?: 2 | 3 | undefined;
+    step?: 2 | 3 | 4 | undefined;
     newAddress?: boolean | undefined;
   } => {
     const raw = search["step"];
-    let step: 2 | 3 = 2;
-    if (raw === 3 || raw === "3" || raw === "payment") {
-      step = 3;
-    }
+    let step: 2 | 3 | 4 = 2;
+    if (raw === 3 || raw === "3" || raw === "confirm") step = 3;
+    if (raw === 4 || raw === "4" || raw === "payment") step = 4;
     return {
       step,
       newAddress: search["newAddress"] === true || search["newAddress"] === "true",
@@ -157,7 +165,7 @@ export function CheckoutPage() {
   const { user, isLoading: authLoading, isResolvingIdentity, refreshUser } = useAuth();
   const { refreshNotifications } = useNotifications();
 
-  const currentStep: 2 | 3 = searchParams.step === 3 ? 3 : 2;
+  const currentStep: 2 | 3 | 4 = searchParams.step === 4 ? 4 : searchParams.step === 3 ? 3 : 2;
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [deliverySlots, setDeliverySlots] = useState<DeliverySlot[]>([]);
@@ -167,8 +175,7 @@ export function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Accordion and UI states for Step 3
-  const [isItemsExpanded, setIsItemsExpanded] = useState(true);
+  // Confirmation and payment form state
   const [includeGstin, setIncludeGstin] = useState(false);
   const [gstinNumber, setGstinNumber] = useState("");
   const [cardCvv, setCardCvv] = useState("");
@@ -176,8 +183,8 @@ export function CheckoutPage() {
 
   // New Address Modal state
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [showPhoneVerificationModal, setShowPhoneVerificationModal] = useState(false);
-  const isPhoneVerified = Boolean(user?.phoneVerified);
   const [newTag, setNewTag] = useState<"Home" | "Work" | "Other">("Home");
   const [newName, setNewName] = useState(user?.name || "");
   const [newPhone, setNewPhone] = useState(user?.phone || "");
@@ -186,6 +193,8 @@ export function CheckoutPage() {
   const [newLandmark, setNewLandmark] = useState("");
   const [newCity, setNewCity] = useState("");
   const [newPincode, setNewPincode] = useState("");
+  const [newLat, setNewLat] = useState(0);
+  const [newLng, setNewLng] = useState(0);
 
   useEffect(() => {
     async function loadCheckoutData() {
@@ -246,6 +255,12 @@ export function CheckoutPage() {
   const selectedAddress = useMemo(() => {
     return addresses.find((a) => a.id === selectedAddressId) || addresses[0] || null;
   }, [addresses, selectedAddressId]);
+  const selectedAddressPhone = normalizePhoneForComparison(selectedAddress?.phone || user?.phone);
+  const isDeliveryPhoneVerified = Boolean(
+    user?.phoneVerified &&
+    selectedAddressPhone &&
+    selectedAddressPhone === normalizePhoneForComparison(user.phone)
+  );
 
   const selectedSlot = useMemo(() => {
     if (deliverySpeed === "express") {
@@ -282,15 +297,44 @@ export function CheckoutPage() {
     return addressService.validateDeliveryServiceability(selectedAddress, deliveryConfig);
   }, [selectedAddress, deliveryConfig]);
 
-  // Guard for navigating to Step 3
+  // Step 3 confirms the selected delivery details; Step 4 is payment.
   const canGoToPayment = useMemo(() => {
-    return selectedAddress !== null && geofenceStatus.eligible && items.length > 0 && isPhoneVerified;
-  }, [selectedAddress, geofenceStatus.eligible, items.length, isPhoneVerified]);
+    return selectedAddress !== null && geofenceStatus.eligible && items.length > 0 && isDeliveryPhoneVerified;
+  }, [selectedAddress, geofenceStatus.eligible, items.length, isDeliveryPhoneVerified]);
+
+  const canContinueToPayment = useMemo(() => {
+    return canGoToPayment &&
+      cartSubtotal >= checkoutSettings.minimumOrderAmount &&
+      cartCount <= checkoutSettings.maxItemsPerOrder &&
+      !isOrderCutoffPassed(checkoutSettings.orderCutoffTime);
+  }, [canGoToPayment, cartSubtotal, cartCount, checkoutSettings.minimumOrderAmount, checkoutSettings.maxItemsPerOrder, checkoutSettings.orderCutoffTime]);
 
   const handleOpenNewAddressModal = () => {
+    setEditingAddress(null);
     if (!newName && user?.name) setNewName(user.name);
     if (!newPhone && user?.phone) setNewPhone(user.phone);
-    if (!newCity) setNewCity(deliveryConfig.serviceAreaDistrict);
+    setNewHouseNo("");
+    setNewStreet("");
+    setNewLandmark("");
+    setNewCity(deliveryConfig.serviceAreaDistrict);
+    setNewPincode("");
+    setNewLat(0);
+    setNewLng(0);
+    setShowAddressModal(true);
+  };
+
+  const handleEditAddress = (address: Address) => {
+    setEditingAddress(address);
+    setNewTag(address.tag);
+    setNewName(address.name);
+    setNewPhone(address.phone);
+    setNewHouseNo(address.houseNo);
+    setNewStreet(address.street);
+    setNewLandmark(address.landmark || "");
+    setNewCity(address.city);
+    setNewPincode(address.pincode);
+    setNewLat(address.lat || 0);
+    setNewLng(address.lng || 0);
     setShowAddressModal(true);
   };
 
@@ -309,82 +353,78 @@ export function CheckoutPage() {
     }
   }, [searchParams.newAddress, user]);
 
-  const handleStepNavigation = (targetStep: 1 | 2 | 3) => {
-    if (targetStep === 1) {
-      navigate({ to: "/cart" });
-      return;
-    }
-
-    if (targetStep === 2) {
-      navigate({ to: "/checkout", search: { step: 2 } as any });
-      return;
-    }
-
-    if (targetStep === 3) {
-      if (!selectedAddress || addresses.length === 0) {
-        handleOpenNewAddressModal();
-        toast.info("Please add a delivery address to proceed.");
-        return;
-      }
-      if (!geofenceStatus.eligible) {
-        toast.error(
-          geofenceStatus.reason ||
-          `Selected address is outside our ${deliveryConfig.deliveryRadiusKm}km delivery zone (${geofenceStatus.distanceKm}km away)`
-        );
-        return;
-      }
-      if (!isPhoneVerified) {
-        toast.info("Verify your mobile number to continue with checkout.");
-        setShowPhoneVerificationModal(true);
-        return;
-      }
-      navigate({ to: "/checkout", search: { step: 3 } as any });
-    }
-  };
-
-  const handleContinueToPayment = () => {
+  const validateDeliveryDetails = () => {
     if (!selectedAddress || addresses.length === 0) {
       handleOpenNewAddressModal();
       toast.info("Please add a delivery address to proceed.");
-      return;
-    }
-    if (cartSubtotal < checkoutSettings.minimumOrderAmount) {
-      toast.error(
-        `The minimum order amount is ₹${checkoutSettings.minimumOrderAmount}.`
-      );
-      return;
-    }
-    if (cartCount > checkoutSettings.maxItemsPerOrder) {
-      toast.error(
-        `An order can contain up to ${checkoutSettings.maxItemsPerOrder} items.`
-      );
-      return;
+      return false;
     }
     if (!geofenceStatus.eligible) {
       toast.error(
         geofenceStatus.reason ||
-        `Selected address is ${geofenceStatus.distanceKm}km away. Deliveries are restricted within ${deliveryConfig.deliveryRadiusKm}km of our store.`
+        `Selected address is outside our ${deliveryConfig.deliveryRadiusKm}km delivery zone (${geofenceStatus.distanceKm}km away)`
       );
-      return;
+      return false;
     }
-    if (!isPhoneVerified) {
-      toast.info("Verify your mobile number to continue with checkout.");
+    if (!isDeliveryPhoneVerified) {
+      toast.info("Verify the delivery phone number to continue with checkout.");
       setShowPhoneVerificationModal(true);
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const validateOrderLimits = () => {
+    if (cartSubtotal < checkoutSettings.minimumOrderAmount) {
+      toast.error(`The minimum order amount is ${checkoutSettings.minimumOrderAmount}.`);
+      return false;
+    }
+    if (cartCount > checkoutSettings.maxItemsPerOrder) {
+      toast.error(`An order can contain up to ${checkoutSettings.maxItemsPerOrder} items.`);
+      return false;
+    }
+    if (isOrderCutoffPassed(checkoutSettings.orderCutoffTime)) {
+      toast.error(`Today's order cutoff (${checkoutSettings.orderCutoffTime}) has passed.`);
+      return false;
+    }
+    return true;
+  };
+
+  const handleContinueToConfirmDetails = () => {
+    if (!validateDeliveryDetails() || !validateOrderLimits()) return;
     navigate({ to: "/checkout", search: { step: 3 } as any });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleAddNewAddress = async (e: React.FormEvent) => {
+  const handleContinueToPayment = () => {
+    if (!validateDeliveryDetails() || !validateOrderLimits()) return;
+    navigate({ to: "/checkout", search: { step: 4 } as any });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleStepNavigation = (targetStep: 1 | 2 | 3 | 4) => {
+    if (targetStep === 1) {
+      navigate({ to: "/cart" });
+      return;
+    }
+    if (targetStep === 2) {
+      navigate({ to: "/checkout", search: { step: 2 } as any });
+      return;
+    }
+    if (targetStep === 3) {
+      void handleContinueToConfirmDetails();
+      return;
+    }
+    if (currentStep === 3) void handleContinueToPayment();
+  };
+  const handleSaveAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHouseNo.trim() || !newStreet.trim()) {
       toast.error("Please fill in house number and street name");
       return;
     }
     try {
-      const added = await addressService.addAddress({
-        userId: user!.id,
+      const addressData = {
         tag: newTag,
         name: newName.trim() || user!.name || "Customer",
         phone: newPhone.trim() || user!.phone || "",
@@ -393,17 +433,34 @@ export function CheckoutPage() {
         landmark: newLandmark.trim(),
         city: newCity.trim(),
         pincode: newPincode.trim(),
-        lat: 0,
-        lng: 0,
-        isDefault: true,
-      });
-      setAddresses((prev) => [added, ...prev]);
-      setSelectedAddressId(added.id);
+        lat: newLat,
+        lng: newLng,
+      };
+
+      if (editingAddress) {
+        const updated = await addressService.updateAddress(editingAddress.id, {
+          ...addressData,
+          userId: user!.id,
+        });
+        setAddresses((prev) => prev.map((address) => address.id === updated.id ? updated : address));
+        setSelectedAddressId(updated.id);
+        toast.success("Delivery address updated!");
+      } else {
+        const added = await addressService.addAddress({
+          ...addressData,
+          userId: user!.id,
+          isDefault: true,
+        });
+        setAddresses((prev) => [added, ...prev]);
+        setSelectedAddressId(added.id);
+        toast.success("New delivery address saved!");
+      }
+
       setShowAddressModal(false);
+      setEditingAddress(null);
       setNewHouseNo("");
       setNewStreet("");
       setNewLandmark("");
-      toast.success("New delivery address saved!");
     } catch (err: any) {
       toast.error(err.message || "Failed to save address");
     }
@@ -423,8 +480,8 @@ export function CheckoutPage() {
       return;
     }
 
-    if (!isPhoneVerified) {
-      toast.info("Verify your mobile number to continue with checkout.");
+    if (!isDeliveryPhoneVerified) {
+      toast.info("Verify the delivery phone number to continue with checkout.");
       setShowPhoneVerificationModal(true);
       return;
     }
@@ -515,7 +572,7 @@ export function CheckoutPage() {
       }
 
       // Clear customer's cart only after confirmed successful order creation
-      await clearCart();
+      await clearCart({ skipRemote: true });
       resetDiscounts();
       await refreshNotifications();
       await refreshUser();
@@ -741,12 +798,12 @@ export function CheckoutPage() {
 
       <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
         <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
-          {deliverySettingsError && (
+          {/* {deliverySettingsError && (
             <div role="status" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900">
               Delivery settings could not be loaded. The legacy default charges are being shown. {deliverySettingsError}
             </div>
-          )}
-          {/* Top 3-Step Checkout Progress Bar */}
+          )} */}
+          {/* Address, confirmation, and payment progress */}
           <div className="mb-8">
             <CheckoutProgressBar
               currentStep={currentStep}
@@ -756,20 +813,25 @@ export function CheckoutPage() {
                   ? `${selectedAddress.city}, ${selectedAddress.pincode}`
                   : "No address selected"
               }
+              hideCartStep
               onStepClick={handleStepNavigation}
-              canNavigateToStep={(s) => (s === 3 ? canGoToPayment : true)}
+              canNavigateToStep={(s) => {
+                if (s <= 2) return true;
+                if (s === 3) return canContinueToPayment;
+                return currentStep === 3 && canContinueToPayment;
+              }}
             />
           </div>
 
           {/* Desktop Two-Column Checkout Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* LEFT COLUMN: Step 2 (Address & Slot) OR Step 3 (Payment & Order Review) */}
+            {/* Step 2: Delivery details, Step 3: Confirmation, Step 4: Payment */}
             <div className="lg:col-span-8 space-y-6">
               {currentStep === 2 ? (
                 /* ================= STEP 2: ADDRESS & SLOT ================= */
                 <>
                   {/* Mandatory Phone Verification Banner */}
-                  {!isPhoneVerified && (
+                  {(!user?.phoneVerified || (selectedAddress && !isDeliveryPhoneVerified)) && (
                     <div
                       data-testid="checkout-phone-verification-banner"
                       className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
@@ -781,14 +843,18 @@ export function CheckoutPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-headline-sm text-sm font-extrabold text-amber-950">
-                              Verify your mobile number to continue with checkout.
+                              {user?.phoneVerified
+                                ? "Verify the delivery phone number to continue with checkout."
+                                : "Verify your mobile number to continue with checkout."}
                             </h3>
                             <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500/20 text-amber-900">
                               REQUIRED
                             </span>
                           </div>
                           <p className="text-xs text-amber-900/80 mt-0.5">
-                            Order updates, live doorstep dispatch, and delivery security require a verified contact number.
+                            {user?.phoneVerified
+                              ? "This delivery contact differs from your verified number. Verify it with OTP before continuing."
+                              : "Order updates, live doorstep dispatch, and delivery security require a verified contact number."}
                           </p>
                         </div>
                       </div>
@@ -797,21 +863,21 @@ export function CheckoutPage() {
                         onClick={() => setShowPhoneVerificationModal(true)}
                         className="font-headline-sm text-xs font-bold px-4 py-2 rounded-xl bg-[#005f3f] text-white hover:bg-[#004d32] transition-colors shrink-0 shadow-sm cursor-pointer"
                       >
-                        Verify Mobile Number
+                        {user?.phoneVerified ? "Verify Delivery Number" : "Verify Mobile Number"}
                       </button>
                     </div>
                   )}
 
                   {/* Delivery Address Section */}
-                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-5">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary text-[22px]">
+                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
+                    <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
+                      <div className="min-w-0 flex items-start gap-2">
+                        <span className="material-symbols-outlined text-primary text-[22px] mt-0.5">
                           location_on
                         </span>
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <h2 className="font-headline-sm text-base font-extrabold text-on-surface">
+                            <h2 className="font-headline-sm !text-[15px] leading-4 sm:!text-base sm:leading-normal font-extrabold text-on-surface">
                               Delivery Address
                             </h2>
                             {selectedAddress && (
@@ -820,7 +886,7 @@ export function CheckoutPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-on-surface-variant">
+                          <p className="hidden sm:block text-[11px] text-on-surface-variant">
                             {selectedAddress ? (
                               <>
                                 {deliveryConfig.deliveryZones.length > 0
@@ -839,10 +905,10 @@ export function CheckoutPage() {
                       <button
                         type="button"
                         onClick={handleOpenNewAddressModal}
-                        className="text-primary hover:text-primary-container font-headline-sm text-xs font-bold flex items-center gap-1 cursor-pointer hover:underline"
+                        className="shrink-0 whitespace-nowrap text-primary hover:text-primary-container font-headline-sm text-[10px] sm:text-xs font-bold flex items-center gap-1 cursor-pointer hover:underline"
                       >
                         <span className="material-symbols-outlined text-[16px]">add</span>
-                        <span>Change / Add New</span>
+                        <span>Add</span>
                       </button>
                     </div>
 
@@ -912,47 +978,47 @@ export function CheckoutPage() {
                             />
 
                             <div className="flex-1">
-                              <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-headline-sm text-xs font-bold text-on-surface">
-                                    {addr.name}
-                                  </span>
-                                  <span className="text-xs text-on-surface-variant font-medium">
-                                    {addr.phone}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                  {addr.isDefault && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-primary/10 text-primary">
-                                      • Selected Default
-                                    </span>
-                                  )}
-                                  {geo.eligible ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary flex items-center gap-0.5">
-                                      <span className="material-symbols-outlined text-[12px]">
-                                        check_circle
-                                      </span>
-                                      Within {deliveryConfig.deliveryRadiusKm} km zone
-                                    </span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-error/10 text-error flex items-center gap-0.5">
-                                      <span className="material-symbols-outlined text-[12px]">
-                                        warning
-                                      </span>
-                                      Outside {deliveryConfig.deliveryRadiusKm} km ({geo.distanceKm} km)
-                                    </span>
-                                  )}
-                                </div>
+                              <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <span className="font-headline-sm text-[14px] font-bold text-on-surface">{addr.name}</span>
+                                {isSelected && (
+                                  <button
+                                    type="button"
+                                    aria-label="Edit selected delivery address"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleEditAddress(addr);
+                                    }}
+                                    className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-primary hover:bg-primary/10"
+                                  >
+                                    <span className="material-symbols-outlined text-[15px]">edit</span>
+                                    Edit
+                                  </button>
+                                )}
                               </div>
-
-                              <p className="text-xs text-on-surface-variant leading-relaxed">
+                              <span className="text-[14px] font-medium text-on-surface-variant">{addr.phone}</span>
+                              <p className="text-[12px] text-on-surface-variant leading-relaxed">
                                 #{addr.houseNo}, {addr.street}
                                 {addr.landmark ? `, ${addr.landmark}` : ""}, {addr.city} -{" "}
                                 {addr.pincode}
                               </p>
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                {addr.isDefault && (
+                                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-black text-primary sm:text-[10px]">Selected Default</span>
+                                )}
+                                {geo.eligible ? (
+                                  <span className="flex items-center gap-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary sm:text-[10px]">
+                                    <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                                    Within zone
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-0.5 rounded-full bg-error/10 px-2 py-0.5 text-[9px] font-bold text-error sm:text-[10px]">
+                                    <span className="material-symbols-outlined text-[12px]">warning</span>
+                                    Outside {deliveryConfig.deliveryRadiusKm} km ({geo.distanceKm} km)
+                                  </span>
+                                )}
+                              </div>
 
-                              <div className="flex items-center gap-4 mt-2 text-[10px] text-outline font-semibold">
+                                <div className="hidden sm:flex items-center gap-4 mt-2 text-[10px] text-outline font-semibold">
                                 <span className="flex items-center gap-1">
                                   <span className="material-symbols-outlined text-[13px] text-primary">
                                     verified
@@ -993,25 +1059,25 @@ export function CheckoutPage() {
                   </div>
 
                   {/* Delivery Speed & Slot Section */}
-                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
+                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
+                    <div className="flex items-start justify-between gap-3 mb-3 sm:mb-4">
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-secondary text-[22px]">
                           bolt
                         </span>
-                        <h3 className="font-headline-sm text-sm font-extrabold text-on-surface">
+                        <h3 className="font-headline-sm !text-[15px] leading-4 sm:!text-base sm:leading-normal font-extrabold text-on-surface">
                           Delivery Speed & Slot
                         </h3>
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-full bg-secondary/15 text-secondary text-[10px] font-black uppercase tracking-wider">
+                      <span className="hidden sm:inline-flex px-2.5 py-0.5 rounded-full bg-secondary/15 text-secondary text-[10px] font-black uppercase tracking-wider">
                         {deliveryConfig.storeName}
                       </span>
                     </div>
 
-                    <p className="mb-3 text-[11px] font-semibold text-on-surface-variant">
+                    <p className="hidden sm:block mb-3 text-[11px] font-semibold text-on-surface-variant">
                       Orders for today's delivery must be placed by {checkoutSettings.orderCutoffTime}.
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4">
                       {/* Express 60-Min */}
                       <div
                         onClick={() => {
@@ -1019,7 +1085,7 @@ export function CheckoutPage() {
                           setDeliverySpeed("express");
                           setSelectedSlotId("slot_exp");
                         }}
-                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
+                        className={`p-2.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-2 sm:gap-3 ${
                           deliverySpeed === "express"
                             ? "border-primary bg-primary/5 shadow-sm"
                             : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/40"
@@ -1041,18 +1107,18 @@ export function CheckoutPage() {
                           <div className="flex items-center justify-between">
                             <label
                               htmlFor="slot_opt_express"
-                              className="font-headline-sm text-xs font-bold text-on-surface flex items-center gap-1 cursor-pointer"
+                              className="font-headline-sm text-[12px] sm:text-xs font-bold text-on-surface flex items-center gap-0.5 sm:gap-1 cursor-pointer"
                             >
                               <span>Express 60–Min</span>
                               <span className="text-secondary">⚡</span>
                             </label>
-                            <span className="font-headline-sm text-xs font-extrabold text-on-surface">
+                            <span className="font-headline-sm text-[12px] font-extrabold text-on-surface">
                               {expressDeliveryFee > 0 ? `₹${expressDeliveryFee}` : "FREE"}</span>
                           </div>
-                          <p className="text-[11px] font-semibold text-on-surface-variant mt-1">
-                            Arrival in 45–60 mins (Today)
+                          <p className="text-[11px] sm:text-[11px] font-semibold text-on-surface-variant mt-1">
+                            Arrives in 45–60 min
                           </p>
-                          <div className="flex items-center justify-between mt-2 pt-1 border-t border-outline-variant/15 text-[10px] text-outline">
+                          <div className="hidden sm:flex items-center justify-between mt-2 pt-1 border-t border-outline-variant/15 text-[10px] text-outline">
                             <span>Rider Assigned from Store Hub</span>
                             <span className="px-1.5 py-0.2 rounded bg-primary/10 text-primary font-bold">
                               Fastest
@@ -1067,7 +1133,7 @@ export function CheckoutPage() {
                           setDeliverySpeed("standard");
                           setSelectedSlotId(deliverySlots[0]?.id || "slot_std_morning");
                         }}
-                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
+                        className={`p-2.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-2 sm:gap-3 ${
                           deliverySpeed === "standard"
                             ? "border-primary bg-primary/5 shadow-sm"
                             : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/40"
@@ -1088,19 +1154,19 @@ export function CheckoutPage() {
                           <div className="flex items-center justify-between">
                             <label
                               htmlFor="slot_opt_standard"
-                              className="font-headline-sm text-xs font-bold text-on-surface cursor-pointer"
+                            className="font-headline-sm text-[12px] sm:text-xs font-bold text-on-surface cursor-pointer"
                             >
                               Standard Delivery
                             </label>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-primary/10 text-primary">
+                            <span className="px-2 py-0.5 rounded text-[12px] font-black uppercase bg-primary/10 text-primary">
                               {standardDeliveryFee > 0 ? `₹${standardDeliveryFee}` : "FREE"}
                             </span>
                           </div>
-                          <p className="text-[11px] font-semibold text-on-surface-variant mt-1">
+                          <p className="hidden sm:block text-[11px] font-semibold text-on-surface-variant mt-1">
                             Configured delivery window
                           </p>
                           {deliverySlots.length > 1 && (
-                            <label className="mt-3 block text-[10px] font-bold text-on-surface-variant">
+                            <label className="mt-2 sm:mt-3 block text-[11px] sm:text-[13px] font-bold text-on-surface-variant">
                               Delivery time
                               <select
                                 value={
@@ -1110,7 +1176,7 @@ export function CheckoutPage() {
                                 }
                                 onClick={(event) => event.stopPropagation()}
                                 onChange={(event) => setSelectedSlotId(event.target.value)}
-                                className="mt-1 w-full rounded-lg border border-outline-variant/30 bg-white px-2.5 py-2 text-xs font-semibold text-on-surface"
+                                className="mt-1 w-full rounded-lg border border-outline-variant/30 bg-white px-1.5 sm:px-2.5 py-1.5 sm:py-2 text-[9px] sm:text-xs font-semibold text-on-surface"
                               >
                                 {deliverySlots.map((slot) => (
                                   <option key={slot.id} value={slot.id}>
@@ -1121,11 +1187,11 @@ export function CheckoutPage() {
                             </label>
                           )}
                           {deliverySlots.length > 0 && (
-                            <p className="mt-2 text-[10px] font-semibold text-primary">
+                            <p className="hidden sm:block mt-2 text-[10px] font-semibold text-primary">
                               Selected window: {selectedSlot.title}
                             </p>
                           )}
-                          <div className="flex items-center justify-between mt-2 pt-1 border-t border-outline-variant/15 text-[10px] text-outline">
+                          <div className="hidden sm:flex items-center justify-between mt-2 pt-1 border-t border-outline-variant/15 text-[10px] text-outline">
                             <span>Direct Batch Farm Fulfillment</span>
                             <span className="px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface-variant font-bold">
                               Eco Route
@@ -1137,10 +1203,12 @@ export function CheckoutPage() {
                   </div>
 
                   {/* Step 2 Bottom Navigation Actions */}
-                  <div className="flex items-center justify-between pt-2">
+
+
+                  <div className="flex items-center justify-between gap-3 pt-2">
                     <Link
                       to="/cart"
-                      className="px-5 py-2.5 rounded-2xl border border-outline-variant/30 text-xs font-bold text-on-surface hover:bg-surface-container transition-colors flex items-center gap-1.5"
+                      className="whitespace-nowrap px-3 sm:px-5 py-2.5 rounded-2xl border border-outline-variant/30 text-xs font-bold text-on-surface hover:bg-surface-container transition-colors flex items-center gap-1.5"
                     >
                       <span className="material-symbols-outlined text-[16px]">arrow_back</span>
                       <span>Back to Cart</span>
@@ -1148,115 +1216,123 @@ export function CheckoutPage() {
 
                     <button
                       type="button"
-                      onClick={handleContinueToPayment}
-                      className="px-6 py-3 rounded-2xl bg-primary text-white font-headline-sm text-xs font-bold hover:bg-primary-container transition-all flex items-center gap-2 shadow-md cursor-pointer"
+                      onClick={handleContinueToConfirmDetails}
+                      className="whitespace-nowrap px-4 sm:px-6 py-3 rounded-2xl bg-primary text-white font-headline-sm text-xs font-bold hover:bg-primary-container transition-all flex items-center gap-2 shadow-md cursor-pointer"
                     >
-                      <span>Continue to Payment</span>
+                      <span>Continue to Confirm Details</span>
                       <span className="material-symbols-outlined text-[16px]">
                         arrow_forward
                       </span>
                     </button>
                   </div>
                 </>
-              ) : (
-                /* ================= STEP 3: PAYMENT ================= */
+              ) : currentStep === 3 ? (
+                /* ================= STEP 3: CONFIRM DETAILS ================= */
                 <>
-                  {/* Mandatory Phone Verification Banner */}
-                  {!isPhoneVerified && (
-                    <div
-                      data-testid="checkout-phone-verification-banner"
-                      className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                    >
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-900 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-[22px]">verified_user</span>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-headline-sm text-sm font-extrabold text-amber-950">
-                              Verify your mobile number to continue with checkout.
-                            </h3>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-500/20 text-amber-900">
-                              REQUIRED
-                            </span>
-                          </div>
-                          <p className="text-xs text-amber-900/80 mt-0.5">
-                            Order updates, live doorstep dispatch, and delivery security require a verified contact number.
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowPhoneVerificationModal(true)}
-                        className="font-headline-sm text-xs font-bold px-4 py-2 rounded-xl bg-[#005f3f] text-white hover:bg-[#004d32] transition-colors shrink-0 shadow-sm cursor-pointer"
-                      >
-                        Verify Mobile Number
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Selected Address & Slot Review Banner */}
-                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-5 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Address Review */}
-                    <div className="flex items-start justify-between gap-3 p-3.5 rounded-2xl bg-surface-container-low/50 border border-outline-variant/15">
-                      <div className="flex items-start gap-2.5">
-                        <span className="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">
-                          location_on
-                        </span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-headline-sm text-xs font-bold text-on-surface">
-                              Delivery Address
-                            </span>
-                            {selectedAddress && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-primary/10 text-primary">
-                                {selectedAddress.tag || "HOME"}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-on-surface-variant mt-0.5 line-clamp-1">
-                            {selectedAddress
-                              ? `${selectedAddress.name} — #${selectedAddress.houseNo}, ${selectedAddress.street}, ${selectedAddress.city}`
-                              : "No address selected. Please add or select an address."}
-                          </p>
-                        </div>
+                  <section className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-[22px]">location_on</span>
+                        <h2 className="font-headline-sm text-base font-extrabold text-on-surface">Delivery Address</h2>
                       </div>
                       <button
                         type="button"
                         onClick={() => handleStepNavigation(2)}
-                        className="text-primary hover:underline text-[11px] font-bold shrink-0 cursor-pointer"
+                        className="shrink-0 text-primary text-xs font-bold hover:underline"
                       >
                         Change
                       </button>
                     </div>
-
-                    {/* Slot Review */}
-                    <div className="flex items-start justify-between gap-3 p-3.5 rounded-2xl bg-surface-container-low/50 border border-outline-variant/15">
-                      <div className="flex items-start gap-2.5">
-                        <span className="material-symbols-outlined text-secondary text-[20px] shrink-0 mt-0.5">
-                          local_shipping
-                        </span>
-                        <div>
-                          <span className="font-headline-sm text-xs font-bold text-on-surface block">
-                            {selectedSlot.title}
-                          </span>
-                          <p className="text-[11px] text-on-surface-variant mt-0.5">
-                            {deliveryFee > 0 ? `Delivery Fee: ₹${deliveryFee}` : "Free Delivery"}
-                          </p>
+                    {selectedAddress ? (
+                      <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-low/40 p-3 sm:p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-headline-sm text-sm font-bold text-on-surface">{selectedAddress.name}</span>
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{selectedAddress.tag || "Home"}</span>
                         </div>
+                        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                          {selectedAddress.houseNo}, {selectedAddress.street}{selectedAddress.landmark ? `, ${selectedAddress.landmark}` : ""}, {selectedAddress.city} {selectedAddress.pincode}
+                        </p>
+                        <p className="mt-1 text-[11px] text-on-surface-variant">{selectedAddress.phone}</p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleStepNavigation(2)}
-                        className="text-primary hover:underline text-[11px] font-bold shrink-0 cursor-pointer"
-                      >
-                        Change
-                      </button>
+                    ) : (
+                      <p className="text-xs text-error">Select a delivery address to continue.</p>
+                    )}
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-outline-variant/15 bg-surface-container-low/40 p-3">
+                      <div className="min-w-0">
+                        <p className="font-headline-sm text-xs font-bold text-on-surface">{selectedSlot.title}</p>
+                        <p className="mt-0.5 text-[11px] text-on-surface-variant">
+                          {deliverySpeed === "express" ? "Express delivery" : "Standard delivery"} · {deliveryFee > 0 ? `Delivery fee ₹${deliveryFee}` : "Free delivery"}
+                        </p>
+                      </div>
+                      <button type="button" onClick={() => handleStepNavigation(2)} className="shrink-0 text-primary text-xs font-bold hover:underline">Change</button>
                     </div>
+                  </section>
+
+                  <section className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-[22px]">shopping_bag</span>
+                        <h2 className="font-headline-sm text-base font-extrabold text-on-surface">Confirm Items ({cartCount})</h2>
+                      </div>
+                      <button type="button" onClick={() => handleStepNavigation(1)} className="shrink-0 text-primary text-xs font-bold hover:underline">Edit Cart</button>
+                    </div>
+                    <div className="divide-y divide-outline-variant/15">
+                      {items.map((item) => (
+                        <div key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-outline-variant/15 bg-white p-1.5">
+                            <img src={item.image} alt={item.name} className="h-full w-full object-contain" loading="lazy" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-xs font-bold text-on-surface">{item.name}</p>
+                            <p className="text-[10px] text-on-surface-variant">{item.unitSize} {item.unit} · Qty: {item.quantity}</p>
+                          </div>
+                          <span className="shrink-0 text-xs font-extrabold text-on-surface">₹{(item.price * item.quantity).toLocaleString("en-IN")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 shadow-sm flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        id="gstin_check"
+                        checked={includeGstin}
+                        onChange={(event) => setIncludeGstin(event.target.checked)}
+                        className="mt-0.5 accent-primary cursor-pointer"
+                      />
+                      <div className="min-w-0">
+                        <label htmlFor="gstin_check" className="font-headline-sm text-xs font-bold text-on-surface cursor-pointer">
+                          Include GSTIN for Business Purchase
+                        </label>
+                        {includeGstin && (
+                          <input
+                            type="text"
+                            value={gstinNumber}
+                            onChange={(event) => setGstinNumber(event.target.value.toUpperCase())}
+                            placeholder="Enter 15-digit GSTIN"
+                            className="mt-2 w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface px-3 py-2 text-xs font-bold uppercase focus:outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <span className="material-symbols-outlined shrink-0 text-outline text-[20px]">receipt_long</span>
+                  </section>
+
+                  <div className="flex items-center justify-between gap-3 pt-2">
+                    <button type="button" onClick={() => handleStepNavigation(2)} className="shrink-0 whitespace-nowrap rounded-2xl border border-outline-variant/30 px-3 sm:px-5 py-2.5 text-xs font-bold text-on-surface hover:bg-surface-container transition-colors">
+                      <span className="sm:hidden">Back</span><span className="hidden sm:inline">Back to Address & Delivery</span>
+                    </button>
+                    <button type="button" onClick={handleContinueToPayment} disabled={!canContinueToPayment} className="flex-1 rounded-2xl bg-primary px-3 sm:px-6 py-3 text-xs font-bold text-white shadow-md transition-all hover:bg-primary-container disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-outline">
+                      Continue to Payment <span className="material-symbols-outlined ml-1 align-middle text-[16px]">arrow_forward</span>
+                    </button>
                   </div>
-
+                </>
+              ) : (
+                /* ================= STEP 4: PAYMENT ================= */
+                <>
                   {/* Payment Method Section (Screenshot 4) */}
-                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm space-y-4">
+                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm space-y-3 sm:space-y-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary text-[22px]">
@@ -1266,7 +1342,7 @@ export function CheckoutPage() {
                           Payment Method
                         </h2>
                       </div>
-                      <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider flex items-center gap-1">
+                      <span className="hidden sm:flex px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider items-center gap-1">
                         <span className="material-symbols-outlined text-[13px]">verified</span>
                         PCI DSS Validated
                       </span>
@@ -1275,14 +1351,14 @@ export function CheckoutPage() {
                     {/* 1. UPI Option */}
                     <div
                       onClick={() => setPaymentMethod("upi")}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                      className={`p-3 sm:p-4 rounded-2xl border transition-all cursor-pointer ${
                         paymentMethod === "upi"
                           ? "border-primary bg-primary/5 shadow-sm"
                           : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/30"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2.5">
                           <input
                             type="radio"
                             name="payment_method_group"
@@ -1293,11 +1369,11 @@ export function CheckoutPage() {
                           <span className="font-headline-sm text-xs font-bold text-on-surface">
                             UPI (Instant 0% Fee)
                           </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-secondary/15 text-secondary">
+                          <span className="hidden sm:inline-flex px-2 py-0.5 rounded text-[10px] font-black uppercase bg-secondary/15 text-secondary">
                             Recommended
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-[11px] font-bold text-outline">
+                        <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold text-outline">
                           <span>GPay</span>
                           <span>•</span>
                           <span>PhonePe</span>
@@ -1307,12 +1383,12 @@ export function CheckoutPage() {
                       </div>
 
                       {paymentMethod === "upi" && (
-                        <div className="mt-4 pt-3 border-t border-outline-variant/15 space-y-3.5">
-                          <div className="p-4 rounded-2xl bg-surface-container-low/60 border border-outline-variant/20 space-y-3">
-                            <div className="flex items-center justify-between">
+                        <div className="mt-3 sm:mt-4 pt-3 border-t border-outline-variant/15 space-y-3">
+                          <div className="p-3 sm:p-4 rounded-2xl bg-surface-container-low/60 border border-outline-variant/20 space-y-3">
+                            <div className="flex items-start sm:items-center justify-between gap-3">
                               <div>
                                 <span className="text-[10px] uppercase tracking-wider font-extrabold text-on-surface-variant block">
-                                  Store Payee
+                                  Pay to
                                 </span>
                                 <span className="font-headline-sm text-xs font-extrabold text-on-surface">
                                   {paymentConfig.merchantName}
@@ -1320,7 +1396,7 @@ export function CheckoutPage() {
                               </div>
                               <div className="text-right">
                                 <span className="text-[10px] uppercase tracking-wider font-extrabold text-on-surface-variant block">
-                                  Exact Amount
+                                  Amount
                                 </span>
                                 <span className="font-headline-sm text-sm font-extrabold text-primary">
                                   ₹{finalTotal.toLocaleString("en-IN")}
@@ -1329,16 +1405,16 @@ export function CheckoutPage() {
                             </div>
 
                             {/* Merchant UPI ID & Copy Button */}
-                            <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-surface border border-outline-variant/25">
-                              <div className="flex items-center gap-2.5">
+                            <div className="flex items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl bg-surface border border-outline-variant/25">
+                              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
                                 <span className="material-symbols-outlined text-primary text-[20px]">
                                   qr_code_2
                                 </span>
-                                <div>
+                                <div className="min-w-0">
                                   <span className="text-[10px] text-outline font-bold block">
                                     Merchant UPI ID
                                   </span>
-                                  <span className="font-mono text-xs font-black text-on-surface select-all">
+                                  <span className="block break-all font-mono text-[10px] sm:text-xs font-black text-on-surface select-all">
                                     {paymentConfig.merchantUpiId}
                                   </span>
                                 </div>
@@ -1351,21 +1427,22 @@ export function CheckoutPage() {
                                     toast.success("Merchant UPI ID copied!");
                                   }
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Copy UPI ID"
+                                className="shrink-0 px-2 sm:px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
                               >
                                 <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                                <span>Copy</span>
+                                <span className="hidden sm:inline">Copy</span>
                               </button>
                             </div>
 
                             {/* Direct App Launch URI */}
-                            <div className="flex items-center justify-between gap-2 pt-1">
-                              <span className="text-[11px] text-on-surface-variant font-medium">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-1">
+                              <span className="hidden sm:inline text-[11px] text-on-surface-variant font-medium">
                                 Pay using any installed UPI application
                               </span>
                               <a
                                 href={`upi://pay?pa=${paymentConfig.merchantUpiId}&pn=${encodeURIComponent(paymentConfig.merchantName)}&am=${finalTotal}&cu=INR&tn=${encodeURIComponent(`Order by ${user?.name || "Customer"}`)}`}
-                                className="px-3 py-1.5 rounded-lg bg-secondary/15 text-secondary font-bold text-xs hover:bg-secondary/25 transition-colors flex items-center gap-1 cursor-pointer"
+                                className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-secondary/15 text-secondary font-bold text-xs hover:bg-secondary/25 transition-colors flex items-center gap-1 cursor-pointer"
                               >
                                 <span className="material-symbols-outlined text-[14px]">open_in_new</span>
                                 <span>Open UPI App</span>
@@ -1373,10 +1450,10 @@ export function CheckoutPage() {
                             </div>
 
                             {/* Verification status note */}
-                            <div className="flex items-start gap-2 p-2.5 rounded-xl bg-primary/5 text-primary text-[11px] leading-relaxed">
+                            <div className="flex items-start gap-2 p-2.5 rounded-xl bg-primary/5 text-primary text-[10px] sm:text-[11px] leading-relaxed">
                               <span className="material-symbols-outlined text-[16px] shrink-0 mt-0.5">info</span>
                               <span>
-                                Pay to the merchant UPI ID above, then click <strong>Place Order</strong> below. Your order will be placed with payment <strong>awaiting verification</strong>.
+                                Pay to this UPI ID, then tap <strong>Place Order</strong>. The store will verify the payment.
                               </span>
                             </div>
                           </div>
@@ -1387,14 +1464,14 @@ export function CheckoutPage() {
                     {/* 2. Credit / Debit Cards Option */}
                     <div
                       onClick={() => setPaymentMethod("card")}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                      className={`p-3 sm:p-4 rounded-2xl border transition-all cursor-pointer ${
                         paymentMethod === "card"
                           ? "border-primary bg-primary/5 shadow-sm"
                           : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/30"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-1 items-start gap-2.5">
                           <input
                             type="radio"
                             name="payment_method_group"
@@ -1406,7 +1483,7 @@ export function CheckoutPage() {
                             Credit / Debit Cards
                           </span>
                         </div>
-                        <span className="text-[11px] font-bold text-outline">
+                        <span className="hidden sm:inline text-[11px] font-bold text-outline">
                           Visa, Mastercard, RuPay
                         </span>
                       </div>
@@ -1460,7 +1537,7 @@ export function CheckoutPage() {
                     {/* 3. Net Banking Option */}
                     <div
                       onClick={() => setPaymentMethod("netbanking")}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                      className={`p-3 sm:p-4 rounded-2xl border transition-all cursor-pointer ${
                         paymentMethod === "netbanking"
                           ? "border-primary bg-primary/5 shadow-sm"
                           : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/30"
@@ -1479,7 +1556,7 @@ export function CheckoutPage() {
                             Net Banking
                           </span>
                         </div>
-                        <span className="text-[11px] font-bold text-outline">
+                        <span className="hidden sm:inline text-[11px] font-bold text-outline">
                           HDFC • ICICI • SBI • Axis
                         </span>
                       </div>
@@ -1487,12 +1564,12 @@ export function CheckoutPage() {
 
                     {/* Smart Coins Redemption Applied Banner (Screenshot 4) */}
                     {coinDiscount > 0 && (
-                      <div className="p-4 rounded-2xl bg-secondary/10 border border-secondary/20 flex items-center justify-between gap-3">
+                      <div className="hidden lg:flex p-4 rounded-2xl bg-secondary/10 border border-secondary/20 items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5">
                           <span className="material-symbols-outlined text-secondary text-[22px]">
                             monetization_on
                           </span>
-                          <div>
+                          <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-headline-sm text-xs font-extrabold text-on-surface">
                                 Smart Coins Redemption
@@ -1529,14 +1606,14 @@ export function CheckoutPage() {
                         }
                         setPaymentMethod("cod");
                       }}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                      className={`p-3 sm:p-4 rounded-2xl border transition-all cursor-pointer ${
                         paymentMethod === "cod"
                           ? "border-primary bg-primary/5 shadow-sm"
                           : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/30"
                       }`}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-1 items-start gap-2.5">
                           <input
                             type="radio"
                             name="payment_method_group"
@@ -1551,16 +1628,14 @@ export function CheckoutPage() {
                             }}
                             className="accent-primary cursor-pointer"
                           />
-                          <div>
+                          <div className="min-w-0">
                             <span className="font-headline-sm text-xs font-bold text-on-surface block">
-                              Cash / Pay on Delivery (UPI at doorstep)
-                            </span>
-                            <span className="text-[10px] text-on-surface-variant">
-                              Nominal ₹15 courier handling charge applies
+                              <span className="sm:hidden">Cash on Delivery</span>
+                              <span className="hidden sm:inline">Cash / Pay on Delivery (UPI at doorstep)</span>
                             </span>
                           </div>
                         </div>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-primary/10 text-primary">
+                        <span className="shrink-0 px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-black uppercase bg-primary/10 text-primary">
                           {!paymentConfig.codEnabled
                             ? "Unavailable"
                             : `Up to ₹${codAmountLimit}`}
@@ -1569,130 +1644,38 @@ export function CheckoutPage() {
                     </div>
                   </div>
 
-                  {/* Order Items Review Accordion (Screenshot 4 & 5) */}
-                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm">
-                    <div
-                      onClick={() => setIsItemsExpanded(!isItemsExpanded)}
-                      className="flex items-center justify-between cursor-pointer select-none"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="material-symbols-outlined text-primary text-[22px]">
-                          shopping_bag
-                        </span>
-                        <div>
-                          <h3 className="font-headline-sm text-sm font-extrabold text-on-surface">
-                            Order Items ({cartCount} Fresh Items)
-                          </h3>
-                          <p className="text-[11px] text-on-surface-variant">
-                            Verified and reserved in store stock
-                          </p>
-                        </div>
-                      </div>
-                      <span className="material-symbols-outlined text-outline transition-transform duration-200">
-                        {isItemsExpanded ? "expand_less" : "expand_more"}
-                      </span>
-                    </div>
+                  <CartDiscountControls className="lg:hidden" accordionOnMobile />
 
-                    {/* Expanded Items Grid (Screenshot 5) */}
-                    {isItemsExpanded && (
-                      <div className="mt-4 pt-4 border-t border-outline-variant/15 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                        {items.map((item) => (
-                          <div
-                            key={item.id}
-                            className="p-3 rounded-2xl border border-outline-variant/15 flex items-center gap-3"
-                          >
-                            <div className="w-12 h-12 rounded-xl shrink-0 flex items-center justify-center p-1 border border-outline-variant/15 overflow-hidden">
-                              <img
-                                src={item.image}
-                                alt={item.name}
-                                className="max-w-full max-h-full object-contain"
-                                loading="lazy"
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="whitespace-normal break-words font-headline-sm text-xs font-bold text-on-surface">
-                                {item.name}
-                              </h4>
-                              <p className="text-[10px] text-on-surface-variant">
-                                {item.unitSize} {item.unit} • Qty: {item.quantity}
-                              </p>
-                              <div className="flex items-baseline gap-1.5 mt-0.5">
-                                <span className="font-price-card text-xs font-extrabold text-on-surface">
-                                  ₹{item.price * item.quantity}
-                                </span>
-                                {item.mrp > item.price && (
-                                  <span className="text-[10px] text-outline line-through">
-                                    ₹{item.mrp * item.quantity}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* GSTIN Business Purchase Checkbox (Screenshot 5) */}
-                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 shadow-sm flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2.5">
-                      <input
-                        type="checkbox"
-                        id="gstin_check"
-                        checked={includeGstin}
-                        onChange={(e) => setIncludeGstin(e.target.checked)}
-                        className="mt-0.5 accent-primary cursor-pointer"
-                      />
-                      <div>
-                        <label
-                          htmlFor="gstin_check"
-                          className="font-headline-sm text-xs font-bold text-on-surface cursor-pointer"
-                        >
-                          Include GSTIN for Business Purchase
-                        </label>
-                        <p className="text-[10px] text-on-surface-variant">
-                          Claim input tax credit on corporate entity bills
-                        </p>
-                        {includeGstin && (
-                          <div className="mt-2.5">
-                            <input
-                              type="text"
-                              value={gstinNumber}
-                              onChange={(e) => setGstinNumber(e.target.value.toUpperCase())}
-                              placeholder="Enter 15-digit GSTIN (e.g. 33AAAAA0000A1Z5)"
-                              className="px-3 py-1.5 rounded-xl bg-surface text-xs font-bold border border-outline-variant/20 focus:outline-none focus:ring-1 focus:ring-primary uppercase w-full max-w-sm"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <span className="material-symbols-outlined text-outline text-[20px]">
-                      receipt_long
-                    </span>
-                  </div>
-
-                  {/* Step 3 Bottom Navigation Actions */}
-                  <div className="flex items-center justify-between pt-2">
+                  {/* Step 4 Bottom Navigation Actions */}
+                  <div className="flex items-center justify-between gap-2 pt-2">
                     <button
                       type="button"
-                      onClick={() => handleStepNavigation(2)}
-                      className="px-5 py-2.5 rounded-2xl border border-outline-variant/30 text-xs font-bold text-on-surface hover:bg-surface-container transition-colors flex items-center gap-1.5 cursor-pointer"
+                      onClick={() => handleStepNavigation(3)}
+                      className="shrink-0 whitespace-nowrap px-3 sm:px-5 py-2.5 rounded-2xl border border-outline-variant/30 text-xs font-bold text-on-surface hover:bg-surface-container transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-                      <span>Back to Address & Slot</span>
+                      <span className="sm:hidden">Back</span>
+                      <span className="hidden sm:inline">Back to Confirm Details</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={handlePlaceOrder}
-                      disabled={isSubmitting}
-                      className="px-7 py-3.5 rounded-2xl bg-primary text-white font-headline-sm text-xs font-bold hover:bg-primary-container transition-all flex items-center gap-2 shadow-md cursor-pointer active:scale-95"
+                      disabled={isSubmitting || !canContinueToPayment}
+                      className="min-w-0 flex-1 px-2 sm:px-7 py-3.5 rounded-2xl bg-primary text-white font-headline-sm text-xs font-bold hover:bg-primary-container transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
                     >
                       {isSubmitting ? (
                         <span>Processing Order...</span>
                       ) : (
                         <>
-                          <span>
+                          <span className="sm:hidden">
+                            {paymentMethod === "upi"
+                              ? `Place Order · ₹${finalTotal.toLocaleString("en-IN")}`
+                              : paymentMethod === "cod"
+                              ? "Place Order"
+                              : `Pay ₹${finalTotal.toLocaleString("en-IN")} & Place Order`}
+                          </span>
+                          <span className="hidden sm:inline">
                             {paymentMethod === "upi"
                               ? `Place Order (Awaiting UPI ₹${finalTotal.toLocaleString("en-IN")})`
                               : paymentMethod === "cod"
@@ -1730,23 +1713,26 @@ export function CheckoutPage() {
               )}
               <OrderBillSummary
                 mode="checkout"
+                hideCtaOnMobile
                 ctaText={
                   currentStep === 2
+                    ? "Continue to Confirm Details"
+                    : currentStep === 3
                     ? "Continue to Payment"
-                    : `Pay ₹${finalTotal.toLocaleString("en-IN")} & Place Order`
+                    : `Pay ${String.fromCharCode(8377)}${finalTotal.toLocaleString("en-IN")} & Place Order`
                 }
                 onCtaClick={
-                  currentStep === 2 ? handleContinueToPayment : handlePlaceOrder
+                  currentStep === 2
+                    ? handleContinueToConfirmDetails
+                    : currentStep === 3
+                    ? handleContinueToPayment
+                    : handlePlaceOrder
                 }
                 isSubmitting={isSubmitting}
                 disabled={
                   currentStep === 2
                     ? items.length === 0 || isSubmitting
-                    : !canGoToPayment ||
-                      isSubmitting ||
-                      cartSubtotal < checkoutSettings.minimumOrderAmount ||
-                      cartCount > checkoutSettings.maxItemsPerOrder ||
-                      isOrderCutoffPassed(checkoutSettings.orderCutoffTime)
+                    : !canContinueToPayment || isSubmitting
                 }
               />
             </div>
@@ -1756,10 +1742,10 @@ export function CheckoutPage() {
         {/* Modal: Add New Address */}
         {showAddressModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-surface-container-lowest rounded-3xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-surface-container-lowest p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
               <div className="flex items-center justify-between mb-4 pb-2 border-b border-outline-variant/15">
                 <h3 className="font-headline-sm text-base font-extrabold text-on-surface">
-                  Add New Delivery Address
+                  {editingAddress ? "Edit Delivery Address" : "Add New Delivery Address"}
                 </h3>
                 <button
                   type="button"
@@ -1770,36 +1756,14 @@ export function CheckoutPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleAddNewAddress} className="space-y-4">
-                {/* Quick Auto-Detect / Simulation helper for local store hub */}
-                <div className="p-2.5 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 text-primary font-medium">
-                    <span className="material-symbols-outlined text-[18px]">my_location</span>
-                    <span>Store Delivery Zone</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewHouseNo((prev) => prev || "42/B");
-                      const firstZone = deliveryConfig.deliveryZones[0];
-                      setNewStreet((prev) => prev || firstZone || "");
-                      setNewLandmark((prev) => prev || "");
-                      const location = firstZone
-                        ? findDeliveryLocation(firstZone, deliveryConfig.deliveryZones)
-                        : undefined;
-                      setNewCity(location?.city || deliveryConfig.serviceAreaDistrict);
-                      setNewPincode(location?.pincode || "");
-                      toast.info(
-                        firstZone
-                          ? `Auto-filled inside the ${firstZone} delivery zone.`
-                          : "Enter an address inside the service area."
-                      );
-                    }}
-                    className="px-2.5 py-1 bg-primary text-white font-bold rounded-lg text-[11px] hover:bg-primary-container transition-colors cursor-pointer"
-                  >
-                    Fill Service Zone
-                  </button>
-                </div>
+              <form onSubmit={handleSaveAddress} className="space-y-4">
+                <LocationPinPicker
+                  position={newLat !== 0 || newLng !== 0 ? { lat: newLat, lng: newLng } : null}
+                  onChange={(position) => {
+                    setNewLat(position.lat);
+                    setNewLng(position.lng);
+                  }}
+                />
 
                 {/* Tag Selection */}
                 <div className="flex gap-2">
@@ -1934,7 +1898,7 @@ export function CheckoutPage() {
                     type="submit"
                     className="flex-1 py-2.5 rounded-xl bg-primary text-white font-headline-sm text-xs font-bold hover:bg-primary-container transition-colors shadow-md cursor-pointer"
                   >
-                    Save Address
+                    {editingAddress ? "Save Changes" : "Save Address"}
                   </button>
                 </div>
 
@@ -1960,7 +1924,13 @@ export function CheckoutPage() {
           onSuccess={(verifiedPhone) => {
             toast.success(`Mobile number ${verifiedPhone} verified! You can now proceed.`);
           }}
-          initialPhone={user?.phone || selectedAddress?.phone || ""}
+          initialPhone={selectedAddress?.phone || user?.phone || ""}
+          title={user?.phoneVerified ? "Verify Delivery Phone Number" : "Verify Mobile Number"}
+          subtitle={
+            user?.phoneVerified
+              ? "Your delivery address uses a different number. Verify it with the OTP sent to that phone."
+              : "Verify your mobile number with OTP to continue checkout and receive delivery updates."
+          }
         />
       </main>
 

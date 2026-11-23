@@ -65,6 +65,18 @@ export function PhoneVerificationModal({
   const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const otpRequestInFlightRef = useRef(false);
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      setCountryCode(initialCountryCode);
+      setNationalNumber(defaultDigits);
+      setOtpCode("");
+      setStep("phone_input");
+      setErrorMessage("");
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, defaultDigits, initialCountryCode]);
 
   // Cooldown countdown effect
   useEffect(() => {

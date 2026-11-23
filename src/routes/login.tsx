@@ -14,6 +14,7 @@ import { authService, NO_PHONE_ACCOUNT_MESSAGE } from "../services/authService";
 import { formatToE164, mapPhoneAuthError } from "../services/phoneVerificationService";
 import { checkCustomerPhoneEligibility, mapPhoneEligibilityError } from "../services/phoneEligibilityService";
 import { emailLinkAuthService, EmailLinkAuthError } from "../services/emailLinkAuthService";
+import { addressService } from "../services/addressService";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
@@ -192,12 +193,23 @@ export function LoginPage() {
   }, [otpSent, resendTimer]);
 
   // Handle redirect navigation
-  const navigatePostLogin = () => {
-    if (searchParams.redirect) {
-      navigate({ to: searchParams.redirect as never });
-    } else {
-      navigate({ to: "/" });
+  const navigatePostLogin = async (userId: string) => {
+    try {
+      const addresses = await addressService.getAddresses(userId);
+      if (addresses.length === 0) {
+        navigate({
+          to: "/addresses",
+          search: {
+            action: "add",
+            ...(searchParams.redirect ? { redirect: searchParams.redirect } : {}),
+          },
+        } as any);
+        return;
+      }
+    } catch (error) {
+      console.error("Could not check for a saved delivery address:", error);
     }
+    navigate({ to: (searchParams.redirect || "/") as never });
   };
 
   const requestEligibleFirebaseOtp = async (): Promise<boolean> => {
@@ -363,7 +375,7 @@ export function LoginPage() {
           referralApplied ? referralCode : undefined,
         );
         toast.success(`Welcome back, ${loggedIn.name}!`);
-        navigatePostLogin();
+        void navigatePostLogin(loggedIn.id);
         return;
       } catch (err: unknown) {
         const message = getErrorMessage(err, "Invalid OTP code");
@@ -391,7 +403,7 @@ export function LoginPage() {
       });
       if (result.status === "resolved") {
         toast.success(`Welcome back, ${result.profile.name}!`);
-        navigatePostLogin();
+        void navigatePostLogin(result.profile.id);
       } else {
         setOtpError(
           "Firebase verified your phone, but no linked customer profile was found. No SASS or ONCUS profile was created. Contact support or continue only after the approved registration flow is available.",
@@ -415,7 +427,7 @@ export function LoginPage() {
       const result = await resolveFirebaseSession(identity);
       if (result.status === "resolved") {
         toast.success(`Welcome back, ${result.profile.name}!`);
-        navigatePostLogin();
+        void navigatePostLogin(result.profile.id);
       } else {
         const userMsg =
           describeIdentityResolutionState(result)?.userMessage ??
@@ -447,7 +459,7 @@ export function LoginPage() {
     try {
       const loggedIn = await loginWithEmail(email, password);
       toast.success(`Welcome back, ${loggedIn.name}!`);
-      navigatePostLogin();
+      void navigatePostLogin(loggedIn.id);
     } catch (err: unknown) {
       const message = getErrorMessage(err, "Invalid email or password");
       setEmailError(message);
@@ -493,7 +505,7 @@ export function LoginPage() {
 
       if (resolution.status === "resolved") {
         toast.success(`Welcome back, ${resolution.profile.name}!`);
-        navigatePostLogin();
+        void navigatePostLogin(resolution.profile.id);
       } else if (resolution.status === "unlinked") {
         toast.warning(
           "Email verified, but no linked Sriman Smart Store customer account was found.",

@@ -468,14 +468,26 @@ export function OrdersPage() {
           ) : (
             <section data-testid="orders-list-view">
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div><h1 className="text-3xl font-black text-on-surface">My Orders</h1><p className="mt-1 text-sm text-on-surface-variant">Review your purchases and open an order for its details.</p></div>
+                <div><h1 className="text-3xl font-black text-on-surface">My Orders</h1><p className="mt-1 text-sm text-on-surface-variant hidden min-[450px]">Review your purchases and open an order for its details.</p></div>
                 <p className="text-sm font-semibold text-on-surface-variant">{orders.length} order{orders.length === 1 ? "" : "s"}</p>
               </div>
-              <div className="mb-6 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filter orders">
-                <FilterButton active={activeFilter === "all"} onClick={() => setActiveFilter("all")}>All Orders ({orders.length})</FilterButton>
-                <FilterButton active={activeFilter === "active"} onClick={() => setActiveFilter("active")}>Active / In Transit ({activeOrdersCount})</FilterButton>
-                <FilterButton active={activeFilter === "delivered"} onClick={() => setActiveFilter("delivered")}>Delivered ({deliveredOrdersCount})</FilterButton>
-                <FilterButton active={activeFilter === "cancelled"} onClick={() => setActiveFilter("cancelled")}>Cancelled ({cancelledOrdersCount})</FilterButton>
+              <div className="mb-4 grid grid-cols-4 gap-1 sm:flex sm:gap-2" role="tablist" aria-label="Filter orders">
+                <FilterButton active={activeFilter === "all"} onClick={() => setActiveFilter("all")}>
+                  <span className="sm:hidden">All ({orders.length})</span>
+                  <span className="hidden sm:inline">All Orders ({orders.length})</span>
+                </FilterButton>
+                <FilterButton active={activeFilter === "active"} onClick={() => setActiveFilter("active")}>
+                  <span className="sm:hidden">Active ({activeOrdersCount})</span>
+                  <span className="hidden sm:inline">Active / In Transit ({activeOrdersCount})</span>
+                </FilterButton>
+                <FilterButton active={activeFilter === "delivered"} onClick={() => setActiveFilter("delivered")}>
+                  <span className="sm:hidden">Delivered ({deliveredOrdersCount})</span>
+                  <span className="hidden sm:inline">Delivered ({deliveredOrdersCount})</span>
+                </FilterButton>
+                <FilterButton active={activeFilter === "cancelled"} onClick={() => setActiveFilter("cancelled")}>
+                  <span className="sm:hidden">Cancelled ({cancelledOrdersCount})</span>
+                  <span className="hidden sm:inline">Cancelled ({cancelledOrdersCount})</span>
+                </FilterButton>
               </div>
               {filteredOrders.length === 0 ? <div className="rounded-2xl border border-outline-variant/20 bg-white p-8 text-center text-sm text-on-surface-variant">No orders match this filter.</div> : (
                 <div className="space-y-3" data-testid="orders-list">
@@ -515,7 +527,7 @@ function LoadingState({ label }: { label: string }) {
 }
 
 function FilterButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
-  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`shrink-0 rounded-full px-4 py-2.5 text-xs font-bold transition-colors ${active ? "bg-primary text-white" : "border border-outline-variant/20 bg-white text-on-surface-variant hover:text-primary"}`}>{children}</button>;
+  return <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`min-w-0 whitespace-nowrap rounded-full px-1 py-2 text-[9px] font-bold transition-colors sm:shrink-0 sm:px-4 sm:py-2.5 sm:text-xs ${active ? "bg-primary text-white" : "border border-outline-variant/20 bg-white text-on-surface-variant hover:text-primary"}`}>{children}</button>;
 }
 
 function OrderCard({ order, onOpen, onReorder, isReordering }: { order: Order; onOpen: () => void; onReorder: () => void; isReordering: boolean }) {
@@ -533,7 +545,7 @@ function OrderCard({ order, onOpen, onReorder, isReordering }: { order: Order; o
       <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,296px)_minmax(0,1fr)] sm:items-start">
         <div className="grid grid-cols-4 gap-2 sm:w-[296px] sm:shrink-0" aria-label={`${order.items.length} products in this order`}>
           {order.items.slice(0, imageLimit).map((item, index) => {
-            return <div key={`${item.productId}-${item.unitSize}-${index}`} className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-outline-variant/15 bg-surface-container-low p-1.5 sm:h-[68px] sm:w-[68px]">
+            return <div key={`${item.productId}-${item.unitSize}-${index}`} className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-outline-variant/15 bg-white p-0.5 sm:h-[68px] sm:w-[68px]">
               <OrderProductImage item={item} className="h-full w-full object-contain" />
             </div>;
           })}
@@ -605,7 +617,7 @@ function OrderDetails({ order, onBack, onInvoice, onHelp, onCancel, onReturn, on
           <div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-lg font-extrabold text-on-surface">Items ({itemCount})</h2><span className="text-sm font-bold text-on-surface">{money(order.pricingSummary.totalAmount)} total</span></div>
           <ul className="mt-4 divide-y divide-outline-variant/15">
             {order.items.map((item, index) => <li key={`${item.productId}-${item.unitSize}-${index}`} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-              <OrderProductImage item={item} alt={`${item.name} product image`} className="h-16 w-16 shrink-0 rounded-xl bg-surface-container object-contain p-1" />
+              <OrderProductImage item={item} alt={`${item.name} product image`} className="h-16 w-16 shrink-0 rounded-xl bg-white object-contain" />
               <div className="min-w-0 flex-1"><p className="font-bold text-on-surface">{item.name}</p><p className="mt-0.5 text-xs text-on-surface-variant">{[item.unitSize, item.unit].filter(Boolean).join(" ")} · Qty {item.quantity}</p><p className="mt-1 text-xs text-on-surface-variant">{money(item.price)} each</p></div>
               <p className="shrink-0 text-sm font-bold text-on-surface">{money(item.price * item.quantity)}</p>
             </li>)}

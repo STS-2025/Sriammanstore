@@ -223,17 +223,17 @@ export function ReferPage() {
     return (
       <div className="bg-[#f8f9fc] font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-20 max-w-[1000px] mx-auto px-margin-desktop py-16 text-center">
-          <div className="bg-white rounded-3xl border border-outline-variant/20 p-8 md:p-12 shadow-xs max-w-lg mx-auto">
-            <div className="w-16 h-16 rounded-2xl bg-[#e3f5ec] text-[#005F3F] flex items-center justify-center mx-auto mb-4">
-              <span className="material-symbols-outlined text-3xl">
+        <main className="mx-auto w-full max-w-[1000px] px-margin-desktop py-8 pt-20 text-center sm:py-16">
+          <div className="mx-auto max-w-lg rounded-2xl border border-outline-variant/20 bg-white p-5 shadow-xs sm:rounded-3xl sm:p-8 md:p-12">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#e3f5ec] text-[#005F3F] sm:mb-4 sm:h-16 sm:w-16 sm:rounded-2xl">
+              <span className="material-symbols-outlined text-2xl sm:text-3xl">
                 redeem
               </span>
             </div>
-            <h1 className="font-headline-lg text-xl md:text-2xl font-extrabold text-on-surface mb-2">
+            <h1 className="mb-2 font-headline-lg text-lg font-extrabold text-on-surface sm:text-xl md:text-2xl">
               Sign In to Access Refer & Earn
             </h1>
-            <p className="text-xs md:text-sm text-on-surface-variant mb-6 leading-relaxed">
+            <p className="mb-4 hidden text-xs leading-relaxed text-on-surface-variant sm:mb-6 sm:block sm:text-sm">
               Sign in with your mobile number to view your personal referral
               passcode, share invite links with neighbors, and track your
               credited Smart Coins.
@@ -241,9 +241,9 @@ export function ReferPage() {
             <Link
               to="/login"
               search={{ redirect: "/refer" } as any}
-              className="inline-flex items-center gap-2 bg-[#005F3F] text-white px-6 py-3 rounded-xl font-headline-sm text-xs font-bold shadow-sm hover:bg-[#004c32] transition-all"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#005F3F] px-4 py-2.5 font-headline-sm text-[10px] font-bold text-white shadow-sm transition-all hover:bg-[#004c32] sm:gap-2 sm:rounded-xl sm:px-6 sm:py-3 sm:text-xs"
             >
-              <span className="material-symbols-outlined text-[16px]">
+              <span className="material-symbols-outlined text-[15px] sm:text-[16px]">
                 login
               </span>
               <span>Sign In with Mobile OTP</span>
@@ -261,7 +261,7 @@ export function ReferPage() {
       <StoreHeader />
 
       <main className="w-full pt-20 min-h-[calc(100vh-80px)] pb-16">
-        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-8">
+          <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 md:pt-8">
           {/* Breadcrumb Navigation */}
           <nav
             aria-label="Breadcrumb"
@@ -316,24 +316,25 @@ export function ReferPage() {
           )}
 
           {/* Introductory Header & Compact Amman Vault Bar */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
+          <div className="mb-5 flex flex-col justify-between gap-3 sm:mb-8 sm:gap-6 lg:flex-row lg:items-end">
             <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-1.5 bg-[#fbf3dc] border border-[#f0deaa] text-[#7a4f00] text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider mb-3">
+              <div className="mb-2 items-center gap-1 rounded-full border border-[#f0deaa] bg-[#fbf3dc] px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-[#7a4f00] sm:mb-3 sm:gap-1.5 sm:px-3 sm:text-[10px] hidden min-[500px]">
                 <span className="material-symbols-outlined text-[14px]">
                   workspace_premium
                 </span>
                 <span>Amman Community Rewards</span>
               </div>
 
-              <h1 className="font-headline-lg text-3xl sm:text-4xl font-extrabold text-on-surface tracking-tight leading-tight">
-                Refer & Earn{" "}
+              <h1 className="font-headline-lg text-2xl font-extrabold text-on-surface tracking-tight leading-tight sm:text-3xl md:text-4xl">
+                <span className="sm:hidden">Refer & Earn</span>
+                <span className="hidden sm:inline">Refer & Earn{" "}
                 <span className="text-[#005F3F] relative inline-block">
                   Pure Savings
                   <span className="block h-1.5 w-full bg-[#005F3F]/25 rounded-full mt-0.5"></span>
-                </span>
+                </span></span>
               </h1>
 
-              <p className="text-xs sm:text-sm text-on-surface-variant mt-3 leading-relaxed">
+              <p className="hidden text-xs leading-relaxed text-on-surface-variant sm:mt-3 sm:block sm:text-sm">
                 Invite your friends and neighbors to{" "}
                 <strong className="text-on-surface font-semibold">
                   {storeInfo?.storeName || "Sriman Smart Store"}
@@ -354,10 +355,10 @@ export function ReferPage() {
             </div>
 
             {/* Compact Amman Vault Summary Card */}
-            <div className="bg-white border border-outline-variant/20 rounded-2xl p-4 shadow-xs flex items-center justify-between gap-5 shrink-0 sm:min-w-[330px]">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-[#fff3d6] border border-[#f5dfa6] text-[#9e6700] flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[24px]">
+            {/* <div className="flex shrink-0 items-center justify-between gap-3 rounded-xl border border-outline-variant/20 bg-white p-3 shadow-xs sm:gap-5 sm:rounded-2xl sm:p-4 sm:min-w-[330px]">
+              <div className="flex items-center gap-2.5 sm:gap-3.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#f5dfa6] bg-[#fff3d6] text-[#9e6700] sm:h-12 sm:w-12 sm:rounded-2xl">
+                  <span className="material-symbols-outlined text-[19px] sm:text-[24px]">
                     monetization_on
                   </span>
                 </div>
@@ -368,7 +369,7 @@ export function ReferPage() {
                   <div className="flex items-baseline gap-1.5 mt-0.5">
                     <span
                       data-testid="vault-coin-balance"
-                      className="font-headline-lg text-2xl font-black text-on-surface tracking-tight"
+                      className="font-headline-lg text-xl font-black text-on-surface tracking-tight sm:text-2xl"
                     >
                       {loading ? "—" : availableCoins.toLocaleString("en-IN")}
                     </span>
@@ -386,32 +387,32 @@ export function ReferPage() {
 
               <Link
                 to="/cart"
-                className="bg-[#f1f3f9] hover:bg-[#e4e8f2] text-on-surface font-headline-sm text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shrink-0"
+                className="shrink-0 rounded-lg bg-[#f1f3f9] px-3 py-2 font-headline-sm text-[10px] font-bold text-on-surface transition-colors hover:bg-[#e4e8f2] sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-xs"
               >
                 Redeem
               </Link>
-            </div>
+            </div> */}
           </div>
 
           {/* Main Two-Column Referral Dashboard */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-16">
+          <div className="mb-8 grid grid-cols-1 gap-3 sm:mb-12 sm:gap-6 lg:mb-16 lg:grid-cols-12">
             {/* Left Column (7 Cols): Exclusive Referral Pass */}
-            <div className="lg:col-span-7 bg-white rounded-3xl border border-outline-variant/20 p-6 sm:p-8 shadow-xs relative overflow-hidden flex flex-col justify-between">
+            <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-xs sm:rounded-3xl sm:p-8 lg:col-span-7">
               {/* Subtle top-right decorative green circle */}
               <div
                 aria-hidden="true"
-                className="w-48 h-48 rounded-full bg-[#e8f5ef]/80 absolute -top-12 -right-12 pointer-events-none"
+                className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#e8f5ef]/80 sm:h-48 sm:w-48"
               />
 
               <div className="relative z-10">
                 {/* Top Pass Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
-                  <span className="bg-[#dff5ea] text-[#005F3F] text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-5">
+                  <span className="rounded-full bg-[#dff5ea] px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-[#005F3F] sm:px-3 sm:text-[10px]">
                     Your Exclusive Referral Pass
                   </span>
 
                   {hasActiveCode && (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#005F3F]">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#005F3F] sm:gap-1.5 sm:text-xs">
                       <span className="w-2 h-2 rounded-full bg-[#005F3F] animate-pulse"></span>
                       <span>Active & Ready</span>
                     </span>
@@ -419,31 +420,31 @@ export function ReferPage() {
                 </div>
 
                 {/* Main Offer Heading */}
-                <h2 className="font-headline-lg text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight mb-2">
+                <h2 className="mb-1.5 font-headline-lg text-lg font-extrabold tracking-tight text-on-surface sm:mb-2 sm:text-2xl lg:text-3xl">
                   Give Your Friends a Reason to Shop — Earn{" "}
                   {REFERRAL_REWARD_COINS} Coins
                 </h2>
-                <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-6 max-w-xl">
+                <p className="mb-4 hidden max-w-xl text-xs leading-relaxed text-on-surface-variant sm:mb-6 sm:block sm:text-sm">
                   Valid across farm-fresh produce, wood-pressed Mara Chekku
                   oils, native heirloom staples, and artisanal spice blends in{" "}
                   {storeLocation}.
                 </p>
 
                 {/* Personal Referral Code Box */}
-                <div className="bg-[#f4f5fa] border border-outline-variant/20 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-white border border-outline-variant/15 flex items-center justify-center text-[#005F3F] shrink-0 shadow-2xs">
-                      <span className="material-symbols-outlined text-[20px]">
+                <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-outline-variant/20 bg-[#f4f5fa] p-3 sm:mb-6 sm:gap-3 sm:rounded-2xl sm:p-4">
+                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-outline-variant/15 bg-white text-[#005F3F] shadow-2xs sm:h-10 sm:w-10 sm:rounded-xl">
+                      <span className="material-symbols-outlined text-[18px] sm:text-[20px]">
                         confirmation_number
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <span className="text-[11px] text-on-surface-variant font-medium block">
+                      <span className="block text-[10px] font-medium text-on-surface-variant sm:text-[11px]">
                         Your Personal Code
                       </span>
                       <span
                         data-testid="personal-referral-code"
-                        className="font-headline-lg text-base sm:text-lg font-black text-on-surface tracking-wider break-all"
+                        className="font-headline-lg text-sm font-black tracking-wider text-on-surface break-all sm:text-lg"
                       >
                         {referralCode || "UNASSIGNED"}
                       </span>
@@ -455,28 +456,29 @@ export function ReferPage() {
                     onClick={handleCopyCode}
                     disabled={!hasActiveCode}
                     data-testid="copy-code-btn"
-                    className="bg-[#005F3F] hover:bg-[#004c32] disabled:opacity-50 text-white px-5 py-2.5 rounded-xl font-headline-sm text-xs font-bold inline-flex items-center justify-center gap-2 shadow-xs transition-all shrink-0 cursor-pointer"
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1 rounded-lg bg-[#005F3F] px-2.5 py-1.5 font-headline-sm text-[9px] font-bold text-white shadow-xs transition-all hover:bg-[#004c32] disabled:opacity-50 sm:gap-2 sm:rounded-xl sm:px-5 sm:py-2.5 sm:text-xs"
                   >
-                    <span className="material-symbols-outlined text-[16px]">
+                    <span className="material-symbols-outlined text-[14px] sm:text-[16px]">
                       {copiedCode ? "check" : "content_copy"}
                     </span>
-                    <span>{copiedCode ? "Copied!" : "Copy Code"}</span>
+                    <span className="sm:hidden">{copiedCode ? "Copied" : "Copy"}</span>
+                    <span className="hidden sm:inline">{copiedCode ? "Copied!" : "Copy Code"}</span>
                   </button>
                 </div>
               </div>
 
               {/* Share Channels */}
               <div className="relative z-10 pt-2">
-                <span className="text-xs font-semibold text-on-surface-variant block mb-3">
+                <span className="mb-2 block text-[10px] font-semibold text-on-surface-variant sm:mb-3 sm:text-xs">
                   Share directly via favorite channels:
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={handleShareWhatsApp}
                     disabled={!hasActiveCode}
                     data-testid="share-whatsapp-btn"
-                    className="bg-[#005F3F] hover:bg-[#004c32] disabled:opacity-50 text-white py-3.5 px-5 rounded-xl font-headline-sm text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                    className="flex cursor-pointer items-center justify-center gap-1 rounded-lg bg-[#005F3F] px-2 py-2.5 font-headline-sm text-[9px] font-bold text-white shadow-xs transition-all hover:bg-[#004c32] disabled:opacity-50 sm:gap-2 sm:rounded-xl sm:px-5 sm:py-3.5 sm:text-xs"
                   >
                     <span className="material-symbols-outlined text-[18px]">
                       chat
@@ -489,7 +491,7 @@ export function ReferPage() {
                     onClick={handleShareLinkOrMore}
                     disabled={!hasActiveCode}
                     data-testid="share-link-btn"
-                    className="bg-[#eef0f8] hover:bg-[#e2e5f2] disabled:opacity-50 text-on-surface py-3.5 px-5 rounded-xl font-headline-sm text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    className="flex cursor-pointer items-center justify-center gap-1 rounded-lg bg-[#eef0f8] px-2 py-2.5 font-headline-sm text-[9px] font-bold text-on-surface transition-all hover:bg-[#e2e5f2] disabled:opacity-50 sm:gap-2 sm:rounded-xl sm:px-5 sm:py-3.5 sm:text-xs"
                   >
                     <span className="material-symbols-outlined text-[18px]">
                       {copiedLink ? "check" : "share"}
@@ -503,12 +505,12 @@ export function ReferPage() {
             </div>
 
             {/* Right Column (5 Cols): Your Impact Metrics + Community Strip */}
-            <div className="lg:col-span-5 flex flex-col justify-between gap-4">
-              <div className="bg-white rounded-3xl border border-outline-variant/20 p-6 sm:p-7 shadow-xs flex-1 flex flex-col justify-between">
+            <div className="flex flex-col justify-between gap-3 sm:gap-4 lg:col-span-5">
+              <div className="flex flex-1 flex-col justify-between rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-xs sm:rounded-3xl sm:p-7">
                 <div>
                   {/* Card Heading */}
-                  <div className="flex items-center justify-between mb-5">
-                    <h3 className="font-headline-lg text-base sm:text-lg font-extrabold text-on-surface">
+                  <div className="mb-3 flex items-center justify-between sm:mb-5">
+                    <h3 className="font-headline-lg text-sm font-extrabold text-on-surface sm:text-lg">
                       Your Impact Metrics
                     </h3>
                     <span className="material-symbols-outlined text-on-surface-variant text-[20px]">
@@ -517,8 +519,8 @@ export function ReferPage() {
                   </div>
 
                   {/* Top 2 Sub-Cards: Total Invites & Orders Placed */}
-                  <div className="grid grid-cols-2 gap-3.5 mb-3.5">
-                    <div className="bg-[#f6f7fb] rounded-2xl p-4 border border-outline-variant/10">
+                  <div className="mb-3.5 grid grid-cols-2 gap-2 sm:gap-3.5">
+                    <div className="rounded-xl border border-outline-variant/10 bg-[#f6f7fb] p-2.5 sm:rounded-2xl sm:p-4">
                       <div className="flex items-center justify-between text-on-surface-variant mb-1">
                         <span className="text-[11px] font-semibold">
                           Total Invites
@@ -538,7 +540,7 @@ export function ReferPage() {
                       </span>
                     </div>
 
-                    <div className="bg-[#eefaf3] rounded-2xl p-4 border border-[#cdebd9]/60">
+                    <div className="rounded-xl border border-[#cdebd9]/60 bg-[#eefaf3] p-2.5 sm:rounded-2xl sm:p-4">
                       <div className="flex items-center justify-between text-on-surface-variant mb-1">
                         <span className="text-[11px] font-semibold">
                           Orders Placed
@@ -589,10 +591,6 @@ export function ReferPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-on-surface-variant mt-0.5">
-                      Applied seamlessly toward cold-pressed oils, produce &
-                      grocery carts.
-                    </p>
                   </div>
                 </div>
 
@@ -638,7 +636,7 @@ export function ReferPage() {
                   </span>
                 </div>
                 <p className="text-[11px] font-semibold text-[#004c32] leading-snug">
-                  Every referral strengthens farm-to-doorstep harvest sourcing
+                  Every referral strengthens shop-to-doorstep sourcing
                   across {storeLocation} neighborhoods!
                 </p>
               </div>
@@ -646,27 +644,27 @@ export function ReferPage() {
           </div>
 
           {/* Section 4: How The Reward Cycle Works */}
-          <section className="mb-14">
-            <div className="text-center max-w-xl mx-auto mb-8">
-              <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#005F3F] block mb-1.5">
+          <section className="mb-8 sm:mb-14">
+            <div className="mx-auto mb-4 max-w-xl text-center sm:mb-8">
+              <span className="mb-1.5 hidden text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#005F3F] sm:block">
                 Simplicity by Design
               </span>
-              <h2 className="font-headline-lg text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight">
+              <h2 className="font-headline-lg text-lg font-extrabold tracking-tight text-on-surface sm:text-2xl md:text-3xl">
                 How The Reward Cycle Works
               </h2>
-              <p className="text-xs sm:text-sm text-on-surface-variant mt-1.5">
+              <p className="mt-1.5 hidden text-xs text-on-surface-variant sm:block sm:text-sm">
                 Three straightforward steps to organic freshness and effortless
                 grocery savings.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-3 sm:gap-6 md:grid-cols-3">
               {/* Step 01 */}
-              <div className="bg-white rounded-3xl border border-outline-variant/20 p-6 sm:p-7 shadow-xs flex flex-col justify-between">
+              <div className="flex flex-col justify-between rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-xs sm:rounded-3xl sm:p-7">
                 <div>
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="w-12 h-12 rounded-2xl bg-[#e3f5ec] text-[#005F3F] flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[24px]">
+                  <div className="mb-3 flex items-center justify-between sm:mb-5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#e3f5ec] text-[#005F3F] sm:h-12 sm:w-12 sm:rounded-2xl">
+                      <span className="material-symbols-outlined text-[19px] sm:text-[24px]">
                         extension
                       </span>
                     </div>
@@ -674,10 +672,10 @@ export function ReferPage() {
                       01
                     </span>
                   </div>
-                  <h3 className="font-headline-lg text-base font-extrabold text-on-surface mb-2">
+                  <h3 className="mb-1.5 font-headline-lg text-sm font-extrabold text-on-surface sm:mb-2 sm:text-base">
                     Share Your Code
                   </h3>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                  <p className="text-[11px] leading-relaxed text-on-surface-variant sm:text-xs">
                     Send your unique referral link or passcode{" "}
                     <strong className="text-on-surface font-bold">
                       {referralCode}
@@ -686,7 +684,7 @@ export function ReferPage() {
                   </p>
                 </div>
 
-                <div className="bg-[#f4f5fa] rounded-xl px-3.5 py-2.5 flex items-center gap-2 text-[11px] font-semibold text-on-surface-variant mt-6">
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-[#f4f5fa] px-3 py-2 text-[10px] font-semibold text-on-surface-variant sm:mt-6 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-[11px]">
                   <span className="material-symbols-outlined text-[15px] text-[#005F3F]">
                     qr_code_2
                   </span>
@@ -695,11 +693,11 @@ export function ReferPage() {
               </div>
 
               {/* Step 02 */}
-              <div className="bg-white rounded-3xl border border-outline-variant/20 p-6 sm:p-7 shadow-xs flex flex-col justify-between">
+              <div className="flex flex-col justify-between rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-xs sm:rounded-3xl sm:p-7">
                 <div>
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="w-12 h-12 rounded-2xl bg-[#fff0d6] text-[#9e6700] flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[24px]">
+                  <div className="mb-3 flex items-center justify-between sm:mb-5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fff0d6] text-[#9e6700] sm:h-12 sm:w-12 sm:rounded-2xl">
+                      <span className="material-symbols-outlined text-[19px] sm:text-[24px]">
                         shopping_cart_checkout
                       </span>
                     </div>
@@ -707,36 +705,36 @@ export function ReferPage() {
                       02
                     </span>
                   </div>
-                  <h3 className="font-headline-lg text-base font-extrabold text-on-surface mb-2">
-                    They Register & Shop Fresh
+                  <h3 className="mb-1.5 font-headline-lg text-sm font-extrabold text-on-surface sm:mb-2 sm:text-base">
+                    They Register & Shop
                   </h3>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                  <p className="text-[11px] leading-relaxed text-on-surface-variant sm:text-xs">
                     Your friend registers with your referral code during Mobile
                     OTP sign-in to receive{" "}
                     <strong className="text-[#9e6700] font-bold">
                       welcome bonus Smart Coins
                     </strong>{" "}
-                    and places their first farm-fresh order.
+                    and places their first order.
                   </p>
                 </div>
 
-                <div className="bg-[#f4f5fa] rounded-xl px-3.5 py-2.5 flex items-center gap-2 text-[11px] font-semibold text-on-surface-variant mt-6">
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-[#f4f5fa] px-3 py-2 text-[10px] font-semibold text-on-surface-variant sm:mt-6 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-[11px]">
                   <span className="material-symbols-outlined text-[15px] text-[#9e6700]">
                     bolt
                   </span>
                   <span>
-                    Serviceable within {storeInfo?.maxRadiusKm ?? 6} km of{" "}
+                    Serviceable within {storeInfo?.maxRadiusKm ?? 50} km of{" "}
                     {storeLocation}
                   </span>
                 </div>
               </div>
 
               {/* Step 03 */}
-              <div className="bg-white rounded-3xl border border-outline-variant/20 p-6 sm:p-7 shadow-xs flex flex-col justify-between">
+              <div className="flex flex-col justify-between rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-xs sm:rounded-3xl sm:p-7">
                 <div>
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="w-12 h-12 rounded-2xl bg-[#d6f7e5] text-[#005F3F] flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[24px]">
+                  <div className="mb-3 flex items-center justify-between sm:mb-5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#d6f7e5] text-[#005F3F] sm:h-12 sm:w-12 sm:rounded-2xl">
+                      <span className="material-symbols-outlined text-[19px] sm:text-[24px]">
                         savings
                       </span>
                     </div>
@@ -744,10 +742,10 @@ export function ReferPage() {
                       03
                     </span>
                   </div>
-                  <h3 className="font-headline-lg text-base font-extrabold text-on-surface mb-2">
+                  <h3 className="mb-1.5 font-headline-lg text-sm font-extrabold text-on-surface sm:mb-2 sm:text-base">
                     Both Get Rewarded
                   </h3>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                  <p className="text-[11px] leading-relaxed text-on-surface-variant sm:text-xs">
                     Once their first order is completed, you earn{" "}
                     <strong className="text-[#005F3F] font-bold">
                       {REFERRAL_REWARD_COINS} Smart Coins
@@ -759,7 +757,7 @@ export function ReferPage() {
                   </p>
                 </div>
 
-                <div className="bg-[#f4f5fa] rounded-xl px-3.5 py-2.5 flex items-center gap-2 text-[11px] font-semibold text-on-surface-variant mt-6">
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-[#f4f5fa] px-3 py-2 text-[10px] font-semibold text-on-surface-variant sm:mt-6 sm:rounded-xl sm:px-3.5 sm:py-2.5 sm:text-[11px]">
                   <span className="material-symbols-outlined text-[15px] text-[#005F3F]">
                     auto_awesome
                   </span>
@@ -770,19 +768,16 @@ export function ReferPage() {
           </section>
 
           {/* Section 5: Referral Progress Visualization */}
-          <section className="mb-16">
-            <div className="bg-gradient-to-r from-white via-white to-[#fffaf0] rounded-3xl border border-outline-variant/20 p-6 sm:p-8 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-4">
+          <section className="mb-8 sm:mb-16">
+            <div className="rounded-2xl border border-outline-variant/20 bg-gradient-to-r from-white via-white to-[#fffaf0] p-4 shadow-xs sm:rounded-3xl sm:p-8">
+              <div className="mb-3 flex flex-col justify-between gap-3 sm:mb-4 sm:flex-row sm:items-end sm:gap-4">
                 <div>
-                  <div className="inline-flex items-center gap-2 mb-2">
-                    <span className="bg-[#ffecd1] text-[#855300] text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+                  <div className="mb-1.5 inline-flex items-center gap-1.5 sm:mb-2 sm:gap-2">
+                    <span className="rounded-full bg-[#ffecd1] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-[#855300] sm:px-2.5 sm:text-[10px] text-center">
                       Referral Conversion Overview
                     </span>
-                    <span className="text-[11px] font-semibold text-on-surface-variant">
-                      {REFERRAL_REWARD_COINS} Coins per Completed First Order
-                    </span>
                   </div>
-                  <h3 className="font-headline-lg text-xl sm:text-2xl font-extrabold text-on-surface tracking-tight">
+                  <h3 className="font-headline-lg text-base font-extrabold tracking-tight text-on-surface sm:text-xl md:text-2xl">
                     {referralStats.totalNeighbors === 0
                       ? "Invite Your First Neighbor to Start Earning Referral Rewards"
                       : referralStats.pendingCount > 0
@@ -791,14 +786,14 @@ export function ReferPage() {
                   </h3>
                 </div>
 
-                <div className="sm:text-right shrink-0">
+                <div className="flex items-baseline gap-1 sm:block sm:shrink-0 sm:text-right">
                   <span
                     data-testid="progress-fraction"
-                    className="font-headline-lg text-2xl sm:text-3xl font-black text-[#005F3F]"
+                    className="font-headline-lg text-xl font-black text-[#005F3F] sm:text-3xl"
                   >
                     {referralStats.completedCount}
                   </span>
-                  <span className="text-sm font-bold text-on-surface-variant">
+                  <span className="text-[11px] font-bold text-on-surface-variant sm:text-sm">
                     {" "}
                     / {referralStats.totalNeighbors} Completed
                   </span>
@@ -812,7 +807,7 @@ export function ReferPage() {
                 aria-valuenow={referralStats.conversionRatePercent}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                className="w-full h-3.5 bg-[#eaedf5] rounded-full overflow-hidden mb-5"
+                className="mb-3 h-2.5 w-full overflow-hidden rounded-full bg-[#eaedf5] sm:mb-5 sm:h-3.5"
               >
                 <div
                   className="h-full bg-gradient-to-r from-[#005F3F] to-[#26a66c] rounded-full transition-all duration-500"
@@ -826,12 +821,12 @@ export function ReferPage() {
               </div>
 
               {/* 3 Truthful Status Pills */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                <div className="bg-[#f4f5fa] rounded-2xl p-3.5 flex items-center gap-3">
-                  <span className="material-symbols-outlined text-[#005F3F] text-[20px] shrink-0">
+              <div className="grid grid-cols-1 gap-2 sm:gap-3.5 md:grid-cols-3">
+                <div className="flex items-center gap-2 rounded-xl bg-[#f4f5fa] p-3 sm:gap-3 sm:rounded-2xl sm:p-3.5">
+                  <span className="material-symbols-outlined shrink-0 text-[17px] text-[#005F3F] sm:text-[20px]">
                     check_circle
                   </span>
-                  <div className="text-[11px] leading-snug">
+                  <div className="text-[10px] leading-snug sm:text-[11px]">
                     <span className="font-bold text-on-surface block">
                       Completed Referrals: {referralStats.completedCount}
                     </span>
@@ -845,11 +840,11 @@ export function ReferPage() {
                   </div>
                 </div>
 
-                <div className="bg-[#eafaf1] border border-[#c5ebd6] rounded-2xl p-3.5 flex items-center gap-3">
-                  <span className="material-symbols-outlined text-[#005F3F] text-[20px] shrink-0">
+                <div className="flex items-center gap-2 rounded-xl border border-[#c5ebd6] bg-[#eafaf1] p-3 sm:gap-3 sm:rounded-2xl sm:p-3.5">
+                  <span className="material-symbols-outlined shrink-0 text-[17px] text-[#005F3F] sm:text-[20px]">
                     flag
                   </span>
-                  <div className="text-[11px] leading-snug">
+                  <div className="text-[10px] leading-snug sm:text-[11px]">
                     <span className="font-bold text-[#004c32] block">
                       Pending First Orders: {referralStats.pendingCount}
                     </span>
@@ -860,11 +855,11 @@ export function ReferPage() {
                   </div>
                 </div>
 
-                <div className="bg-[#f4f5fa] rounded-2xl p-3.5 flex items-center gap-3">
-                  <span className="material-symbols-outlined text-on-surface-variant text-[20px] shrink-0">
+                <div className="flex items-center gap-2 rounded-xl bg-[#f4f5fa] p-3 sm:gap-3 sm:rounded-2xl sm:p-3.5">
+                  <span className="material-symbols-outlined shrink-0 text-[17px] text-on-surface-variant sm:text-[20px]">
                     verified_user
                   </span>
-                  <div className="text-[11px] leading-snug">
+                  <div className="text-[10px] leading-snug sm:text-[11px]">
                     <span className="font-bold text-on-surface block">
                       Standard Per-Referral Reward
                     </span>
@@ -879,16 +874,16 @@ export function ReferPage() {
           </section>
 
           {/* Section 6: Referral Activity Log */}
-          <section className="mb-16">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+          <section className="mb-8 sm:mb-16">
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:mb-6 sm:flex-row sm:items-end sm:gap-4">
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#005F3F] block mb-1">
+                <span className="mb-1 hidden text-[10px] font-extrabold uppercase tracking-[0.15em] text-[#005F3F] sm:block">
                   Audit Log
                 </span>
-                <h2 className="font-headline-lg text-2xl font-extrabold text-on-surface tracking-tight">
+                <h2 className="font-headline-lg text-lg font-extrabold tracking-tight text-on-surface sm:text-2xl">
                   Referral Activity Log
                 </h2>
-                <p className="text-xs text-on-surface-variant mt-0.5">
+                <p className="mt-0.5 hidden text-xs text-on-surface-variant sm:block">
                   Track referral registrations, first-order statuses, and coin
                   credits in real-time.
                 </p>
@@ -898,7 +893,7 @@ export function ReferPage() {
               <div
                 role="tablist"
                 aria-label="Filter referral activity"
-                className="bg-white border border-outline-variant/20 p-1 rounded-full inline-flex flex-wrap items-center gap-1 shadow-2xs self-start md:self-auto"
+                className="inline-flex flex-wrap items-center gap-0.5 self-start rounded-full border border-outline-variant/20 bg-white p-1 shadow-2xs sm:gap-1 sm:self-auto"
               >
                 <button
                   type="button"
@@ -906,13 +901,13 @@ export function ReferPage() {
                   aria-selected={activityFilter === "all"}
                   data-testid="filter-tab-all"
                   onClick={() => handleFilterChange("all")}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  className={`rounded-full px-2 py-1.5 text-[10px] font-bold transition-all cursor-pointer sm:px-4 sm:text-xs ${
                     activityFilter === "all"
                       ? "bg-[#005F3F] text-white shadow-2xs"
                       : "text-on-surface-variant hover:text-on-surface"
                   }`}
                 >
-                  All Referrals ({referrals.length})
+                  <span className="sm:hidden">All ({referrals.length})</span><span className="hidden sm:inline">All Referrals ({referrals.length})</span>
                 </button>
                 <button
                   type="button"
@@ -920,13 +915,13 @@ export function ReferPage() {
                   aria-selected={activityFilter === "completed"}
                   data-testid="filter-tab-completed"
                   onClick={() => handleFilterChange("completed")}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  className={`rounded-full px-2 py-1.5 text-[10px] font-bold transition-all cursor-pointer sm:px-4 sm:text-xs ${
                     activityFilter === "completed"
                       ? "bg-[#005F3F] text-white shadow-2xs"
                       : "text-on-surface-variant hover:text-on-surface"
                   }`}
                 >
-                  Completed & Credited ({referralStats.completedCount})
+                  <span className="sm:hidden">Done ({referralStats.completedCount})</span><span className="hidden sm:inline">Completed & Credited ({referralStats.completedCount})</span>
                 </button>
                 <button
                   type="button"
@@ -934,21 +929,21 @@ export function ReferPage() {
                   aria-selected={activityFilter === "pending"}
                   data-testid="filter-tab-pending"
                   onClick={() => handleFilterChange("pending")}
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  className={`rounded-full px-2 py-1.5 text-[10px] font-bold transition-all cursor-pointer sm:px-4 sm:text-xs ${
                     activityFilter === "pending"
                       ? "bg-[#005F3F] text-white shadow-2xs"
                       : "text-on-surface-variant hover:text-on-surface"
                   }`}
                 >
-                  Pending First Order ({referralStats.pendingCount})
+                  <span className="sm:hidden">Pending ({referralStats.pendingCount})</span><span className="hidden sm:inline">Pending First Order ({referralStats.pendingCount})</span>
                 </button>
               </div>
             </div>
 
             {/* Activity Table Card */}
-            <div className="bg-white rounded-3xl border border-outline-variant/20 shadow-xs overflow-hidden">
+            <div className="overflow-hidden rounded-2xl border border-outline-variant/20 bg-white shadow-xs sm:rounded-3xl">
               {loading ? (
-                <div className="py-14 px-6 text-center">
+                <div className="px-4 py-8 text-center sm:px-6 sm:py-14">
                   <div className="w-10 h-10 rounded-full border-2 border-[#005F3F] border-t-transparent animate-spin mx-auto mb-3" />
                   <p className="text-xs font-semibold text-on-surface-variant">
                     Loading referral activity from server...
@@ -957,7 +952,7 @@ export function ReferPage() {
               ) : filteredReferrals.length === 0 ? (
                 <div
                   data-testid="empty-referrals-view"
-                  className="py-14 px-6 text-center max-w-md mx-auto"
+                  className="mx-auto max-w-md px-4 py-8 text-center sm:px-6 sm:py-14"
                 >
                   <div
                     data-testid="referral-empty-state"
@@ -1112,7 +1107,7 @@ export function ReferPage() {
                       return (
                         <div
                           key={friend.id}
-                          className="p-4 flex flex-col gap-2.5"
+                          className="flex flex-col gap-2 p-3 sm:gap-2.5 sm:p-4"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2.5 min-w-0">
@@ -1158,7 +1153,7 @@ export function ReferPage() {
                   </div>
 
                   {/* Table Footer & Pagination */}
-                  <div className="bg-[#f6f7fb] border-t border-outline-variant/15 px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] text-on-surface-variant">
+                  <div className="flex flex-col justify-between gap-2 border-t border-outline-variant/15 bg-[#f6f7fb] px-3 py-2.5 text-[10px] text-on-surface-variant sm:flex-row sm:items-center sm:gap-3 sm:px-6 sm:py-3.5 sm:text-[11px]">
                     <div className="flex items-center gap-3">
                       <span>
                         Showing {visibleReferrals.length} of{" "}
@@ -1180,7 +1175,7 @@ export function ReferPage() {
                       )}
                     </div>
 
-                    <div className="inline-flex items-center gap-1.5">
+                    <div className="hidden items-center gap-1.5 sm:inline-flex">
                       <span className="w-2 h-2 rounded-full bg-[#005F3F]"></span>
                       <span>
                         Referral rewards credit upon verified first-order
@@ -1195,26 +1190,26 @@ export function ReferPage() {
 
           {/* Section 7: Referral Terms & Fair Use Guidelines */}
           <section>
-            <div className="bg-white rounded-3xl border border-outline-variant/20 p-6 sm:p-8 shadow-xs">
-              <div className="flex items-center gap-2.5 mb-6">
-                <span className="material-symbols-outlined text-[#005F3F] text-[22px]">
+            <div className="rounded-2xl border border-outline-variant/20 bg-white p-4 shadow-xs sm:rounded-3xl sm:p-8">
+              <div className="mb-3 flex items-center gap-2 sm:mb-6 sm:gap-2.5">
+                <span className="material-symbols-outlined text-[19px] text-[#005F3F] sm:text-[22px]">
                   gavel
                 </span>
-                <h2 className="font-headline-lg text-lg sm:text-xl font-extrabold text-on-surface">
+                <h2 className="font-headline-lg text-sm font-extrabold text-on-surface sm:text-xl">
                   Referral Terms & Fair Use Guidelines
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-3">
                 {/* Guideline 1: New Customer Registration & Eligibility */}
-                <div className="bg-[#f6f7fb] rounded-2xl p-5 border border-outline-variant/10">
+                <div className="rounded-xl border border-outline-variant/10 bg-[#f6f7fb] p-3 sm:rounded-2xl sm:p-5">
                   <div className="flex items-center gap-2 text-[#005F3F] font-headline-sm text-xs font-extrabold mb-2">
                     <span className="material-symbols-outlined text-[18px]">
                       person_check
                     </span>
                     <span>New Customer Eligibility</span>
                   </div>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                  <p className="text-[11px] leading-relaxed text-on-surface-variant sm:text-xs">
                     Referral codes (
                     <span className="font-mono font-semibold text-on-surface">
                       {referralCode}
@@ -1226,18 +1221,18 @@ export function ReferPage() {
                 </div>
 
                 {/* Guideline 2: Configured Serviceability Zone */}
-                <div className="bg-[#f6f7fb] rounded-2xl p-5 border border-outline-variant/10">
+                <div className="rounded-xl border border-outline-variant/10 bg-[#f6f7fb] p-3 sm:rounded-2xl sm:p-5">
                   <div className="flex items-center gap-2 text-[#005F3F] font-headline-sm text-xs font-extrabold mb-2">
                     <span className="material-symbols-outlined text-[18px]">
                       location_on
                     </span>
                     <span>{storeLocation} Service Zone</span>
                   </div>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                  <p className="text-[11px] leading-relaxed text-on-surface-variant sm:text-xs">
                     Orders placed by referred friends must be within our
                     configured{" "}
                     <strong className="text-on-surface font-semibold">
-                      {storeInfo?.maxRadiusKm ?? 6} km delivery radius
+                      {storeInfo?.maxRadiusKm ?? 50} km delivery radius
                     </strong>{" "}
                     around {storeLocation}
                     {storeInfo?.minOrderForFreeDelivery
@@ -1248,14 +1243,14 @@ export function ReferPage() {
                 </div>
 
                 {/* Guideline 3: Reward Credit & Binary VIP Separation */}
-                <div className="bg-[#f6f7fb] rounded-2xl p-5 border border-outline-variant/10">
+                <div className="rounded-xl border border-outline-variant/10 bg-[#f6f7fb] p-3 sm:rounded-2xl sm:p-5">
                   <div className="flex items-center gap-2 text-[#005F3F] font-headline-sm text-xs font-extrabold mb-2">
                     <span className="material-symbols-outlined text-[18px]">
                       redeem
                     </span>
                     <span>Reward Credit & Redemption</span>
                   </div>
-                  <p className="text-xs text-on-surface-variant leading-relaxed">
+                  <p className="text-[11px] leading-relaxed text-on-surface-variant sm:text-xs">
                     You earn{" "}
                     <strong className="text-on-surface font-semibold">
                       {REFERRAL_REWARD_COINS} Smart Coins

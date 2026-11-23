@@ -238,7 +238,7 @@ export function ProductCard({
                 <img
                   src={product.imageUrl}
                   alt={product.name}
-                  className="h-full w-full scale-105 object-cover object-center select-none sm:scale-100 sm:object-contain"
+                  className="h-full w-full object-contain object-center select-none"
                   loading="lazy"
                   onError={() => setImageError(true)}
                 />
@@ -248,7 +248,7 @@ export function ProductCard({
                 <img
                   src={product.imageUrl}
                   alt={product.name}
-                  className="h-full w-full scale-105 object-cover object-center group-hover:scale-110 transition-transform duration-300 drop-shadow-sm select-none sm:scale-100 sm:object-contain sm:group-hover:scale-105"
+                  className="h-full w-full object-contain object-center transition-transform duration-300 drop-shadow-sm select-none sm:group-hover:scale-[1.02]"
                   loading="lazy"
                   onError={() => setImageError(true)}
                 />

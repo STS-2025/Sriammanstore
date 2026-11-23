@@ -6,7 +6,11 @@ import { useNotifications } from "../../context/NotificationContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { productService } from "../../services/productService";
 import { addressService } from "../../services/addressService";
+import { settingsService, DEFAULT_DELIVERY_SETTINGS, type StoreDeliverySettings } from "../../services/settingsService";
+import { calculateDistanceKm, STORE_COORDINATES } from "../../lib/haversine";
+import { getDrivingRoute } from "../../services/routingService";
 import { useCartFlyAnimation } from "../../hooks/useCartFlyAnimation";
+import { VoiceSearchButton } from "../search/VoiceSearchButton";
 import type { Address, Category } from "../../types";
 import { ChevronDown, MapPin, X } from "lucide-react";
 import logo from "../../assests/logo.png"
@@ -21,6 +25,9 @@ export function StoreHeader() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
+  const [deliveryConfig, setDeliveryConfig] = useState<StoreDeliverySettings>(DEFAULT_DELIVERY_SETTINGS);
+  const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
+  const [routeEtaMinutes, setRouteEtaMinutes] = useState<number | null>(null);
   const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);
   const [addressSearch, setAddressSearch] = useState("");
   const [isSavingAddress, setIsSavingAddress] = useState(false);
@@ -56,6 +63,14 @@ export function StoreHeader() {
 
   useEffect(() => {
     let cancelled = false;
+    settingsService.getDeliveryConfiguration()
+      .then((config) => { if (!cancelled) setDeliveryConfig(config); })
+      .catch((error) => console.error("Failed to load delivery settings for the header:", error));
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     setAddresses([]);
     setDefaultAddress(null);
     if (!user?.id) return;
@@ -74,6 +89,29 @@ export function StoreHeader() {
       cancelled = true;
     };
   }, [user?.id, user?.legacySassId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const address = defaultAddress;
+    if (!address || (address.lat === 0 && address.lng === 0)) {
+      setRouteDistanceKm(null);
+      setRouteEtaMinutes(null);
+      return;
+    }
+
+    const store = deliveryConfig.storeCoordinates;
+    const directDistance = calculateDistanceKm(address.lat, address.lng, store.lat, store.lng);
+    setRouteDistanceKm(directDistance);
+    setRouteEtaMinutes(null);
+    void getDrivingRoute(store, address).then((route) => {
+      if (!cancelled && route) {
+        setRouteDistanceKm(route.distanceKm);
+        setRouteEtaMinutes(route.durationMinutes + 12);
+      }
+    }).catch(() => undefined);
+
+    return () => { cancelled = true; };
+  }, [defaultAddress, deliveryConfig]);
 
   const filteredAddresses = addresses.filter((address) =>
     [address.name, address.houseNo, address.street, address.landmark, address.city, address.pincode]
@@ -157,8 +195,8 @@ export function StoreHeader() {
       {/* Main Navigation Bar */}
       <div className="h-19 w-full px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-space-md">
         {/* Brand & Location */}
-        <div className="flex items-center gap-space-lg shrink-0">
-          <Link to="/" className="flex items-center gap-space-sm group">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-space-lg">
+          <Link to="/" className="flex shrink-0 items-center gap-space-sm group">
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-black text-xl shadow-md group-hover:scale-105 transition-transform">
               <img src={logo} alt="Sriman Smart Store" className="h-full w-full rounded-xl object-contain" />
             </div>
@@ -177,24 +215,37 @@ export function StoreHeader() {
             onClick={() => setIsAddressPickerOpen(true)}
             aria-haspopup="dialog"
             aria-expanded={isAddressPickerOpen}
-            className="hidden xl:flex items-center gap-space-xs bg-surface-container-low hover:bg-surface-container px-space-md py-space-sm rounded-xl text-on-surface transition-all text-left"
+            className="flex min-w-0 max-w-[96px] shrink items-center gap-1 rounded-xl bg-surface-container-low px-1.5 py-2 text-left text-on-surface transition-all hover:bg-surface-container sm:max-w-[190px] sm:gap-space-xs sm:px-space-md sm:py-space-sm xl:max-w-none"
           >
             <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
               <MapPin size={18} />
             </div>
             <div className="flex min-w-0 flex-col pr-space-xs">
-              <span className="font-body-sm text-[12px] font-extrabold text-on-surface leading-tight">
+              <span className="truncate font-body-sm text-[10px] font-extrabold leading-tight text-on-surface sm:text-[12px]">
                 {defaultAddress ? "Deliver to" : "Add delivery address"}
               </span>
-              <span className="font-body-sm text-[11px] font-medium text-on-surface-variant truncate max-w-[160px]">
+              <span className="max-w-[86px] truncate font-body-sm text-[10px] font-medium text-on-surface-variant sm:max-w-[160px] sm:text-[11px]">
                 {defaultAddress
-                  ? [defaultAddress.houseNo, defaultAddress.street, defaultAddress.city, defaultAddress.pincode]
+                  ? [defaultAddress.street || defaultAddress.city, defaultAddress.pincode]
                       .filter(Boolean)
                       .join(", ")
                   : "Choose a saved location"}
               </span>
+              {defaultAddress && (
+                <span className="truncate text-[9px] font-semibold leading-tight text-primary sm:text-[10px]">
+                  {routeDistanceKm !== null ? `${routeDistanceKm} km` : "Distance pending"}
+                  {routeEtaMinutes !== null
+                    ? ` · ~${routeEtaMinutes} min`
+                    : routeDistanceKm !== null && routeDistanceKm <= Math.min(
+                        deliveryConfig.deliveryRadiusKm,
+                        STORE_COORDINATES.maxRadiusKm,
+                      )
+                      ? " · ~60 min"
+                      : ""}
+                </span>
+              )}
             </div>
-            <ChevronDown size={16} className="ml-1 shrink-0 text-on-surface-variant" />
+            <ChevronDown size={16} className="ml-1 hidden shrink-0 text-on-surface-variant sm:block" />
           </button>
         </div>
 
@@ -205,9 +256,10 @@ export function StoreHeader() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search 5,000+ groceries, organic produce & cold pressed oils..."
+              placeholder="Search 2,000+ groceries & daily essentials..."
               className="w-full bg-transparent px-space-sm font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none"
             />
+            <VoiceSearchButton language={language} onTranscript={setSearchQuery} />
             <button
               type="submit"
               disabled={!searchQuery.trim()}
@@ -238,12 +290,17 @@ export function StoreHeader() {
 
           <Link
             to={isLoading ? "/account" : user ? "/account" : "/login"}
-            aria-label={user ? "Account" : "Sign in"}
-            className="relative rounded-full p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary md:hidden"
+            aria-label={user?.name || (user ? "Account" : "Sign in")}
+            className="relative flex flex-col items-center rounded-xl px-1.5 py-1 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-primary md:hidden"
           >
             <span className="material-symbols-outlined text-[24px]">
               {user?.name ? "account_circle" : "person"}
             </span>
+            {user?.name && (
+              <span className="max-w-[64px] truncate text-[9px] font-medium leading-tight">
+                {user.name}
+              </span>
+            )}
           </Link>
 
           <Link

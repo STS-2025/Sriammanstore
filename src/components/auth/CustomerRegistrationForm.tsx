@@ -69,7 +69,13 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
   const [partialAuth, setPartialAuth] = useState<PartialAuthSession | null>(null);
 
   const navigateAfterRegistration = () => {
-    navigate({ to: (redirectTo || "/account") as never });
+    navigate({
+      to: "/addresses",
+      search: {
+        action: "add",
+        ...(redirectTo ? { redirect: redirectTo } : {}),
+      },
+    });
   };
 
   const clearFieldError = (field: keyof FormFieldErrors) => {

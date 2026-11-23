@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc as updateFirestoreDoc,
   deleteDoc,
   query,
   where,
@@ -774,6 +775,12 @@ export interface FirestoreDriver {
     patch: Record<string, unknown>,
     timeoutMs?: number
   ): Promise<Record<string, unknown>>;
+  patchDoc(
+    collectionName: string,
+    docId: string,
+    patch: Record<string, unknown>,
+    timeoutMs?: number
+  ): Promise<void>;
   deleteDoc(
     collectionName: string,
     docId: string,
@@ -1018,6 +1025,22 @@ export class SdkFirestoreDriver implements FirestoreDriver {
       return copy;
     }
     return merged;
+  }
+
+  async patchDoc(
+    collectionName: string,
+    docId: string,
+    patch: Record<string, unknown>,
+    timeoutMs = 2500
+  ): Promise<void> {
+    const db = this.getDb();
+    const ref = doc(db, collectionName, docId);
+    const cleanPatch = stripUndefinedDeep({ ...patch });
+    await withBoundedTimeout(
+      updateFirestoreDoc(ref, cleanPatch),
+      timeoutMs,
+      `patchDoc(${collectionName}/${docId})`
+    );
   }
 
   async deleteDoc(
@@ -1528,6 +1551,14 @@ export class InMemoryFirestoreDriver implements FirestoreDriver {
     }
     col.set(docId, updated);
     return JSON.parse(JSON.stringify(updated));
+  }
+
+  async patchDoc(
+    collectionName: string,
+    docId: string,
+    patch: Record<string, unknown>
+  ): Promise<void> {
+    await this.updateDoc(collectionName, docId, patch);
   }
 
   async deleteDoc(collectionName: string, docId: string): Promise<void> {

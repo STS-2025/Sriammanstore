@@ -957,6 +957,7 @@ export function normalizeLegacyProduct(
     parseNonNegativeNumber(rawDoc["reviewsCount"]);
   const reviewCount =
     rawReviewCount !== null ? Math.floor(rawReviewCount) : 0;
+  const rankingScore = parseStrictNumber(rawDoc["rankingScore"]);
 
   // 10. Tags, Active Flag, Offer Metadata, Origin, Extraction, Nutrition, Customer-Facing Details
   const tags = normalizeTags(rawDoc);
@@ -1007,6 +1008,7 @@ export function normalizeLegacyProduct(
     brand,
     rating,
     reviewCount,
+    ...(rankingScore !== null ? { rankingScore } : {}),
     description,
     imageUrl,
     images,

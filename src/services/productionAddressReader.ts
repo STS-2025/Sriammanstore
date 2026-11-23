@@ -63,8 +63,8 @@ export function normalizeLegacyAddressDocument(
   primaryAddressId?: string | null
 ): Address {
   const resolvedId = String(docData["id"] || docId || "").trim();
-  const lat = parseSafeCoordinate(docData["lat"] ?? docData["latitude"], 11.4598);
-  const lng = parseSafeCoordinate(docData["lng"] ?? docData["longitude"], 77.334);
+  const lat = parseSafeCoordinate(docData["lat"] ?? docData["latitude"]);
+  const lng = parseSafeCoordinate(docData["lng"] ?? docData["longitude"]);
   const landmarkVal = docData["landmark"] ? String(docData["landmark"]).trim() : undefined;
 
   const isDefault = Boolean(

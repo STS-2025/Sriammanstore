@@ -447,10 +447,12 @@ export class LegacyCartAddressAdapter {
       );
     }
 
-    const updated = await this.driver.updateDoc(subcollectionPath, canonicalKey, {
+    const patch = {
       quantity,
       lastUpdated: new Date().toISOString(),
-    });
+    };
+    await this.driver.patchDoc(subcollectionPath, canonicalKey, patch);
+    const updated = { ...existing, ...patch };
 
     const stock =
       typeof updated["stock"] === "number"

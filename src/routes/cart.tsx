@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
@@ -7,14 +7,14 @@ import { WishlistHeartButton } from "../components/product/WishlistHeartButton";
 import { ProductNameSlider } from "../components/product/ProductNameSlider";
 import { CheckoutProgressBar } from "../components/checkout/CheckoutProgressBar";
 import { OrderBillSummary } from "../components/checkout/OrderBillSummary";
+import { CartDiscountControls } from "../components/checkout/CartDiscountControls";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { useWishlist } from "../context/WishlistContext";
 import { useLanguage } from "../context/LanguageContext";
-import { addressService } from "../services/addressService";
 import { productService } from "../services/productService";
 import { authManager } from "../services/authAdapter";
-import type { Address, Product } from "../types";
+import type { Product } from "../types";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/cart")({
@@ -38,22 +38,6 @@ export function CartPage() {
     cartCount,
     cartSubtotal,
     cartTotalSavings,
-    appliedCoupon,
-    couponDiscount,
-    deliverySettingsError,
-    redeemCoins,
-    coinsToRedeem,
-    coinsAvailable,
-    checkoutSettings,
-    coinValueInRupees,
-    deliverySpeed,
-    isExpressDeliveryAvailable,
-    standardDeliveryFee,
-    expressDeliveryFee,
-    applyCoupon,
-    removeCoupon,
-    setRedeemCoins,
-    setDeliverySpeed,
     updateQty,
     removeFromCart,
     clearCart,
@@ -65,24 +49,11 @@ export function CartPage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
 
-  // Coupon input state
-  const [couponCode, setCouponCode] = useState("");
-  const [isCouponChecking, setIsCouponChecking] = useState(false);
-  const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
   const [quickAddProducts, setQuickAddProducts] = useState<Product[]>([]);
 
-  // Load default delivery address and quick-add staples
+  // Load quick-add staples
   useEffect(() => {
-    async function loadAddressAndStaples() {
-      if (user) {
-        try {
-          const addrList = await addressService.getAddresses(user.id);
-          const def = addrList?.find((a) => a.isDefault) || addrList?.[0] || null;
-          setDefaultAddress(def);
-        } catch {
-          // Address fetch best effort
-        }
-      }
+    async function loadQuickAddStaples() {
       try {
         const prods = await productService.getProducts();
         // Pick 2 staples for quick add (e.g. turmeric or staples)
@@ -96,36 +67,8 @@ export function CartPage() {
         // Best effort
       }
     }
-    loadAddressAndStaples();
-  }, [user, items]);
-
-  const userCoins = coinsAvailable;
-
-  const handleApplyCoupon = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!couponCode.trim()) {
-      toast.error("Please enter a coupon code");
-      return;
-    }
-    setIsCouponChecking(true);
-    try {
-      const res = await applyCoupon(couponCode);
-      if (res.success) {
-        toast.success(res.message);
-        setCouponCode("");
-      } else {
-        toast.error(res.message);
-      }
-    } finally {
-      setIsCouponChecking(false);
-    }
-  };
-
-  const handleRemoveCoupon = () => {
-    removeCoupon();
-    setCouponCode("");
-    toast.info("Coupon removed");
-  };
+    loadQuickAddStaples();
+  }, [items]);
 
   const handleSaveToWishlist = async (item: (typeof items)[0]): Promise<boolean> => {
     try {
@@ -174,23 +117,11 @@ export function CartPage() {
     } as any);
   };
 
-  const handleAddAddressFromCart = () => {
-    if (!user) {
-      toast.info("Please sign in to add a delivery address");
-      navigate({ to: "/login", search: { redirect: "/checkout?step=2&newAddress=true" } as any } as any);
-      return;
-    }
-    navigate({
-      to: "/checkout",
-      search: { step: 2, newAddress: true } as any,
-    } as any);
-  };
-
   if (isLoading) {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-12">
+        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-6 sm:py-12">
           <div className="animate-pulse space-y-6">
             <div className="h-10 bg-surface-container-low rounded-2xl w-1/4"></div>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -213,12 +144,7 @@ export function CartPage() {
       <StoreHeader />
 
       <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
-        <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
-          {/* {deliverySettingsError && (
-            <div role="status" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900">
-              Delivery settings could not be loaded. The legacy default charges are being shown. {deliverySettingsError}
-            </div>
-          )} */}
+        <div className="max-w-[1320px] mx-auto px-margin-desktop pt-4 pb-space-xl sm:py-space-xl">
           {guestCartSyncError && (
             <div role="alert" className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-950 sm:flex-row sm:items-center sm:justify-between">
               <p>{guestCartSyncError} Your saved guest cart has not been deleted.</p>
@@ -232,8 +158,8 @@ export function CartPage() {
               </button>
             </div>
           )}
-          {/* Top Bar: Title & 3-Step Progress Indicator */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          {/* Top Bar: Cart Title & Checkout Progress */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3 md:mb-8">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
                 <span className="material-symbols-outlined text-[24px]">shopping_bag</span>
@@ -249,27 +175,24 @@ export function CartPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-on-surface-variant mt-0.5">
+                <p className="text-xs text-on-surface-variant hidden min-[500px]:block mt-0.5">
                   Carefully packed from Gobichettipalayam Hub
                 </p>
               </div>
             </div>
 
-            {/* 3-Step Progress Bar (Step 1 Active) */}
-            <div className="w-full md:w-auto">
+            {/* Checkout Progress Bar (Cart Step) */}
+            <div className="hidden md:block w-full md:w-auto">
               <CheckoutProgressBar
                 currentStep={1}
                 cartItemCount={cartCount}
-                selectedAddressText={
-                  defaultAddress
-                    ? `${defaultAddress.city}, ${defaultAddress.pincode}`
-                    : "No Address"
-                }
+                selectedAddressText="Choose delivery details in step 2"
                 onStepClick={(step) => {
-                  if (step > 1) void handleProceedToCheckout();
+                  if (step === 2) void handleProceedToCheckout();
                 }}
                 canNavigateToStep={(step) =>
-                  step === 1 || (items.length > 0 && !!user && !isGuestCartSyncing && !guestCartSyncError)
+                  step === 1 ||
+                  (step === 2 && items.length > 0 && !!user && !isGuestCartSyncing && !guestCartSyncError)
                 }
               />
             </div>
@@ -321,193 +244,30 @@ export function CartPage() {
                 Your Shopping Cart is Empty
               </h2>
               <p className="text-xs text-on-surface-variant mb-6 leading-relaxed">
-                Explore our wide range of daily essentials, fresh kitchen staples, and favorite household items.
+                Explore our wide range of daily essentials, kitchen staples, and favorite household items.
               </p>
               <Link
                 to="/shop"
                 className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-headline-sm text-xs font-bold shadow-md hover:bg-primary-container transition-all"
               >
-                <span>Browse Farm Catalog</span>
+                <span>Browse Catalog</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </Link>
             </div>
           ) : (
             /* Desktop Two-Column Layout */
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* LEFT COLUMN: Address Banner, Delivery Speed, Cart Items, Quick Add */}
-              <div className="lg:col-span-8 space-y-6">
-                {/* 1. Delivery Address Banner */}
-                {defaultAddress ? (
-                  <div
-                    data-testid="delivery-address-cart-banner"
-                    className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                        <span className="material-symbols-outlined text-[20px]">location_on</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-headline-sm text-sm font-extrabold text-on-surface">
-                            Delivering to {defaultAddress.tag || "Home"}
-                          </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-primary/10 text-primary">
-                            DEFAULT
-                          </span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-1">
-                          {defaultAddress.name} — {defaultAddress.houseNo}, {defaultAddress.street}, {defaultAddress.city} {defaultAddress.pincode}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleProceedToCheckout}
-                      className="font-headline-sm text-xs font-bold flex items-center gap-1 shrink-0 px-3 py-1.5 rounded-xl transition-colors text-primary hover:text-primary-container hover:bg-primary/5 cursor-pointer"
-                    >
-                      <span>Change Address</span>
-                      <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    data-testid="no-address-cart-banner"
-                    className="bg-surface-container-lowest border border-dashed border-primary/30 rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                        <span className="material-symbols-outlined text-[20px]">add_location_alt</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-headline-sm text-sm font-extrabold text-on-surface">
-                            No Delivery Address Found
-                          </span>
-                        </div>
-                        <p className="text-xs text-on-surface-variant mt-0.5">
-                          No address saved for this account. Please add a delivery address.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleAddAddressFromCart}
-                      className="font-headline-sm text-xs font-bold flex items-center gap-1.5 shrink-0 px-4 py-2 rounded-xl transition-colors bg-primary text-white hover:bg-primary-container cursor-pointer shadow-sm"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">add</span>
-                      <span>Add Address</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* 2. Choose Delivery Speed Card */}
-                <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary text-[20px]">
-                        local_shipping
-                      </span>
-                      <h3 className="font-headline-sm text-sm font-extrabold text-on-surface">
-                        Choose Delivery Speed
-                      </h3>
-                    </div>
-                    <span className="text-[11px] font-bold text-primary flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      {isExpressDeliveryAvailable ? "Express available now" : "Standard delivery available now"}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Standard Delivery */}
-                    <div
-                      onClick={() => setDeliverySpeed("standard")}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
-                        deliverySpeed === "standard"
-                          ? "border-primary bg-primary/5 shadow-sm"
-                          : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/40"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        id="speed_standard"
-                        name="delivery_speed"
-                        checked={deliverySpeed === "standard"}
-                        onChange={() => setDeliverySpeed("standard")}
-                        className="mt-1 accent-primary cursor-pointer"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <label
-                            htmlFor="speed_standard"
-                            className="font-headline-sm text-xs font-bold text-on-surface cursor-pointer"
-                          >
-                            Standard Delivery
-                          </label>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-primary/10 text-primary">
-                            {standardDeliveryFee > 0 ? `₹${standardDeliveryFee}` : "FREE"}
-                          </span>
-                        </div>
-                        <p className="text-[11px] font-semibold text-on-surface-variant mt-1">
-                          Tomorrow Morning, 8:00 AM – 11:00 AM
-                        </p>
-                        <p className="text-[10px] text-outline mt-0.5 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[13px]">eco</span>
-                          Low carbon consolidated route
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Express 60-Min */}
-                    <div
-                      onClick={() => isExpressDeliveryAvailable && setDeliverySpeed("express")}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
-                        deliverySpeed === "express"
-                          ? "border-primary bg-primary/5 shadow-sm"
-                          : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/40"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        id="speed_express"
-                        name="delivery_speed"
-                        checked={deliverySpeed === "express"}
-                        disabled={!isExpressDeliveryAvailable}
-                        onChange={() => setDeliverySpeed("express")}
-                        className="mt-1 accent-primary cursor-pointer"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <label
-                            htmlFor="speed_express"
-                            className="font-headline-sm text-xs font-bold text-on-surface flex items-center gap-1 cursor-pointer"
-                          >
-                            <span>Express 60–Min</span>
-                            <span className="text-secondary">⚡</span>
-                          </label>
-                          <span className="font-headline-sm text-xs font-extrabold text-on-surface">
-                            {expressDeliveryFee > 0 ? `₹${expressDeliveryFee}` : "FREE"}</span>
-                        </div>
-                        <p className="text-[11px] font-semibold text-on-surface-variant mt-1">
-                          Arriving in 45–60 mins
-                        </p>
-                        <p className="text-[10px] text-outline mt-0.5 flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[13px]">bolt</span>
-                          Dedicated Express rider
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Items in Your Cart Card */}
-                <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
+              {/* Cart Items and Quick Add */}
+              <div className="contents lg:block lg:col-span-8 lg:space-y-6">
+                {/* Step 1: Cart Items */}
+                <div className="order-1 bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-5 pb-3 border-b border-outline-variant/15">
                     <div>
                       <h2 className="font-headline-sm text-base font-extrabold text-on-surface">
                         Items in Your Cart ({cartCount})
                       </h2>
-                      <p className="text-[11px] text-on-surface-variant">
-                        Guaranteed fresh or immediate credit return
+                      <p className="text-[11px] text-on-surface-variant hidden min-[500px]:block">
+                        Guaranteed immediate credit return
                       </p>
                     </div>
                     <button
@@ -540,12 +300,12 @@ export function CartPage() {
                             <Link
                               to="/product"
                               search={{ id: item.productId } as any}
-                              className="h-14 w-14 sm:h-20 sm:w-20 rounded-2xl bg-surface-container-low overflow-hidden shrink-0 flex items-center justify-center p-2 border border-outline-variant/15 group"
+                              className="h-20 w-20 sm:h-20 sm:w-20 rounded-2xl bg-white overflow-hidden shrink-0 flex items-center justify-center p-0.5 sm:p-2 border border-outline-variant/15 group"
                             >
                               <img
                                 src={item.image}
                                 alt={item.name}
-                                className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform drop-shadow-xs"
+                                className="h-full w-full object-contain group-hover:scale-105 transition-transform drop-shadow-xs"
                                 loading="lazy"
                               />
                             </Link>
@@ -569,7 +329,7 @@ export function CartPage() {
                                 </span>
                                 {hasDiscount && (
                                   <>
-                                    <span className="font-price-mrp text-xs text-outline line-through">
+                                    <span className="font-price-mrp text-base text-outline line-through">
                                       ₹{itemMrp}
                                     </span>
                                     <span className="text-[11px] font-bold text-secondary">
@@ -589,7 +349,7 @@ export function CartPage() {
                                 <button
                                   type="button"
                                   onClick={() => updateQty(item.id, item.quantity - 1)}
-                                  className="h-9 w-9 sm:h-7 sm:w-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors hover:bg-surface text-on-surface cursor-pointer"
+                                  className="h-9 w-9 sm:h-7 sm:w-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors bg-primary-container hover:bg-surface text-white cursor-pointer"
                                   title="Decrease quantity"
                                 >
                                   −
@@ -600,7 +360,7 @@ export function CartPage() {
                                 <button
                                   type="button"
                                   onClick={() => updateQty(item.id, item.quantity + 1)}
-                                  className="h-9 w-9 sm:h-7 sm:w-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors bg-primary text-white hover:bg-primary-container cursor-pointer shadow-sm"
+                                  className="h-9 w-9 sm:h-7 sm:w-7 rounded-lg flex items-center justify-center font-bold text-sm transition-colors bg-primary-container text-white hover:bg-primary-container cursor-pointer shadow-sm"
                                   title="Increase quantity"
                                 >
                                   +
@@ -662,7 +422,7 @@ export function CartPage() {
 
                 {/* 4. Saved for Later & Quick Add */}
                 {quickAddProducts.length > 0 && (
-                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm">
+                  <div className="hidden lg:block order-7 bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="font-headline-sm text-sm font-extrabold text-on-surface">
@@ -733,170 +493,14 @@ export function CartPage() {
                     </div>
                   </div>
                 )}
-
-                {/* 5. Trust Guarantee Badges */}
-                {/* <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                  <div className="p-3 rounded-2xl bg-surface-container-low text-center">
-                    <span className="material-symbols-outlined text-primary text-[22px] mb-1">
-                      verified
-                    </span>
-                    <h5 className="font-headline-sm text-xs font-bold text-on-surface">
-                      100% Genuine
-                    </h5>
-                    <p className="text-[10px] text-on-surface-variant">Hand-sorted fresh</p>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-surface-container-low text-center">
-                    <span className="material-symbols-outlined text-primary text-[22px] mb-1">
-                      bolt
-                    </span>
-                    <h5 className="font-headline-sm text-xs font-bold text-on-surface">
-                      60-Min Express
-                    </h5>
-                    <p className="text-[10px] text-on-surface-variant">Local neighborhoods</p>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-surface-container-low text-center">
-                    <span className="material-symbols-outlined text-primary text-[22px] mb-1">
-                      replay
-                    </span>
-                    <h5 className="font-headline-sm text-xs font-bold text-on-surface">
-                      Easy 24-hr Returns
-                    </h5>
-                    <p className="text-[10px] text-on-surface-variant">No questions asked</p>
-                  </div>
-                  <div className="p-3 rounded-2xl bg-surface-container-low text-center">
-                    <span className="material-symbols-outlined text-primary text-[22px] mb-1">
-                      lock
-                    </span>
-                    <h5 className="font-headline-sm text-xs font-bold text-on-surface">
-                      Secure UPI & Cards
-                    </h5>
-                    <p className="text-[10px] text-on-surface-variant">PCI-DSS encrypted</p>
-                  </div>
-                </div> */}
               </div>
 
               {/* RIGHT COLUMN: Coupon, Smart Coins, Bill Summary, Quality Promise */}
-              <div className="lg:col-span-4 space-y-6">
-                {/* 1. Apply Coupon Card */}
-                <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-primary text-[20px]">
-                        sell
-                      </span>
-                      <h3 className="font-headline-sm text-sm font-extrabold text-on-surface">
-                        Apply Coupon
-                      </h3>
-                    </div>
-                    <span className="text-[11px] font-bold text-secondary">Store promotions</span>
-                  </div>
-
-                  {/* Input Form */}
-                  <form onSubmit={handleApplyCoupon} className="flex gap-2 mb-3">
-                    <input
-                      type="text"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                      placeholder="Enter a promo code"
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-surface-container-low text-xs font-bold text-on-surface uppercase placeholder:normal-case placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/40 border border-outline-variant/15"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isCouponChecking}
-                      className="px-5 py-2.5 rounded-xl bg-primary text-white font-headline-sm text-xs font-bold hover:bg-primary-container transition-colors shadow-sm cursor-pointer"
-                    >
-                      Apply
-                    </button>
-                  </form>
-
-                  {/* Applied Coupon Banner */}
-                  {appliedCoupon && (
-                    <div className="bg-primary/10 border border-primary/20 rounded-2xl p-3 flex items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary text-[18px]">
-                          check_circle
-                        </span>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-headline-sm text-xs font-black text-primary">
-                              {appliedCoupon.code}
-                            </span>
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-primary text-white">
-                              APPLIED
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-primary/90 font-medium">Promo discount: ₹{couponDiscount}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleRemoveCoupon}
-                        className="text-xs font-bold text-error hover:underline shrink-0 cursor-pointer"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
-
-                </div>
-
-                {/* 2. Smart Coins Card */}
-                <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-secondary text-[20px]">
-                        monetization_on
-                      </span>
-                      <h3 className="font-headline-sm text-sm font-extrabold text-on-surface">
-                        Smart Coins
-                      </h3>
-                    </div>
-                    <span className="text-xs font-black text-secondary">
-                      {userCoins} Available
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-on-surface-variant mb-4 leading-relaxed">
-                    Earn {checkoutSettings.smartCoinEarnRate} Smart Coin{checkoutSettings.smartCoinEarnRate === 1 ? "" : "s"} per eligible order. Redeem once your balance reaches {checkoutSettings.minCoinsToRedeem} coins, up to {checkoutSettings.maxCoinRedemptionPercent}% of your item subtotal. Coins expire after {checkoutSettings.coinValidityMonths} months.
-                  </p>
-
-                  {/* Redeem Checkbox Card */}
-                  <div
-                    onClick={() => {
-                      if (coinsToRedeem > 0) setRedeemCoins(!redeemCoins);
-                      else toast.info(`You need a balance of at least ${checkoutSettings.minCoinsToRedeem} Smart Coins to redeem.`);
-                    }}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                      redeemCoins
-                        ? "border-secondary bg-secondary/10 shadow-sm"
-                        : "border-outline-variant/20 hover:border-secondary/40 bg-surface-container-low/40"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <input
-                        type="checkbox"
-                        checked={redeemCoins}
-                        onChange={(e) => setRedeemCoins(e.target.checked)}
-                        onClick={(e) => e.stopPropagation()}
-                        disabled={coinsToRedeem <= 0}
-                        className="accent-secondary cursor-pointer"
-                      />
-                      <div>
-                        <span className="font-headline-sm text-xs font-bold text-on-surface block">
-                          Redeem {coinsToRedeem} Coins
-                        </span>
-                        <span className="text-[10px] text-on-surface-variant font-medium">
-                          Instant ₹{(coinsToRedeem * coinValueInRupees).toFixed(2).replace(/\.00$/, "")} direct checkout discount
-                        </span>
-                      </div>
-                    </div>
-                    <span className="material-symbols-outlined text-secondary text-[20px]">
-                      military_tech
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3. Bill Summary Card */}
+              <div className="contents lg:block lg:col-span-4 lg:space-y-6">
+                <CartDiscountControls className="hidden lg:block order-5" />
+                                {/* 3. Bill Summary Card */}
                 <OrderBillSummary
+                  className="order-4"
                   mode="cart"
                   ctaText="Proceed to Checkout"
                   disabled={items.length === 0}

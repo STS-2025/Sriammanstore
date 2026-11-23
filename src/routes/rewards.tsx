@@ -282,7 +282,7 @@ export function RewardsPage() {
       <StoreHeader />
 
       <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
-        <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
+        <div className="max-w-[1320px] mx-auto px-margin-desktop py-4 sm:py-space-xl">
           {/* Breadcrumb Navigation */}
           <nav className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant mb-4">
             <Link to="/" className="hover:text-primary transition-colors flex items-center gap-1">
@@ -298,17 +298,18 @@ export function RewardsPage() {
           </nav>
 
           {/* Heading Bar with Live Conversion Pill */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+          <div className="mb-5 flex flex-col justify-between gap-2 sm:mb-8 sm:gap-4 lg:flex-row lg:items-center">
             <div>
-              <h1 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-on-surface tracking-tight">
-                Smart Coins & VIP Privilege Hub
+              <h1 className="font-headline-lg text-xl font-extrabold tracking-tight text-on-surface sm:text-2xl md:text-3xl">
+                <span className="sm:hidden">Rewards</span>
+                <span className="hidden sm:inline">Smart Coins & VIP Privilege Hub</span>
               </h1>
             </div>
 
             {/* Live Conversion Rate Pill */}
-            <div className="shrink-0 flex items-center gap-2 bg-emerald-50 border border-emerald-200/60 rounded-full px-4 py-2 shadow-xs">
+            <div className="flex w-fit shrink-0 items-center gap-1.5 rounded-full border border-emerald-200/60 bg-emerald-50 px-3 py-1.5 shadow-xs sm:gap-2 sm:px-4 sm:py-2">
               <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-              <span className="text-xs font-extrabold text-emerald-900">
+              <span className="text-[10px] font-extrabold text-emerald-900 sm:text-xs">
                 Live Conversion: 1 Coin = ₹{effectiveConversionRate.toFixed(2)} Instant Cash
               </span>
             </div>
@@ -345,74 +346,75 @@ export function RewardsPage() {
           ) : (
             <>
               {/* Top Two-Card Grid: Coins Vault & VIP Privilege Card */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-12">
+              <div className="mb-8 grid grid-cols-1 gap-3 sm:gap-6 lg:mb-12 lg:grid-cols-12">
             {/* Card 1: Available Balance / Smart Coins Vault (7 Cols) */}
-            <div className="lg:col-span-7 bg-gradient-to-br from-[#fffdf5] via-[#fffbf0] to-[#fbf7eb] border border-amber-200/70 rounded-3xl p-6 md:p-8 shadow-sm flex flex-col justify-between">
+            <div className="flex flex-col justify-between rounded-2xl border border-amber-200/70 bg-gradient-to-br from-[#fffdf5] via-[#fffbf0] to-[#fbf7eb] p-4 shadow-sm sm:rounded-3xl sm:p-6 md:p-8 lg:col-span-7">
               <div>
                 {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center text-xl shadow-xs">
+                <div className="mb-3 flex items-center justify-between sm:mb-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/20 text-lg shadow-xs sm:h-10 sm:w-10 sm:rounded-2xl sm:text-xl">
                       🪙
                     </div>
                     <div>
                       <span className="font-headline-sm text-[10px] uppercase font-bold text-amber-800 tracking-wider block">
                         AVAILABLE BALANCE
                       </span>
-                      <h3 className="font-headline-lg text-lg font-bold text-on-surface">
+                      <h3 className="font-headline-lg text-base font-bold text-on-surface sm:text-lg">
                         Smart Coins Vault
                       </h3>
                     </div>
                   </div>
-                  <span className="bg-emerald-100/80 text-emerald-900 border border-emerald-200 text-[11px] font-extrabold px-3 py-1 rounded-full flex items-center gap-1 shadow-xs">
+                  <span className="flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-100/80 px-2 py-1 text-[9px] font-extrabold text-emerald-900 shadow-xs sm:px-3 sm:text-[11px]">
                     <span>✔</span>
-                    <span>Verified & Ready</span>
+                    <span className="sm:hidden">Ready</span>
+                    <span className="hidden sm:inline">Verified & Ready</span>
                   </span>
                 </div>
 
                 {/* Big Balance & Cash Valuation */}
-                <div className="flex flex-wrap items-baseline gap-3 mb-3">
-                  <span className="font-headline-lg text-4xl md:text-5xl font-black text-on-surface tracking-tight">
+                <div className="mb-2 flex flex-wrap items-baseline gap-2 sm:mb-3 sm:gap-3">
+                  <span className="font-headline-lg text-3xl font-black tracking-tight text-on-surface sm:text-4xl md:text-5xl">
                     {coinBalance}
                   </span>
-                  <span className="font-headline-sm text-lg font-bold text-on-surface-variant">
+                  <span className="font-headline-sm text-sm font-bold text-on-surface-variant sm:text-lg">
                     Smart Coins
                   </span>
-                  <span className="bg-cyan-50 text-cyan-800 border border-cyan-200 font-extrabold text-xs px-3 py-1 rounded-xl flex items-center gap-1 shadow-xs">
+                  <span className="flex items-center gap-1 rounded-xl border border-cyan-200 bg-cyan-50 px-2 py-1 text-[10px] font-extrabold text-cyan-800 shadow-xs sm:px-3 sm:text-xs">
                     <span className="material-symbols-outlined text-[15px]">sell</span>
                     <span>Valued at ₹{cashEquivalent} Cart Discount</span>
                   </span>
                 </div>
 
-                <p className="text-xs text-on-surface-variant leading-relaxed mb-6">
+                <p className="mb-4 hidden text-xs leading-relaxed text-on-surface-variant sm:mb-6 sm:block">
                   Apply seamlessly on your cart summary during checkout with no minimum order constraints. Valid across Mara Chekku Oils, Heirloom Rice, & Farm Fresh Greens.
                 </p>
 
                 {/* Monthly Ledger Stats Pills */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                  <div className="bg-white/80 rounded-2xl p-3.5 border border-amber-200/40 flex items-center gap-3 shadow-xs">
-                    <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[18px]">trending_up</span>
+                <div className="mb-4 grid grid-cols-2 gap-2 sm:mb-6 sm:gap-3">
+                  <div className="flex items-center gap-2 rounded-xl border border-amber-200/40 bg-white/80 p-2.5 shadow-xs sm:gap-3 sm:rounded-2xl sm:p-3.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 sm:h-8 sm:w-8">
+                      <span className="material-symbols-outlined text-[16px] sm:text-[18px]">trending_up</span>
                     </div>
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-on-surface-variant block">
+                      <span className="block text-[9px] font-bold uppercase text-on-surface-variant sm:text-[10px]">
                         Earned this month
                       </span>
-                      <span className="font-headline-sm text-sm font-extrabold text-emerald-800">
+                      <span className="font-headline-sm text-xs font-extrabold text-emerald-800 sm:text-sm">
                         +{ledgerStats.earnedThisMonth} Coins
                       </span>
                     </div>
                   </div>
 
-                  <div className="bg-white/80 rounded-2xl p-3.5 border border-amber-200/40 flex items-center gap-3 shadow-xs">
-                    <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-800 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[18px]">shopping_bag</span>
+                  <div className="flex items-center gap-2 rounded-xl border border-amber-200/40 bg-white/80 p-2.5 shadow-xs sm:gap-3 sm:rounded-2xl sm:p-3.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-800 sm:h-8 sm:w-8">
+                      <span className="material-symbols-outlined text-[16px] sm:text-[18px]">shopping_bag</span>
                     </div>
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-on-surface-variant block">
+                      <span className="block text-[9px] font-bold uppercase text-on-surface-variant sm:text-[10px]">
                         Redeemed this month
                       </span>
-                      <span className="font-headline-sm text-sm font-extrabold text-rose-700">
+                      <span className="font-headline-sm text-xs font-extrabold text-rose-700 sm:text-sm">
                         -{ledgerStats.redeemedThisMonth} Coins
                       </span>
                     </div>
@@ -421,57 +423,59 @@ export function RewardsPage() {
               </div>
 
               {/* Action Buttons Row */}
-              <div className="flex flex-wrap items-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-2 pt-1 sm:gap-3 sm:pt-2">
                 <Link
                   to="/cart"
-                  className="bg-[#005f3f] hover:bg-[#004e33] text-white px-6 py-3 rounded-2xl font-headline-sm text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-xl bg-[#005f3f] px-3.5 py-2.5 font-headline-sm text-[10px] font-bold text-white shadow-md transition-all hover:bg-[#004e33] active:scale-95 sm:gap-2 sm:rounded-2xl sm:px-6 sm:py-3 sm:text-xs"
                 >
                   <span className="material-symbols-outlined text-[18px]">shopping_cart</span>
-                  <span>Redeem on Next Order</span>
+                  <span className="sm:hidden">Redeem</span>
+                  <span className="hidden sm:inline">Redeem on Next Order</span>
                 </Link>
 
                 <a
                   href="#how-coins-work"
-                  className="bg-surface-container hover:bg-surface-container-high text-on-surface px-5 py-3 rounded-2xl font-headline-sm text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="flex items-center gap-1 rounded-xl bg-surface-container px-3 py-2.5 font-headline-sm text-[10px] font-bold text-on-surface transition-all hover:bg-surface-container-high sm:gap-1.5 sm:rounded-2xl sm:px-5 sm:py-3 sm:text-xs"
                 >
                   <span className="material-symbols-outlined text-[16px]">help</span>
-                  <span>How to Earn More</span>
+                  <span className="sm:hidden">How it works</span>
+                  <span className="hidden sm:inline">How to Earn More</span>
                 </a>
               </div>
             </div>
 
             {/* Card 2: VIP Privilege Card (5 Cols) */}
-            <div className="lg:col-span-5 bg-[#102217] text-white rounded-3xl p-6 md:p-8 shadow-lg border border-[#1b3826] flex flex-col justify-between relative overflow-hidden">
+            <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl border border-[#1b3826] bg-[#102217] p-4 text-white shadow-lg sm:rounded-3xl sm:p-6 md:p-8 lg:col-span-5">
               <div className="relative z-10">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl shadow-xs">
+                <div className="mb-3 flex items-center justify-between gap-2 sm:mb-4">
+                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-lg text-amber-400 shadow-xs sm:h-10 sm:w-10 sm:rounded-2xl sm:text-xl">
                       👑
                     </div>
                     <div>
                       <span className="font-headline-sm text-[10px] uppercase font-bold text-amber-400 tracking-wider block">
                         PRIVILEGE STATUS
                       </span>
-                      <h3 className="font-headline-lg text-lg font-bold text-white flex items-center gap-1.5">
+                      <h3 className="flex items-center gap-1.5 font-headline-lg text-sm font-bold text-white sm:text-lg">
                         <span>{vipStats.isVIP ? "VIP Privilege Member" : "Standard Customer"}</span>
                         {vipStats.isVIP && <span className="text-amber-400">★</span>}
                       </h3>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] uppercase font-extrabold text-white/60 block">
+                    <span className="block text-[9px] font-extrabold uppercase text-white/60 sm:text-[10px]">
                       MEMBERSHIP
                     </span>
-                    <span className="text-xs font-bold text-amber-300">
+                    <span className="text-[10px] font-bold text-amber-300 sm:text-xs">
                       {vipStats.isVIP ? "Active (30-Day Window)" : "Rolling Evaluation"}
                     </span>
                   </div>
                 </div>
 
                 {/* Progress Bar (Binary ₹5,000 Rolling 30-Day Rule) */}
-                <div className="bg-white/5 rounded-2xl p-4 border border-white/10 mb-5">
-                  <div className="flex justify-between text-xs font-bold mb-2">
+                <div className="mb-3 rounded-xl border border-white/10 bg-white/5 p-3 sm:mb-5 sm:rounded-2xl sm:p-4">
+                  <div className="mb-2 flex justify-between text-[10px] font-bold sm:text-xs">
                     <span className="text-white/90">
                       Spent ₹{vipStats.rollingSpend.toLocaleString("en-IN")} of ₹5,000 threshold
                     </span>
@@ -485,7 +489,7 @@ export function RewardsPage() {
                       style={{ width: `${vipStats.percentage}%` }}
                     ></div>
                   </div>
-                  <p className="text-[11px] text-white/70 leading-relaxed">
+                  <p className="text-[10px] leading-relaxed text-white/70 sm:text-[11px]">
                     {vipStats.isVIP ? (
                       <span className="text-emerald-400 font-semibold">
                         ✔ ₹5,000 threshold achieved! You enjoy VIP wholesale prices and free express delivery.
@@ -499,24 +503,24 @@ export function RewardsPage() {
                 </div>
 
                 {/* Active VIP Perks */}
-                <div className="space-y-2.5 mb-5 text-xs">
-                  <div className="flex items-center gap-2.5 text-white/90">
-                    <span className="material-symbols-outlined text-amber-400 text-[18px]">bolt</span>
-                    <span className="font-medium">Unlimited Free 60-Min Express Deliveries</span>
+                <div className="mb-4 space-y-2 text-[11px] sm:mb-5 sm:space-y-2.5 sm:text-xs">
+                  <div className="flex items-center gap-2 text-white/90 sm:gap-2.5">
+                    <span className="material-symbols-outlined text-[16px] text-amber-400 sm:text-[18px]">bolt</span>
+                    <span className="font-medium"><span className="sm:hidden">Free express delivery</span><span className="hidden sm:inline">Unlimited Free 60-Min Express Deliveries</span></span>
                   </div>
-                  <div className="flex items-center gap-2.5 text-white/90">
-                    <span className="material-symbols-outlined text-amber-400 text-[18px]">percent</span>
-                    <span className="font-medium">Guaranteed VIP Special Price Discounts</span>
+                  <div className="flex items-center gap-2 text-white/90 sm:gap-2.5">
+                    <span className="material-symbols-outlined text-[16px] text-amber-400 sm:text-[18px]">percent</span>
+                    <span className="font-medium"><span className="sm:hidden">VIP prices</span><span className="hidden sm:inline">Guaranteed VIP Special Price Discounts</span></span>
                   </div>
-                  <div className="flex items-center gap-2.5 text-white/90">
-                    <span className="material-symbols-outlined text-amber-400 text-[18px]">toll</span>
-                    <span className="font-medium">2X Smart Coin Accrual on Delivered Orders</span>
+                  <div className="flex items-center gap-2 text-white/90 sm:gap-2.5">
+                    <span className="material-symbols-outlined text-[16px] text-amber-400 sm:text-[18px]">toll</span>
+                    <span className="font-medium"><span className="sm:hidden">2× Smart Coins</span><span className="hidden sm:inline">2X Smart Coin Accrual on Delivered Orders</span></span>
                   </div>
                 </div>
               </div>
 
               {/* Bottom Support Link */}
-              <div className="relative z-10 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-white/80">
+              <div className="relative z-10 flex items-center justify-between gap-2 border-t border-white/10 pt-2 text-[10px] text-white/80 sm:pt-3 sm:text-xs">
                 <span className="flex items-center gap-1 text-emerald-400 font-semibold">
                   <span>✔</span>
                   <span>Evaluated in Real-Time</span>
@@ -525,7 +529,8 @@ export function RewardsPage() {
                   to="/help"
                   className="text-amber-300 hover:text-amber-200 font-bold transition-colors flex items-center gap-1"
                 >
-                  <span>VIP Guidelines & Support</span>
+                  <span className="sm:hidden">VIP Help</span>
+                  <span className="hidden sm:inline">VIP Guidelines & Support</span>
                   <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
                 </Link>
               </div>
@@ -533,15 +538,15 @@ export function RewardsPage() {
           </div>
 
           {/* Middle Two Columns: Ledger & Referral */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
+          <div className="mb-8 grid grid-cols-1 gap-4 lg:mb-16 lg:grid-cols-12 lg:gap-8">
             {/* Left Column: Coins Ledger & Activity (7 Cols) */}
-            <div className="lg:col-span-7 bg-surface-container-lowest rounded-3xl p-6 md:p-8 border border-outline-variant/20 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
+            <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:rounded-3xl sm:p-6 md:p-8 lg:col-span-7">
+              <div className="mb-3 flex items-center justify-between sm:mb-4">
                 <div>
-                  <h3 className="font-headline-lg text-lg font-bold text-on-surface">
+                  <h3 className="font-headline-lg text-base font-bold text-on-surface sm:text-lg">
                     Coins Ledger & Activity
                   </h3>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
+                  <p className="mt-0.5 hidden text-xs text-on-surface-variant sm:block">
                     Real-time trace of order rewards, campaign bonuses, and cart redemptions.
                   </p>
                 </div>
@@ -551,61 +556,61 @@ export function RewardsPage() {
                   className="text-xs font-bold text-primary hover:text-primary-container flex items-center gap-1 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">download</span>
-                  <span>Statement</span>
+                  <span className="hidden sm:inline">Statement</span>
                 </button>
               </div>
 
               {/* Filter Tabs */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-5 border-b border-outline-variant/15 scrollbar-none">
+              <div className="mb-4 grid grid-cols-2 gap-1.5 border-b border-outline-variant/15 pb-3 sm:mb-5 sm:flex sm:gap-2 sm:overflow-x-auto">
                 <button
                   type="button"
                   onClick={() => setActivityFilter("all")}
-                  className={`px-3.5 py-1.5 rounded-full font-headline-sm text-xs font-bold transition-all cursor-pointer ${
+                  className={`min-w-0 rounded-full px-2 py-1.5 font-headline-sm text-[10px] font-bold transition-all cursor-pointer sm:px-3.5 sm:text-xs ${
                     activityFilter === "all"
                       ? "bg-[#005f3f] text-white shadow-xs"
                       : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                   }`}
                 >
-                  All Activities
+                  <span className="sm:hidden">All</span><span className="hidden sm:inline">All Activities</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActivityFilter("earned")}
-                  className={`px-3.5 py-1.5 rounded-full font-headline-sm text-xs font-bold transition-all cursor-pointer ${
+                  className={`min-w-0 rounded-full px-2 py-1.5 font-headline-sm text-[10px] font-bold transition-all cursor-pointer sm:px-3.5 sm:text-xs ${
                     activityFilter === "earned"
                       ? "bg-[#005f3f] text-white shadow-xs"
                       : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                   }`}
                 >
-                  Coins Earned
+                  <span className="sm:hidden">Earned</span><span className="hidden sm:inline">Coins Earned</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActivityFilter("redeemed")}
-                  className={`px-3.5 py-1.5 rounded-full font-headline-sm text-xs font-bold transition-all cursor-pointer ${
+                  className={`min-w-0 rounded-full px-2 py-1.5 font-headline-sm text-[10px] font-bold transition-all cursor-pointer sm:px-3.5 sm:text-xs ${
                     activityFilter === "redeemed"
                       ? "bg-[#005f3f] text-white shadow-xs"
                       : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                   }`}
                 >
-                  Coins Redeemed
+                  <span className="sm:hidden">Redeemed</span><span className="hidden sm:inline">Coins Redeemed</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActivityFilter("expiring")}
-                  className={`px-3.5 py-1.5 rounded-full font-headline-sm text-xs font-bold transition-all cursor-pointer ${
+                  className={`min-w-0 rounded-full px-2 py-1.5 font-headline-sm text-[10px] font-bold transition-all cursor-pointer sm:px-3.5 sm:text-xs ${
                     activityFilter === "expiring"
                       ? "bg-[#005f3f] text-white shadow-xs"
                       : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                   }`}
                 >
-                  Expiring Soon
+                  <span className="sm:hidden">Expiring</span><span className="hidden sm:inline">Expiring Soon</span>
                 </button>
               </div>
 
               {/* Transaction List */}
               {visibleActivities.length === 0 ? (
-                <div className="py-12 text-center text-xs text-on-surface-variant">
+                <div className="py-8 text-center text-[11px] text-on-surface-variant sm:py-12 sm:text-xs">
                   <div className="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center text-2xl mx-auto mb-2">
                     📋
                   </div>
@@ -613,7 +618,7 @@ export function RewardsPage() {
                   <p className="mt-1">Transactions will appear as you place orders and redeem coins.</p>
                 </div>
               ) : (
-                <div className="space-y-3 mb-5">
+                <div className="mb-4 space-y-2 sm:mb-5 sm:space-y-3">
                   {visibleActivities.map((tx) => {
                     const isEarned = tx.type === "earned";
                     const isOrder = tx.description.toLowerCase().includes("order");
@@ -624,17 +629,17 @@ export function RewardsPage() {
                     return (
                       <div
                         key={tx.id}
-                        className="bg-surface-container-low/60 hover:bg-surface-container-low rounded-2xl p-4 border border-outline-variant/15 flex items-center justify-between gap-3 transition-colors"
+                        className="flex items-center justify-between gap-2 rounded-xl border border-outline-variant/15 bg-surface-container-low/60 p-3 transition-colors hover:bg-surface-container-low sm:gap-3 sm:rounded-2xl sm:p-4"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                           <div
-                            className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 sm:rounded-2xl ${
                               isEarned
                                 ? "bg-emerald-100 text-emerald-800"
                                 : "bg-rose-100 text-rose-800"
                             }`}
                           >
-                            <span className="material-symbols-outlined text-[20px]">
+                            <span className="material-symbols-outlined text-[17px] sm:text-[20px]">
                               {isOrder
                                 ? isEarned
                                   ? "local_shipping"
@@ -648,11 +653,11 @@ export function RewardsPage() {
                           </div>
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-headline-sm text-xs font-bold text-on-surface">
+                              <span className="font-headline-sm text-[11px] font-bold text-on-surface sm:text-xs">
                                 {tx.description}
                               </span>
                               <span
-                                className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded tracking-wide ${
+                                className={`hidden rounded px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide sm:inline-flex ${
                                   isEarned
                                     ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                                     : "bg-rose-50 text-rose-700 border border-rose-200"
@@ -661,7 +666,7 @@ export function RewardsPage() {
                                 {isOrder ? (isEarned ? "ORDER REWARD" : "CART DEDUCTION") : "COMMUNITY CREDIT"}
                               </span>
                             </div>
-                            <span className="text-[11px] text-on-surface-variant block mt-0.5">
+                            <span className="mt-0.5 block text-[10px] text-on-surface-variant sm:text-[11px]">
                               {new Date(tx.timestamp).toLocaleString("en-IN", {
                                 day: "numeric",
                                 month: "short",
@@ -677,13 +682,13 @@ export function RewardsPage() {
                         {/* Amount & Cash Valuation */}
                         <div className="text-right shrink-0">
                           <span
-                            className={`font-headline-sm text-sm font-extrabold block ${
+                            className={`font-headline-sm block text-xs font-extrabold sm:text-sm ${
                               isEarned ? "text-emerald-700" : "text-rose-600"
                             }`}
                           >
                             {isEarned ? `+${tx.amount}` : `-${tx.amount}`} Coins
                           </span>
-                          <span className="text-[10px] text-on-surface-variant font-medium">
+                          <span className="hidden text-[10px] font-medium text-on-surface-variant sm:block">
                             {isEarned ? `(+₹${cashVal} value)` : `(-₹${cashVal} applied)`}
                           </span>
                         </div>
@@ -694,8 +699,8 @@ export function RewardsPage() {
               )}
 
               {/* Footer Note & Load More */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-outline-variant/15 text-xs text-on-surface-variant">
-                <span className="flex items-center gap-1">
+              <div className="flex flex-col items-center justify-between gap-2 border-t border-outline-variant/15 pt-3 text-[10px] text-on-surface-variant sm:flex-row sm:gap-3 sm:text-xs">
+                <span className="hidden items-center gap-1 sm:flex">
                   <span className="material-symbols-outlined text-[15px]">info</span>
                   <span>Coins remain valid for a rolling 365 days from issue date.</span>
                 </span>
@@ -717,26 +722,26 @@ export function RewardsPage() {
             </div>
 
             {/* Right Column: Referral Card (5 Cols) */}
-            <div className="lg:col-span-5 bg-surface-container-lowest rounded-3xl p-6 md:p-8 border border-outline-variant/20 shadow-sm flex flex-col justify-between">
+            <div className="flex flex-col justify-between rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:rounded-3xl sm:p-6 md:p-8 lg:col-span-5">
               <div>
                 <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-800 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-3">
                   <span>🤝</span>
                   <span>SHARE THE PURITY</span>
                 </div>
-                <h3 className="font-headline-lg text-xl font-extrabold text-on-surface mb-2">
+                <h3 className="mb-1.5 font-headline-lg text-lg font-extrabold text-on-surface sm:mb-2 sm:text-xl">
                   Give ₹100, Earn 100 Coins
                 </h3>
-                <p className="text-xs text-on-surface-variant leading-relaxed mb-6">
+                <p className="mb-4 hidden text-xs leading-relaxed text-on-surface-variant sm:mb-6 sm:block">
                   Introduce your neighborhood to Tamil Nadu groceries. Friends get ₹100 off their first cart, and you receive 100 Smart Coins instantly upon delivery.
                 </p>
 
                 {/* Personal Referral Code Box */}
-                <div className="bg-surface-container-low/70 border border-outline-variant/25 rounded-2xl p-4 mb-4">
+                <div className="mb-3 rounded-xl border border-outline-variant/25 bg-surface-container-low/70 p-3 sm:mb-4 sm:rounded-2xl sm:p-4">
                   <span className="text-[10px] uppercase font-bold text-on-surface-variant block mb-1 tracking-wider">
                     YOUR PERSONAL INVITATION CODE
                   </span>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-lg font-black text-[#005f3f] tracking-wider">
+                    <span className="font-mono text-base font-black tracking-wider text-[#005f3f] sm:text-lg">
                       {user.referralCode || user.id}
                     </span>
                     <button
@@ -754,21 +759,21 @@ export function RewardsPage() {
                 <button
                   type="button"
                   onClick={handleShareWhatsApp}
-                  className="w-full bg-[#25d366] hover:bg-[#20ba59] text-white py-3 rounded-2xl font-headline-sm text-xs font-extrabold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 mb-6 cursor-pointer"
+                  className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#25d366] py-2.5 font-headline-sm text-[11px] font-extrabold text-white shadow-sm transition-all hover:bg-[#20ba59] active:scale-95 sm:mb-6 sm:rounded-2xl sm:py-3 sm:text-xs"
                 >
                   <span className="text-base">💬</span>
                   <span>Share via WhatsApp</span>
                 </button>
 
                 {/* Community Impact Statistics */}
-                <div className="bg-surface-container-low/40 rounded-2xl p-4 border border-outline-variant/15 mb-4">
-                  <div className="flex items-center justify-between text-xs mb-2">
+                <div className="mb-3 rounded-xl border border-outline-variant/15 bg-surface-container-low/40 p-3 sm:mb-4 sm:rounded-2xl sm:p-4">
+                  <div className="mb-2 flex items-center justify-between gap-2 text-[10px] sm:text-xs">
                     <span className="font-semibold text-on-surface">Community Impact:</span>
                     <span className="font-bold text-on-surface">
                       {referralStats.totalNeighbors} Neighbors Joined
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-xs mb-3">
+                  <div className="mb-2 flex items-center justify-between gap-2 text-[10px] sm:mb-3 sm:text-xs">
                     <span className="font-semibold text-on-surface">Total Harvest Credit Earned:</span>
                     <span className="font-extrabold text-emerald-800">
                       ₹{referralStats.totalCashCredit.toFixed(2)}
@@ -805,96 +810,96 @@ export function RewardsPage() {
           </div>
 
           {/* Section: "How Smart Coins Work" (Matching Screenshot 3) */}
-          <section id="how-coins-work" className="mb-14 scroll-mt-32">
-            <div className="text-center max-w-2xl mx-auto mb-8">
-              <span className="font-headline-sm text-[11px] uppercase font-extrabold text-[#005f3f] tracking-wider block mb-1">
+          <section id="how-coins-work" className="mb-8 scroll-mt-32 sm:mb-14">
+            <div className="mx-auto mb-5 max-w-2xl text-center sm:mb-8">
+              <span className="mb-1 hidden font-headline-sm text-[11px] font-extrabold uppercase tracking-wider text-[#005f3f] sm:block">
                 TRANSPARENT PURITY REWARDS
               </span>
-              <h2 className="font-headline-lg text-2xl md:text-3xl font-extrabold text-on-surface">
+              <h2 className="font-headline-lg text-xl font-extrabold text-on-surface sm:text-2xl md:text-3xl">
                 How Smart Coins Work
               </h2>
-              <p className="text-xs text-on-surface-variant mt-1.5">
+              <p className="mt-1.5 hidden text-xs text-on-surface-variant sm:block">
                 Every staple, vegetable, and cold-pressed oil bottle ordered brings tangible savings back to your kitchen table.
               </p>
             </div>
 
             {/* 3 Step Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="mb-5 grid grid-cols-1 gap-3 sm:mb-8 sm:gap-6 md:grid-cols-3">
               {/* Step 1 */}
-              <div className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant/15 shadow-sm flex flex-col justify-between">
+              <div className="flex flex-col justify-between rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm sm:rounded-3xl sm:p-6">
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
+                  <div className="mb-3 flex items-center justify-between sm:mb-4">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 sm:h-10 sm:w-10 sm:rounded-2xl">
+                      <span className="material-symbols-outlined text-[18px] sm:text-[20px]">shopping_bag</span>
                     </div>
                     <span className="font-headline-sm text-xs font-black text-outline">01</span>
                   </div>
-                  <h4 className="font-headline-sm text-base font-bold text-on-surface mb-2">
+                  <h4 className="mb-1.5 font-headline-sm text-sm font-bold text-on-surface sm:mb-2 sm:text-base">
                     1. Shop Farm Fresh & Staples
                   </h4>
-                  <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
+                  <p className="mb-3 text-[11px] leading-relaxed text-on-surface-variant sm:mb-4 sm:text-xs">
                     Earn {coinPolicy.smartCoinEarnRate} Smart Coins for every eligible order.
                   </p>
                 </div>
-                <span className="bg-emerald-50 text-emerald-800 font-bold text-[10px] px-3 py-1 rounded-full border border-emerald-200/60 inline-block w-fit">
+                <span className="inline-block w-fit rounded-full border border-emerald-200/60 bg-emerald-50 px-2.5 py-1 text-[9px] font-bold text-emerald-800 sm:px-3 sm:text-[10px]">
                   Earn rate: {coinPolicy.smartCoinEarnRate} coins per order
                 </span>
               </div>
 
               {/* Step 2 */}
-              <div className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant/15 shadow-sm flex flex-col justify-between">
+              <div className="flex flex-col justify-between rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm sm:rounded-3xl sm:p-6">
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[20px]">savings</span>
+                  <div className="mb-3 flex items-center justify-between sm:mb-4">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-800 sm:h-10 sm:w-10 sm:rounded-2xl">
+                      <span className="material-symbols-outlined text-[18px] sm:text-[20px]">savings</span>
                     </div>
                     <span className="font-headline-sm text-xs font-black text-outline">02</span>
                   </div>
-                  <h4 className="font-headline-sm text-base font-bold text-on-surface mb-2">
+                  <h4 className="mb-1.5 font-headline-sm text-sm font-bold text-on-surface sm:mb-2 sm:text-base">
                     2. Collect Automatically
                   </h4>
-                  <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
+                  <p className="mb-3 text-[11px] leading-relaxed text-on-surface-variant sm:mb-4 sm:text-xs">
                     Coins are credited when your order is placed and expire after {coinPolicy.coinValidityMonths} months.
                   </p>
                 </div>
-                <span className="bg-amber-50 text-amber-800 font-bold text-[10px] px-3 py-1 rounded-full border border-amber-200/60 inline-block w-fit">
+                <span className="inline-block w-fit rounded-full border border-amber-200/60 bg-amber-50 px-2.5 py-1 text-[9px] font-bold text-amber-800 sm:px-3 sm:text-[10px]">
                   Valid for {coinPolicy.coinValidityMonths} months
                 </span>
               </div>
 
               {/* Step 3 */}
-              <div className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant/15 shadow-sm flex flex-col justify-between">
+              <div className="flex flex-col justify-between rounded-2xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm sm:rounded-3xl sm:p-6">
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 rounded-2xl bg-cyan-100 text-cyan-800 flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[20px]">point_of_sale</span>
+                  <div className="mb-3 flex items-center justify-between sm:mb-4">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-100 text-cyan-800 sm:h-10 sm:w-10 sm:rounded-2xl">
+                      <span className="material-symbols-outlined text-[18px] sm:text-[20px]">point_of_sale</span>
                     </div>
                     <span className="font-headline-sm text-xs font-black text-outline">03</span>
                   </div>
-                  <h4 className="font-headline-sm text-base font-bold text-on-surface mb-2">
+                  <h4 className="mb-1.5 font-headline-sm text-sm font-bold text-on-surface sm:mb-2 sm:text-base">
                     3. Apply at Checkout
                   </h4>
-                  <p className="text-xs text-on-surface-variant leading-relaxed mb-4">
+                  <p className="mb-3 text-[11px] leading-relaxed text-on-surface-variant sm:mb-4 sm:text-xs">
                     Redeem at ₹{coinPolicy.coinValueInRupees} per coin once your balance reaches {coinPolicy.minCoinsToRedeem} coins, up to {coinPolicy.maxCoinRedemptionPercent}% of your item subtotal.
                   </p>
                 </div>
-                <span className="bg-cyan-50 text-cyan-800 font-bold text-[10px] px-3 py-1 rounded-full border border-cyan-200/60 inline-block w-fit">
+                <span className="inline-block w-fit rounded-full border border-cyan-200/60 bg-cyan-50 px-2.5 py-1 text-[9px] font-bold text-cyan-800 sm:px-3 sm:text-[10px]">
                   Minimum balance to redeem: {coinPolicy.minCoinsToRedeem} coins
                 </span>
               </div>
             </div>
 
             {/* Support Callout Banner */}
-            <div className="bg-primary/5 rounded-3xl p-6 border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-primary/10 bg-primary/5 p-4 sm:rounded-3xl sm:p-6 md:flex-row md:items-center md:gap-4">
               <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[20px]">support_agent</span>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary sm:h-10 sm:w-10 sm:rounded-2xl">
+                  <span className="material-symbols-outlined text-[18px] sm:text-[20px]">support_agent</span>
                 </div>
                 <div>
-                  <h4 className="font-headline-sm text-sm font-bold text-on-surface">
+                  <h4 className="font-headline-sm text-xs font-bold text-on-surface sm:text-sm">
                     Have questions about Smart Coins or VIP Perks?
                   </h4>
-                  <p className="text-xs text-on-surface-variant">
+                  <p className="hidden text-xs text-on-surface-variant sm:block">
                     Our neighborhood Adyar concierge team is available daily from 6:30 AM to 10:00 PM.
                   </p>
                 </div>
@@ -902,7 +907,7 @@ export function RewardsPage() {
               <div className="flex items-center gap-3 shrink-0">
                 <a
                   href="tel:+919840012345"
-                  className="bg-surface-container-lowest border border-outline-variant/30 text-on-surface px-4 py-2 rounded-xl font-headline-sm text-xs font-bold hover:bg-surface-container transition-colors"
+                  className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 font-headline-sm text-[10px] font-bold text-on-surface transition-colors hover:bg-surface-container sm:px-4 sm:text-xs"
                 >
                   Call Support
                 </a>
@@ -910,7 +915,7 @@ export function RewardsPage() {
                   href="https://api.whatsapp.com/send?phone=919840012345"
                   target="_blank"
                   rel="noreferrer"
-                  className="bg-[#005f3f] hover:bg-[#004e33] text-white px-5 py-2 rounded-xl font-headline-sm text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                  className="flex items-center gap-1.5 rounded-xl bg-[#005f3f] px-4 py-2 font-headline-sm text-[10px] font-bold text-white shadow-sm transition-all hover:bg-[#004e33] sm:px-5 sm:text-xs"
                 >
                   <span>WhatsApp Us</span>
                   <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
@@ -920,45 +925,45 @@ export function RewardsPage() {
           </section>
 
           {/* Section: Sriman VIP Privilege Framework (Preserves strict binary ₹5,000 rule) */}
-          <div className="bg-surface-container-lowest rounded-3xl p-6 md:p-8 border border-outline-variant/20 shadow-sm mb-12">
-            <div className="flex items-center justify-between mb-4">
+          <div className="mb-8 rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:mb-12 sm:rounded-3xl sm:p-6 md:p-8">
+            <div className="mb-3 flex items-center justify-between gap-2 sm:mb-4">
               <div>
-                <h3 className="font-headline-lg text-lg font-bold text-on-surface">
+                <h3 className="font-headline-lg text-sm font-bold text-on-surface sm:text-lg">
                   Sriman VIP Privilege Framework
                 </h3>
-                <p className="text-xs text-on-surface-variant mt-0.5">
+                <p className="mt-0.5 hidden text-xs text-on-surface-variant sm:block">
                   Transparent qualification standards based strictly on verified delivered grocery orders.
                 </p>
               </div>
-              <span className="bg-amber-100/70 text-amber-900 border border-amber-300 font-extrabold text-[11px] px-3 py-1 rounded-full">
-                {vipStats.isVIP ? "You are currently VIP Privilege Qualified" : "Standard Customer Tier"}
+              <span className="rounded-full border border-amber-300 bg-amber-100/70 px-2 py-1 text-[9px] font-extrabold text-amber-900 sm:px-3 sm:text-[11px] text-center">
+                {vipStats.isVIP ? <><span className="sm:hidden">VIP Qualified</span><span className="hidden sm:inline">You are currently VIP Privilege Qualified</span></> : "Standard Tier"}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-              <div className="bg-surface-container-low/60 rounded-2xl p-5 border border-outline-variant/15">
+            <div className="grid grid-cols-1 gap-3 pt-1 sm:gap-6 sm:pt-2 md:grid-cols-2">
+              <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/60 p-3 sm:rounded-2xl sm:p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="material-symbols-outlined text-primary text-[20px]">calendar_month</span>
-                  <h4 className="font-headline-sm text-sm font-bold text-on-surface">
+                  <span className="material-symbols-outlined text-[18px] text-primary sm:text-[20px]">calendar_month</span>
+                  <h4 className="font-headline-sm text-xs font-bold text-on-surface sm:text-sm">
                     Rolling 30-Day Evaluation
                   </h4>
                 </div>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
+                <p className="hidden text-[11px] leading-relaxed text-on-surface-variant sm:block sm:text-xs">
                   Qualification is recalculated dynamically every morning based on delivered orders placed within the last 30 calendar days. Achieving the ₹5,000 delivered spend threshold activates VIP status immediately.
                 </p>
               </div>
 
-              <div className="bg-surface-container-low/60 rounded-2xl p-5 border border-outline-variant/15">
+              <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/60 p-3 sm:rounded-2xl sm:p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="material-symbols-outlined text-primary text-[20px]">verified</span>
-                  <h4 className="font-headline-sm text-sm font-bold text-on-surface">
+                  <span className="material-symbols-outlined text-[18px] text-primary sm:text-[20px]">verified</span>
+                  <h4 className="font-headline-sm text-xs font-bold text-on-surface sm:text-sm">
                     Guaranteed VIP Benefits
                   </h4>
                 </div>
-                <ul className="text-xs text-on-surface-variant space-y-1 list-disc pl-4 leading-relaxed">
-                  <li>Zero express surge fees and free doorstep delivery on all orders.</li>
-                  <li>Exclusive wholesale special prices on cold-pressed oils, ghee, and staples.</li>
-                  <li>2X coin accrual multipliers on every delivered grocery basket.</li>
+                <ul className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-on-surface-variant sm:text-xs">
+                  <li><span className="sm:hidden">Free express delivery</span><span className="hidden sm:inline">Zero express surge fees and free doorstep delivery on all orders.</span></li>
+                  <li><span className="sm:hidden">Wholesale prices</span><span className="hidden sm:inline">Exclusive wholesale special prices on cold-pressed oils, ghee, and staples.</span></li>
+                  <li><span className="sm:hidden">2× Smart Coins</span><span className="hidden sm:inline">2X coin accrual multipliers on every delivered grocery basket.</span></li>
                 </ul>
               </div>
             </div>

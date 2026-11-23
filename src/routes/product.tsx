@@ -52,6 +52,7 @@ function ProductDetailsPage() {
   const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
   const pinchDistanceRef = useRef<number | null>(null);
+  const isPinchingImageRef = useRef(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const imageSwipeRef = useRef(false);
   const [quantity, setQuantity] = useState(1);
@@ -312,10 +313,52 @@ function ProductDetailsPage() {
                   }}
                   onTouchStart={(event) => {
                     imageSwipeRef.current = false;
+                    if (event.touches.length === 2) {
+                      const [first, second] = Array.from(event.touches);
+                      pinchDistanceRef.current = Math.hypot(
+                        second.clientX - first.clientX,
+                        second.clientY - first.clientY
+                      );
+                      isPinchingImageRef.current = true;
+                      touchStartRef.current = null;
+                      return;
+                    }
+
+                    pinchDistanceRef.current = null;
+                    isPinchingImageRef.current = false;
                     const touch = event.changedTouches[0];
                     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
                   }}
+                  onTouchMove={(event) => {
+                    if (event.touches.length !== 2 || !isPinchingImageRef.current) return;
+                    event.preventDefault();
+
+                    const [first, second] = Array.from(event.touches);
+                    const distance = Math.hypot(
+                      second.clientX - first.clientX,
+                      second.clientY - first.clientY
+                    );
+                    const previousDistance = pinchDistanceRef.current;
+                    if (previousDistance === null || Math.abs(distance - previousDistance) < 2) return;
+
+                    if (!isImageZoomOpen) {
+                      setImageZoom(1);
+                      setIsImageZoomOpen(true);
+                    }
+                    setImageZoom((current) =>
+                      Math.min(4, Math.max(1, current * (distance / previousDistance)))
+                    );
+                    pinchDistanceRef.current = distance;
+                  }}
                   onTouchEnd={(event) => {
+                    if (isPinchingImageRef.current) {
+                      pinchDistanceRef.current = null;
+                      isPinchingImageRef.current = false;
+                      touchStartRef.current = null;
+                      imageSwipeRef.current = true;
+                      return;
+                    }
+
                     const start = touchStartRef.current;
                     const touch = event.changedTouches[0];
                     touchStartRef.current = null;
@@ -352,10 +395,14 @@ function ProductDetailsPage() {
                 </div>
               </div>
 
-              {/* Front/back and alternate image switcher */}
+              {/* Front/back and alternate image dot navigation */}
               {images.length > 1 && (
-                <div className="absolute bottom-0 left-1/2 z-10 order-2 flex max-w-[calc(100%-1rem)] -translate-x-1/2 flex-row gap-1.5 overflow-x-auto rounded-xl bg-surface-container-lowest/75 p-1 shadow-sm backdrop-blur-sm scrollbar-none lg:static lg:left-auto lg:order-1 lg:w-16 lg:max-w-none lg:shrink-0 lg:translate-x-0 lg:flex-col lg:gap-3 lg:overflow-visible lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none">
-                  {images.map((img, idx) => (
+                <div
+                  role="group"
+                  aria-label="Product images"
+                  className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full bg-surface-container-lowest/20 shadow-sm backdrop-blur-sm"
+                >
+                  {images.map((_, idx) => (
                     <button
                       key={idx}
                       type="button"
@@ -363,18 +410,17 @@ function ProductDetailsPage() {
                         setActiveImageIndex(idx);
                         setImageError(false);
                       }}
-                      aria-label={`Show product image ${idx + 1}${idx === 0 ? " (front)" : idx === 1 ? " (back)" : ""}`}
+                      aria-label={`Show ${idx === 0 ? "front" : idx === 1 ? "back" : `image ${idx + 1}`}`}
                       aria-pressed={activeImageIndex === idx}
-                      className={`relative aspect-square w-10 sm:w-11 lg:w-full shrink-0 rounded-xl sm:rounded-2xl bg-surface-container-lowest p-1 sm:p-2 shadow-sm transition-all overflow-hidden flex items-center justify-center cursor-pointer border border-outline-variant/20 ${
-                        activeImageIndex === idx
-                          ? "ring-2 ring-primary bg-primary/5"
-                          : "hover:bg-surface-container opacity-70"
-                      }`}
+                      className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1"
                     >
-                      <img
-                        src={img}
-                        alt={`View ${idx + 1}`}
-                        className="max-w-full max-h-full object-contain select-none"
+                      <span
+                        aria-hidden="true"
+                        className={`h-1.5 w-1.5 rounded-full transition-all ${
+                          activeImageIndex === idx
+                            ? "scale-110 bg-primary"
+                            : "bg-outline-variant hover:bg-primary/60"
+                        }`}
                       />
                     </button>
                   ))}

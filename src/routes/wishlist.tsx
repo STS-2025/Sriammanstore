@@ -44,7 +44,7 @@ function wishlistEntryTime(value: unknown): number {
 
 export function WishlistPage() {
   const { user, isLoading: authLoading, isResolvingIdentity } = useAuth();
-  const { addToCart } = useCart();
+  const { addToCart, refreshCart } = useCart();
   const {
     wishlistItems,
     wishlists,
@@ -67,6 +67,7 @@ export function WishlistPage() {
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("recent");
+  const [isFolderMenuOpen, setIsFolderMenuOpen] = useState(false);
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -83,6 +84,12 @@ export function WishlistPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const [movingItemId, setMovingItemId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeWishlistId === "all" && wishlists.length > 0) {
+      setActiveWishlistId(wishlists[0].id);
+    }
+  }, [activeWishlistId, setActiveWishlistId, wishlists]);
 
   // Load catalog products for current stock status, variant options & recommendations
   useEffect(() => {
@@ -268,6 +275,7 @@ export function WishlistPage() {
     }
     try {
       const result = await moveAllInStockToCart(activeWishlistId, allProducts);
+      await refreshCart();
       if (result.addedCount > 0) {
         if (result.skippedCount > 0) {
           toast.success(
@@ -406,8 +414,8 @@ export function WishlistPage() {
     <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
       <StoreHeader />
 
-      <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
-        <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
+      <main className="w-full pt-16 md:pt-20 bg-surface min-h-[calc(100vh-80px)]">
+        <div className="max-w-[1320px] mx-auto px-margin-desktop py-8 md:py-space-xl">
           {/* Breadcrumb Navigation */}
           <nav className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant mb-4">
             <Link to="/" className="hover:text-primary transition-colors flex items-center gap-1">
@@ -433,7 +441,7 @@ export function WishlistPage() {
             </div>
 
             {/* VIP Member Savings Badge Card */}
-            <div className="shrink-0 flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-2.5 shadow-sm">
+            <div className="hidden sm:flex shrink-0 items-center gap-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-2.5 shadow-sm">
               <div className="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-700 text-lg font-bold">
                 🪙
               </div>
@@ -450,102 +458,81 @@ export function WishlistPage() {
             </div>
           </div>
 
-          {/* Wishlist folders */}
-          <div className="flex items-center justify-between gap-3 overflow-x-auto pb-3 mb-6 scrollbar-none border-b border-outline-variant/15">
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Dynamic User Collections */}
-              {wishlists.map((wl) => (
-                <button
-                  key={wl.id}
-                  type="button"
-                  onClick={() => setActiveWishlistId(wl.id)}
-                  className={`px-4 py-2 rounded-full font-headline-sm text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                    activeWishlistId === wl.id
-                      ? "bg-[#005f3f] text-white shadow-sm"
-                      : "bg-surface-container-low text-on-surface-variant hover:bg-surface-container"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">
-                    {wl.title.toLowerCase().includes("pantry") || wl.title.toLowerCase().includes("monthly")
-                      ? "event_note"
-                      : "inventory_2"}
-                  </span>
-                  <span>{wl.title}</span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
-                      activeWishlistId === wl.id
-                        ? "bg-white/20 text-white"
-                        : "bg-surface-container text-on-surface"
-                    }`}
-                  >
-                    {collectionCounts[wl.id] ?? 0}
-                  </span>
-                </button>
-              ))}
+          {/* Folder picker and sort control */}
+          <div className="flex items-center justify-between gap-2 pb-3 mb-4 border-b border-outline-variant/15">
+            <div className="relative min-w-0 flex-1 sm:flex-none sm:w-72">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={isFolderMenuOpen}
+                onClick={() => setIsFolderMenuOpen((open) => !open)}
+                className="w-full flex items-center gap-2 rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-3 py-2.5 text-left text-xs font-bold shadow-xs"
+              >
+                <span className="material-symbols-outlined text-[17px] text-primary">folder_open</span>
+                <span className="min-w-0 flex-1 truncate">{activeCollectionObj?.title || "Choose a folder"}</span>
+                <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px]">{collectionCounts[activeWishlistId] ?? 0}</span>
+                <span className="material-symbols-outlined text-[18px]">{isFolderMenuOpen ? "expand_less" : "expand_more"}</span>
+              </button>
+              {isFolderMenuOpen && (
+                <div role="menu" className="absolute left-0 top-full z-30 mt-2 w-full min-w-[240px] overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-1.5 shadow-xl">
+                  {wishlists.map((wl) => (
+                    <div key={wl.id} className={`flex items-center gap-1 rounded-xl px-2 py-1 ${activeWishlistId === wl.id ? "bg-primary/5" : ""}`}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setActiveWishlistId(wl.id); setIsFolderMenuOpen(false); }}
+                        className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-xs font-semibold"
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-primary">{wl.title.toLowerCase().includes("pantry") || wl.title.toLowerCase().includes("monthly") ? "event_note" : "inventory_2"}</span>
+                        <span className="flex-1 truncate">{wl.title}</span>
+                        <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px]">{collectionCounts[wl.id] ?? 0}</span>
+                      </button>
+                      {wl.id !== "all" && wl.id !== "wl_default" && (
+                        <>
+                          <button type="button" aria-label={`Rename ${wl.title}`} onClick={() => { setRenameTargetId(wl.id); setRenameTitle(wl.title); setRenameDesc(wl.description || ""); setShowRenameModal(true); setIsFolderMenuOpen(false); }} className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-container hover:text-primary">
+                            <span className="material-symbols-outlined text-[16px]">edit</span>
+                          </button>
+                          <button type="button" aria-label={`Delete ${wl.title}`} onClick={() => { setDeleteTargetId(wl.id); setShowDeleteModal(true); setIsFolderMenuOpen(false); }} className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50">
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => { setShowCreateModal(true); setIsFolderMenuOpen(false); }} className="mt-1 flex w-full items-center gap-2 rounded-xl border-t border-outline-variant/20 px-3 py-2.5 text-left text-xs font-bold text-primary">
+                    <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
+                    <span>Create Folder</span>
+                  </button>
+                </div>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(true)}
-              className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 px-3 py-2 font-headline-sm text-xs font-bold text-primary transition-colors hover:bg-primary/10"
-            >
-              <span className="material-symbols-outlined text-[16px]">create_new_folder</span>
-              <span>Create Folder</span>
-            </button>
+            <label className="flex shrink-0 items-center gap-1.5 text-[11px] text-on-surface-variant sm:text-xs">
+              <span className="hidden sm:inline">Sort by:</span>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} className="max-w-[145px] rounded-xl border border-outline-variant/30 bg-surface-container-lowest px-2.5 py-2.5 text-[11px] font-bold text-on-surface shadow-xs focus:outline-none sm:max-w-none sm:text-xs">
+                <option value="recent">Recently Added</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="savings">Biggest Savings</option>
+                <option value="name">Name (A-Z)</option>
+              </select>
+            </label>
           </div>
-
-          {/* Active Custom Collection Controls (Rename / Delete) */}
-          {activeCollectionObj && activeWishlistId !== "all" && activeWishlistId !== "wl_default" && (
-            <div className="flex items-center justify-between bg-surface-container-low/60 rounded-2xl px-4 py-2.5 mb-5 text-xs text-on-surface-variant">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px] text-primary">folder_open</span>
-                <span className="font-bold text-on-surface">{activeCollectionObj.title}</span>
-                {activeCollectionObj.description && (
-                  <span className="text-outline hidden sm:inline">• {activeCollectionObj.description}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRenameTargetId(activeCollectionObj.id);
-                    setRenameTitle(activeCollectionObj.title);
-                    setRenameDesc(activeCollectionObj.description || "");
-                    setShowRenameModal(true);
-                  }}
-                  className="hover:text-primary transition-colors flex items-center gap-1 font-semibold cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[15px]">edit</span>
-                  <span>Rename</span>
-                </button>
-                <span className="text-outline-variant">|</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeleteTargetId(activeCollectionObj.id);
-                    setShowDeleteModal(true);
-                  }}
-                  className="text-rose-600 hover:text-rose-700 transition-colors flex items-center gap-1 font-semibold cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[15px]">delete</span>
-                  <span>Delete</span>
-                </button>
-              </div>
-            </div>
+          {activeCollectionObj?.description && (
+            <p className="mb-4 hidden text-xs text-on-surface-variant sm:block">{activeCollectionObj.description}</p>
           )}
-
           {/* Search, Sort & Batch Action Control Bar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-5">
+          <div className="flex flex-row items-center gap-2 sm:justify-between sm:gap-3 mb-5">
             {/* Search Input */}
-            <div className="relative flex-1 max-w-md">
-              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-outline text-[18px]">
+            <div className="relative min-w-0 flex-1 sm:max-w-md">
+              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px] sm:left-3.5 sm:text-[18px]">
                 search
               </span>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filter saved staples by name or brand..."
-                className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-2xl pl-10 pr-9 py-2.5 text-xs text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary shadow-xs"
+                placeholder="Search your favourites..."
+                className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-2xl pl-8 pr-7 py-2 text-[10px] text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary shadow-xs sm:py-2.5 sm:pl-10 sm:pr-9 sm:text-xs"
               />
               {searchQuery && (
                 <button
@@ -558,38 +545,24 @@ export function WishlistPage() {
               )}
             </div>
 
-            {/* Sort & Move All CTA */}
-            <div className="flex items-center justify-between sm:justify-end gap-3">
-              {/* Sort Dropdown */}
-              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
-                <span className="shrink-0 font-medium">Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-3 py-2 text-xs font-bold text-on-surface focus:outline-none cursor-pointer shadow-xs"
-                >
-                  <option value="recent">Recently Added</option>
-                  <option value="price_asc">Price: Low to High</option>
-                  <option value="price_desc">Price: High to Low</option>
-                  <option value="savings">Biggest Savings</option>
-                  <option value="name">Name (A-Z)</option>
-                </select>
-              </div>
-
+            {/* Move All CTA */}
+            <div className="flex shrink-0 items-center justify-end">
               {/* Move All In-Stock to Cart Button */}
               <button
                 type="button"
                 onClick={handleMoveAllInStockToCart}
                 disabled={inStockCount === 0}
-                className={`px-5 py-2.5 rounded-full font-headline-sm text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
+                aria-label={`Move all ${inStockCount} in-stock items to cart`}
+                className={`whitespace-nowrap rounded-full px-2.5 py-2 font-headline-sm text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer sm:gap-2 sm:px-5 sm:py-2.5 sm:text-xs ${
                   inStockCount > 0
                     ? "bg-[#005f3f] hover:bg-[#004e33] text-white shadow-sm"
                     : "bg-surface-container text-outline cursor-not-allowed"
                 }`}
                 title={inStockCount > 0 ? "Move all in-stock items to cart" : "No in-stock items to add"}
               >
-                <span className="material-symbols-outlined text-[17px]">shopping_cart</span>
-                <span>Move All In-Stock to Cart ({inStockCount} items)</span>
+                <span className="material-symbols-outlined text-[15px] sm:text-[17px]">shopping_cart</span>
+                <span className="sm:hidden">Move All ({inStockCount})</span>
+                <span className="hidden sm:inline">Move All In-Stock to Cart ({inStockCount} items)</span>
               </button>
             </div>
           </div>
@@ -642,15 +615,15 @@ export function WishlistPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md mb-16">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-space-md mb-16">
               {sortedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-3xl p-2.5 sm:p-4 border border-outline-variant/15 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group relative"
+                  className="rounded-2xl p-1.5 sm:rounded-3xl sm:p-4 border border-outline-variant/15 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group relative"
                 >
                   <div>
                     {/* Card Top: Image + Badges + Heart Button */}
-                    <div className="relative aspect-square rounded-2xl overflow-hidden mb-2 sm:mb-3 flex items-center justify-center p-1 sm:p-3.5 border border-outline-variant/10">
+                    <div className="relative aspect-square rounded-2xl overflow-hidden mb-2 sm:mb-3 flex items-center justify-center border border-outline-variant/10">
                       <OrderProductImage
                         item={{
                           productId: item.productId,
@@ -662,22 +635,22 @@ export function WishlistPage() {
                           image: item.catalogProd?.imageUrl || item.image,
                           ...(item.catalogProd?.images ? { imageCandidates: item.catalogProd.images } : {}),
                         }}
-                        className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-300 drop-shadow-sm select-none"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105 drop-shadow-sm select-none sm:max-h-full sm:max-w-full sm:object-contain"
                       />
 
                       {/* Top Left Badges */}
                       <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
                         {item.discountPercent > 0 && (
-                          <span className="bg-rose-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md shadow-xs">
+                          <span className="hidden sm:inline-flex bg-rose-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md shadow-xs">
                             {item.discountPercent}% OFF
                           </span>
                         )}
-                        <span className="bg-[#005f3f] text-white font-bold text-[10px] px-2 py-0.5 rounded-md shadow-xs flex items-center gap-0.5">
+                        <span className="hidden sm:flex bg-[#005f3f] text-white font-bold text-[10px] px-2 py-0.5 rounded-md shadow-xs items-center gap-0.5">
                           <span>⚡</span>
                           <span>60M</span>
                         </span>
                         {item.tag && item.tag !== "STAPLE" && (
-                          <span className="bg-surface-container-lowest/90 text-on-surface font-extrabold text-[9px] uppercase px-2 py-0.5 rounded-md shadow-xs tracking-wider">
+                          <span className="hidden sm:inline-flex bg-surface-container-lowest/90 text-on-surface font-extrabold text-[9px] uppercase px-2 py-0.5 rounded-md shadow-xs tracking-wider">
                             {item.tag}
                           </span>
                         )}
@@ -694,43 +667,43 @@ export function WishlistPage() {
 
                     {/* Product Metadata */}
                     <div className="mb-2">
-                      <span className="text-[10px] uppercase font-bold text-primary tracking-wider block mb-1">
+                      <span className="hidden sm:block text-[10px] uppercase font-bold text-primary tracking-wider mb-1">
                         {item.tag}
                       </span>
                       <h4 className="overflow-hidden font-headline-sm text-xs sm:text-sm font-bold text-on-surface leading-snug mb-1">
                         <ProductNameSlider name={item.name} />
                       </h4>
                       {(item.catalogProd?.brand || item.brandName) && (
-                        <span className="text-xs text-on-surface-variant block mb-1">
+                        <span className="hidden sm:block text-xs text-on-surface-variant mb-1">
                           {item.catalogProd?.brand || item.brandName}
                         </span>
                       )}
-                      <span className="text-xs text-on-surface-variant block">
+                      <span className="text-[10px] text-on-surface-variant block sm:text-xs">
                         Pack: {item.unitSize} {item.unit}
                       </span>
                     </div>
 
                     {/* Price & Savings Display */}
-                    <div className="flex items-baseline gap-2 mb-2">
-                      <span className="font-headline-sm text-base font-extrabold text-primary">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-2">
+                      <span className="font-headline-sm text-sm font-extrabold text-primary sm:text-base">
                         ₹{item.price}
                       </span>
                       {item.mrp > item.price && (
                         <span className="text-xs text-outline line-through">₹{item.mrp}</span>
                       )}
                       {item.savings > 0 && (
-                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        <span className="hidden sm:inline-flex text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
                           Save ₹{item.savings}
                         </span>
                       )}
                     </div>
 
                     {/* Stock State Badge */}
-                    <div className="flex items-center gap-1.5 text-[11px] mb-3">
+                    <div className="flex items-center gap-1.5 text-[9px] mb-2 sm:mb-3 sm:text-[11px]">
                       {item.inStock ? (
                         <>
                           <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                          <span className="text-emerald-800 font-semibold">In Stock • Rapid Dispatch</span>
+                          <span className="text-emerald-800 font-semibold">In Stock<span className="hidden sm:inline"> • Rapid Dispatch</span></span>
                         </>
                       ) : (
                         <>
@@ -741,8 +714,8 @@ export function WishlistPage() {
                     </div>
                   </div>
 
-                  {/* Card Bottom: Add to Cart + Move to Collection Dropdown */}
-                  <div className="space-y-2 pt-2 border-t border-outline-variant/10">
+                  {/* Card Bottom: Add to Cart + Move to Collection Popup */}
+                  <div className="space-y-1.5 pt-2 border-t border-outline-variant/10 sm:space-y-2">
                     <button
                       type="button"
                       onClick={() => handleAddToCart(item)}
@@ -763,36 +736,44 @@ export function WishlistPage() {
                     {wishlists.length > 0 && (
                       <div className="relative">
                         {movingItemId === item.id ? (
-                          <div className="bg-surface-container-low rounded-xl p-2 border border-outline-variant/20 space-y-1">
-                            <span className="text-[10px] font-bold text-on-surface-variant block mb-1">
-                              Move to Collection:
-                            </span>
-                            <div className="flex flex-col gap-1 max-h-24 overflow-y-auto">
+                          <div
+                            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
+                            onClick={() => setMovingItemId(null)}
+                          >
+                            <div
+                              role="dialog"
+                              aria-modal="true"
+                              aria-label={`Move ${item.name} to a collection`}
+                              onClick={(event) => event.stopPropagation()}
+                              className="w-full max-w-sm rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-2xl"
+                            >
+                              <div className="mb-3 flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-on-surface">Move to Collection</h3>
+                                <button type="button" aria-label="Close" onClick={() => setMovingItemId(null)} className="rounded-lg p-1 text-on-surface-variant hover:bg-surface-container">
+                                  <span className="material-symbols-outlined text-[18px]">close</span>
+                                </button>
+                              </div>
+                              <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+                                {wishlists.map((wl) => (
+                                  <button
+                                    key={wl.id}
+                                    type="button"
+                                    onClick={() => handleMoveProduct(item.id, wl.id)}
+                                    className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container-low"
+                                  >
+                                    <span className="material-symbols-outlined text-[17px] text-primary">folder</span>
+                                    <span className="truncate">{wl.title}</span>
+                                  </button>
+                                ))}
+                              </div>
                               <button
                                 type="button"
-                                onClick={() => handleMoveProduct(item.id, "wl_default")}
-                                className="text-left text-[11px] px-2 py-1 rounded hover:bg-surface-container font-medium text-on-surface"
+                                onClick={() => setMovingItemId(null)}
+                                className="mt-3 w-full rounded-xl bg-surface-container px-3 py-2.5 text-xs font-bold text-on-surface-variant hover:bg-surface-container-highest"
                               >
-                                All Saved Items
+                                Cancel
                               </button>
-                              {wishlists.map((wl) => (
-                                <button
-                                  key={wl.id}
-                                  type="button"
-                                  onClick={() => handleMoveProduct(item.id, wl.id)}
-                                  className="text-left text-[11px] px-2 py-1 rounded hover:bg-surface-container font-medium text-on-surface truncate"
-                                >
-                                  {wl.title}
-                                </button>
-                              ))}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setMovingItemId(null)}
-                              className="text-[10px] text-outline hover:text-on-surface block w-full text-right pt-1"
-                            >
-                              Cancel
-                            </button>
                           </div>
                         ) : (
                           <button
@@ -919,54 +900,6 @@ export function WishlistPage() {
               </div>
             </section>
           )}
-
-          {/* Bottom Trust & Feature Highlights (Matching Screenshot 2) */}
-          <div className="bg-primary/5 rounded-3xl p-6 md:p-8 border border-primary/10 grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            {/* Feature 1 */}
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[22px]">sync</span>
-              </div>
-              <div>
-                <h4 className="font-headline-sm text-sm font-bold text-on-surface mb-1">
-                  Live Stock Calibration
-                </h4>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  Wishlist prices reflect active morning market harvests directly from our Adyar processing facility.
-                </p>
-              </div>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[22px]">sell</span>
-              </div>
-              <div>
-                <h4 className="font-headline-sm text-sm font-bold text-on-surface mb-1">
-                  VIP Auto-Apply
-                </h4>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  Exclusive club savings and coin multipliers are dynamically locked in as you move items to the cart.
-                </p>
-              </div>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[22px]">local_shipping</span>
-              </div>
-              <div>
-                <h4 className="font-headline-sm text-sm font-bold text-on-surface mb-1">
-                  Instant Adyar Dispatch
-                </h4>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
-                  60-minute doorstep fulfillment for Adyar, Besant Nagar, Thiruvanmiyur, and surrounding corridors.
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </main>
 

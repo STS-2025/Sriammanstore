@@ -31,7 +31,7 @@ const FAQS = [
   },
   {
     q: "What is your return & replacement policy?",
-    a: "If produce or cold pressed oils do not match our farm-purity standards, you can request a replacement or full refund within 24 hours of doorstep delivery.",
+    a: "If product do not match the standards, you can request a replacement or full refund within 24 hours of doorstep delivery.",
   },
   {
     q: "How do I become an Amman VIP Prestige Member?",
@@ -155,45 +155,45 @@ function HelpPage() {
           </div>
 
           {/* Quick Contact Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
             <a
               href="https://api.whatsapp.com/send?text=Hi%20Sri%20Amman%20Support"
               target="_blank"
               rel="noreferrer"
-              className="p-4 rounded-3xl bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 flex items-center gap-3 transition-colors text-on-surface"
+              className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/30 flex items-center gap-2.5 sm:gap-3 transition-colors text-on-surface"
             >
-              <div className="w-10 h-10 rounded-2xl bg-[#25D366] text-white flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[20px]">chat</span>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-[#25D366] text-white flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[18px] sm:text-[20px]">chat</span>
               </div>
               <div>
                 <span className="font-headline-sm text-xs font-bold block">WhatsApp Chat</span>
-                <span className="text-[11px] text-on-surface-variant">Instant response</span>
+                <span className="text-[10px] sm:text-[11px] text-on-surface-variant">Instant response</span>
               </div>
             </a>
 
             <a
               href="tel:+919840012345"
-              className="p-4 rounded-3xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/20 flex items-center gap-3 transition-colors text-on-surface"
+              className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/20 flex items-center gap-2.5 sm:gap-3 transition-colors text-on-surface"
             >
-              <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[20px]">call</span>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-primary text-white flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[18px] sm:text-[20px]">call</span>
               </div>
               <div>
                 <span className="font-headline-sm text-xs font-bold block">+91 98400 12345</span>
-                <span className="text-[11px] text-on-surface-variant">Daily 7:00 AM - 10:00 PM</span>
+                <span className="text-[10px] sm:text-[11px] text-on-surface-variant">Daily 7:00 AM - 10:00 PM</span>
               </div>
             </a>
 
             <a
               href="mailto:support@sriammanstore.com"
-              className="p-4 rounded-3xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/20 flex items-center gap-3 transition-colors text-on-surface"
+              className="p-3 sm:p-4 rounded-2xl sm:rounded-3xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/20 flex items-center gap-2.5 sm:gap-3 transition-colors text-on-surface"
             >
-              <div className="w-10 h-10 rounded-2xl bg-secondary text-white flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[20px]">email</span>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-secondary text-white flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[18px] sm:text-[20px]">email</span>
               </div>
               <div>
                 <span className="font-headline-sm text-xs font-bold block">Email Care</span>
-                <span className="text-[11px] text-on-surface-variant">support@sriammanstore.com</span>
+                <span className="text-[10px] sm:text-[11px] text-on-surface-variant">support@sriammanstore.com</span>
               </div>
             </a>
           </div>

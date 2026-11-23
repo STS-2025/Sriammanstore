@@ -1,13 +1,13 @@
 import React from "react";
-import { Link } from "@tanstack/react-router";
 
 export interface CheckoutProgressBarProps {
-  currentStep: 1 | 2 | 3;
-  onStepClick?: (step: 1 | 2 | 3) => void;
-  canNavigateToStep?: (step: 1 | 2 | 3) => boolean;
+  currentStep: 1 | 2 | 3 | 4;
+  onStepClick?: (step: 1 | 2 | 3 | 4) => void;
+  canNavigateToStep?: (step: 1 | 2 | 3 | 4) => boolean;
   cartItemCount?: number;
   selectedAddressText?: string;
   className?: string;
+  hideCartStep?: boolean;
 }
 
 export function CheckoutProgressBar({
@@ -17,9 +17,10 @@ export function CheckoutProgressBar({
   cartItemCount = 0,
   selectedAddressText = "",
   className = "",
+  hideCartStep = false,
 }: CheckoutProgressBarProps) {
   const steps: Array<{
-    id: 1 | 2 | 3;
+    id: 1 | 2 | 3 | 4;
     title: string;
     subtitle: string;
     icon: string;
@@ -32,19 +33,25 @@ export function CheckoutProgressBar({
     },
     {
       id: 2,
-      title: "2. Address & Slot",
+      title: "2. Address & Delivery",
       subtitle: selectedAddressText || "Delivery & Slot",
       icon: "local_shipping",
     },
     {
       id: 3,
-      title: "3. Payment",
-      subtitle: "Instant UPI & Cards",
-      icon: "credit_card",
+      title: "3. Confirm Details",
+      subtitle: "Confirm address and items",
+      icon: "fact_check",
+    },
+    {
+      id: 4,
+      title: "4. Payment",
+      subtitle: "Choose payment method",
+      icon: "payments",
     },
   ];
 
-  const handleStepClick = (stepId: 1 | 2 | 3) => {
+  const handleStepClick = (stepId: 1 | 2 | 3 | 4) => {
     if (stepId === currentStep) return;
 
     if (stepId < currentStep) {
@@ -58,16 +65,17 @@ export function CheckoutProgressBar({
     }
   };
 
+  const visibleSteps = hideCartStep ? steps.filter((step) => step.id !== 1) : steps;
+
   return (
     <div
       data-testid="checkout-progress-bar"
-      className={`bg-surface-container-lowest border border-outline-variant/15 rounded-2xl p-4 sm:p-5 shadow-sm ${className}`}
+      className={`bg-surface-container-lowest border border-outline-variant/15 rounded-2xl px-3 py-2 sm:p-5 shadow-sm ${className}`}
     >
-      <div className="flex items-center justify-between relative max-w-2xl mx-auto">
-        {steps.map((step, idx) => {
+      <div className="flex items-center justify-between relative max-w-3xl mx-auto">
+        {visibleSteps.map((step, idx) => {
           const isCompleted = step.id < currentStep;
           const isCurrent = step.id === currentStep;
-          const isUpcoming = step.id > currentStep;
           const isClickable =
             isCompleted || (canNavigateToStep ? canNavigateToStep(step.id) : false);
 
@@ -87,7 +95,7 @@ export function CheckoutProgressBar({
               <div
                 data-testid={`progress-step-${step.id}`}
                 onClick={() => handleStepClick(step.id)}
-                className={`flex items-center gap-2.5 sm:gap-3 transition-all select-none ${
+                className={`flex items-center transition-all select-none ${hideCartStep ? "flex-col gap-1 sm:flex-row sm:gap-2.5" : "gap-2.5 sm:gap-3"} ${
                   isClickable
                     ? "cursor-pointer group hover:opacity-90"
                     : isCurrent
@@ -127,9 +135,9 @@ export function CheckoutProgressBar({
                 </div>
 
                 {/* Step labels */}
-                <div className="hidden xs:block sm:block text-left">
+                <div className={`${hideCartStep ? "block min-w-0 text-center sm:text-left" : "hidden xs:block sm:block text-left"}`}>
                   <div
-                    className={`font-headline-sm text-xs sm:text-sm font-extrabold leading-tight ${
+                    className={`font-headline-sm ${hideCartStep ? "text-[10px] sm:text-sm" : "text-xs sm:text-sm"} font-extrabold leading-tight ${
                       isCurrent
                         ? "text-primary"
                         : isCompleted
@@ -137,9 +145,14 @@ export function CheckoutProgressBar({
                           : "text-on-surface-variant/70"
                     }`}
                   >
-                    {step.title}
+                    {hideCartStep ? (
+                      <>
+                        <span className="sm:hidden">{step.id === 2 ? "Address" : step.id === 3 ? "Confirm" : "Payment"}</span>
+                        <span className="hidden sm:inline">{step.title}</span>
+                      </>
+                    ) : step.title}
                   </div>
-                  <div className="text-[10px] sm:text-[11px] text-on-surface-variant font-medium line-clamp-1 max-w-[120px] sm:max-w-none">
+                  <div className={`${hideCartStep ? "hidden sm:block" : "block"} text-[10px] sm:text-[11px] text-on-surface-variant font-medium line-clamp-1 max-w-[120px] sm:max-w-none`}>
                     {step.subtitle}
                   </div>
                 </div>

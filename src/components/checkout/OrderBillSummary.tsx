@@ -9,6 +9,7 @@ export interface OrderBillSummaryProps {
   disabled?: boolean;
   mode?: "cart" | "checkout";
   className?: string;
+  hideCtaOnMobile?: boolean;
 }
 
 export function OrderBillSummary({
@@ -19,6 +20,7 @@ export function OrderBillSummary({
   disabled = false,
   mode = "cart",
   className = "",
+  hideCtaOnMobile = false,
 }: OrderBillSummaryProps) {
   const {
     items,
@@ -43,16 +45,16 @@ export function OrderBillSummary({
   return (
     <div
       data-testid="order-bill-summary"
-      className={`bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-6 shadow-sm flex flex-col justify-between ${className}`}
+      className={`bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm flex flex-col justify-between ${className}`}
     >
       <div>
         {/* Title */}
-        <h3 className="font-headline-sm text-lg font-extrabold text-on-surface mb-5">
+        <h3 className="font-headline-sm text-base sm:text-lg font-extrabold text-on-surface mb-4 sm:mb-5">
           {displayTitle}
         </h3>
 
         {/* Pricing Rows */}
-        <div className="space-y-3.5 text-xs">
+        <div className="space-y-2.5 sm:space-y-3.5 text-xs">
           {/* Total Item MRP */}
           <div className="flex justify-between items-center text-on-surface-variant">
             <span>Total Item MRP</span>
@@ -146,7 +148,7 @@ export function OrderBillSummary({
             <span className="font-headline-sm text-sm font-extrabold text-on-surface block">
               {isCheckout ? "Total Payable" : "Total Amount"}
             </span>
-            <span className="text-[11px] text-on-surface-variant">
+            <span className={`${isCheckout ? "hidden sm:block" : "block"} text-[11px] text-on-surface-variant`}>
               {isCheckout
                 ? "Includes all municipal surcharges"
                 : "Inclusive of all local cess & packing"}
@@ -164,7 +166,7 @@ export function OrderBillSummary({
         {totalSavings > 0 && (
           <div
             data-testid="summary-savings-banner"
-            className="bg-primary/10 border border-primary/20 rounded-2xl p-3 mb-5"
+            className={`${isCheckout ? "hidden sm:block" : "block"} bg-primary/10 border border-primary/20 rounded-2xl p-3 mb-5`}
           >
             <div className="flex items-center gap-2 text-primary font-bold text-xs">
               <span className="text-base">🎉</span>
@@ -174,7 +176,7 @@ export function OrderBillSummary({
               </span>
             </div>
             {isCheckout && (
-              <p className="text-[11px] text-primary/80 mt-0.5 ml-6">
+              <p className="hidden sm:block text-[11px] text-primary/80 mt-0.5 ml-6">
                 Smart Store member guaranteed lowest price match
               </p>
             )}
@@ -188,7 +190,7 @@ export function OrderBillSummary({
           type="button"
           onClick={onCtaClick}
           disabled={disabled || isSubmitting || items.length === 0}
-          className={`w-full py-3.5 px-6 rounded-2xl font-headline-sm text-sm font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] ${
+          className={`w-full py-3.5 px-6 rounded-2xl font-headline-sm text-sm font-bold ${hideCtaOnMobile ? "hidden lg:flex" : "flex"} items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] ${
             disabled || isSubmitting || items.length === 0
               ? "bg-surface-container-high text-outline cursor-not-allowed shadow-none"
               : "bg-primary text-white hover:bg-primary-container hover:shadow-lg cursor-pointer"
@@ -211,7 +213,7 @@ export function OrderBillSummary({
 
         {/* Trust Badges below CTA */}
         {isCheckout ? (
-          <div className="space-y-1.5 mt-4 pt-2 text-[11px] text-on-surface-variant font-medium">
+          <div className="hidden sm:block space-y-1.5 mt-4 pt-2 text-[11px] text-on-surface-variant font-medium">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[15px] text-primary">
                 lock
@@ -232,7 +234,7 @@ export function OrderBillSummary({
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center gap-4 mt-4 pt-1 text-[11px] text-on-surface-variant font-medium">
+          <div className="hidden sm:flex items-center justify-center gap-4 mt-4 pt-1 text-[11px] text-on-surface-variant font-medium">
             <span className="flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px] text-primary">
                 lock
