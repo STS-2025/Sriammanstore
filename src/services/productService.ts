@@ -27,6 +27,11 @@ export const productService = {
     return catalogDataSource.getProductById(id);
   },
 
+  /** Reads barcode metadata only for an order line snapshot. */
+  async getProductBarcodeById(id: string, optionIndex = 0): Promise<string | null> {
+    return catalogDataSource.getProductBarcodeById(id, optionIndex);
+  },
+
   /**
    * Retrieves product categories from the configured Firebase categories collection.
    */

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   RecaptchaVerifier,
+  browserLocalPersistence,
+  setPersistence,
+  signInWithCustomToken,
   signInWithPhoneNumber,
   type ConfirmationResult,
 } from "firebase/auth";
@@ -14,6 +17,7 @@ import { authService, NO_PHONE_ACCOUNT_MESSAGE } from "../services/authService";
 import { formatToE164, mapPhoneAuthError } from "../services/phoneVerificationService";
 import { checkCustomerPhoneEligibility, mapPhoneEligibilityError } from "../services/phoneEligibilityService";
 import { emailLinkAuthService, EmailLinkAuthError } from "../services/emailLinkAuthService";
+import { requestEmailPhoneOtp, verifyEmailPhoneOtp } from "../services/emailPhoneOtpService";
 import { addressService } from "../services/addressService";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -85,7 +89,6 @@ export function LoginPage() {
     loginWithEmail,
     completeEmailLinkSignIn,
     resolveFirebaseSession,
-    validateReferralCode,
     logout,
   } = useAuth();
   const navigate = useNavigate();
@@ -99,6 +102,7 @@ export function LoginPage() {
   const [resendTimer, setResendTimer] = useState(30);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [otpError, setOtpError] = useState("");
+  const [emailOtpChallengeId, setEmailOtpChallengeId] = useState<string | null>(null);
   const phoneConfirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const recaptchaReadyRef = useRef<Promise<RecaptchaVerifier> | null>(null);
@@ -118,8 +122,11 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
+  const [unregisteredIdentity, setUnregisteredIdentity] = useState<"email" | "phone" | null>(null);
+  const [googleSignupProfile, setGoogleSignupProfile] = useState<{ name?: string; phone?: string }>({});
 
   // Firebase Passwordless Email-Link Form & Completion State (Local Auth Emulator)
   const [emailLinkAddress, setEmailLinkAddress] = useState("");
@@ -135,23 +142,24 @@ export function LoginPage() {
   const [emulatorGeneratedLink, setEmulatorGeneratedLink] = useState("");
   const hasAttemptedAutoCallbackRef = useRef(false);
 
-  // Referral Accordion State
-  const [isReferralOpen, setIsReferralOpen] = useState(Boolean(searchParams.ref));
-  const [referralCode, setReferralCode] = useState(searchParams.ref || "");
-  const [referralMessage, setReferralMessage] = useState("");
-  const [referralApplied, setReferralApplied] = useState(false);
-
   // Refs for 6-digit OTP inputs
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Phone validation helper
   const cleanPhoneDigits = phone.replace(/\D/g, "");
   const isPhoneValid = cleanPhoneDigits.length === 10;
+  const cleanEmailIdentifier = email.trim().toLowerCase();
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmailIdentifier);
+  const getLoginFirebaseAuth = () => (
+    authManager.getMode() === "production"
+      ? authManager.getProductionAdapter().getAuthInstance().auth
+      : authManager.getEmulatorAdapter().getAuthInstance().auth
+  );
 
   const ensureRecaptchaVerifier = useCallback(() => {
     if (recaptchaReadyRef.current) return recaptchaReadyRef.current;
 
-    const { auth } = authManager.getProductionAdapter().getAuthInstance();
+    const auth = getLoginFirebaseAuth();
     const verifier =
       recaptchaVerifierRef.current ??
       new RecaptchaVerifier(auth, "login-recaptcha-container", { size: "invisible" });
@@ -194,6 +202,11 @@ export function LoginPage() {
 
   // Handle redirect navigation
   const navigatePostLogin = async (userId: string) => {
+    if (searchParams.redirect?.startsWith("/addresses?")) {
+      navigate({ to: searchParams.redirect as never });
+      return;
+    }
+
     try {
       const addresses = await addressService.getAddresses(userId);
       if (addresses.length === 0) {
@@ -234,11 +247,12 @@ export function LoginPage() {
       setOtpDigits(["", "", "", "", "", ""]);
       phoneConfirmationRef.current = null;
       setOtpError(NO_PHONE_ACCOUNT_MESSAGE);
-      toast.error(NO_PHONE_ACCOUNT_MESSAGE);
+      setUnregisteredIdentity("phone");
       return false;
     }
 
-    const { auth } = authManager.getProductionAdapter().getAuthInstance();
+    const auth = getLoginFirebaseAuth();
+    await setPersistence(auth, browserLocalPersistence);
     const verifier = await verifierReady;
     phoneConfirmationRef.current = await signInWithPhoneNumber(
       auth,
@@ -246,6 +260,18 @@ export function LoginPage() {
       verifier,
     );
     return true;
+  };
+
+  const requestEmailOtp = async () => {
+    if (authMode === "mock") {
+      throw new Error("Email-to-phone OTP is available with Firebase authentication. Use your mobile number or password in mock mode.");
+    }
+    const recaptchaToken = authMode === "emulator"
+      ? "emulator"
+      : await (await ensureRecaptchaVerifier()).verify();
+    const challenge = await requestEmailPhoneOtp(cleanEmailIdentifier, recaptchaToken);
+    setEmailOtpChallengeId(challenge.challengeId);
+    return challenge;
   };
 
   useEffect(() => {
@@ -259,10 +285,36 @@ export function LoginPage() {
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (otpRequestInFlightRef.current) return;
-    if (!isPhoneValid) {
-      setOtpError("Please enter a valid 10-digit mobile number.");
+    if (isEmailValid && authMode !== "mock") {
+      setOtpError("");
+      otpRequestInFlightRef.current = true;
+      setIsSubmitting(true);
+      try {
+        const challenge = await requestEmailOtp();
+        toast.success(challenge.message);
+        setOtpSent(true);
+        setResendTimer(30);
+        setOtpDigits(["", "", "", "", "", ""]);
+        setTimeout(() => inputRefs.current[0]?.focus(), 100);
+      } catch (err: unknown) {
+        const message = getErrorMessage(err, "Could not request a sign-in code.");
+        setOtpError(message);
+        toast.error(message);
+      } finally {
+        otpRequestInFlightRef.current = false;
+        setIsSubmitting(false);
+      }
       return;
     }
+    if (!isPhoneValid) {
+      setOtpError(
+        authMode === "mock" && isEmailValid
+          ? "Email-to-phone OTP requires Firebase mode. Enter a mobile number or use password sign in in mock mode."
+          : "Enter a valid email address or 10-digit mobile number.",
+      );
+      return;
+    }
+    setEmailOtpChallengeId(null);
     setOtpError("");
     otpRequestInFlightRef.current = true;
     setIsSubmitting(true);
@@ -316,6 +368,24 @@ export function LoginPage() {
     otpRequestInFlightRef.current = true;
     setIsSubmitting(true);
 
+    if (emailOtpChallengeId) {
+      try {
+        const challenge = await requestEmailOtp();
+        toast.success(challenge.message);
+        setResendTimer(30);
+        setOtpDigits(["", "", "", "", "", ""]);
+        inputRefs.current[0]?.focus();
+      } catch (err: unknown) {
+        const message = getErrorMessage(err, "Could not resend the sign-in code.");
+        setOtpError(message);
+        toast.error(message);
+      } finally {
+        otpRequestInFlightRef.current = false;
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     if (authMode === "mock") {
       try {
         await authService.requestOtp(`${countryCode}${cleanPhoneDigits}`);
@@ -367,12 +437,41 @@ export function LoginPage() {
     setOtpError("");
     setIsSubmitting(true);
 
+    if (emailOtpChallengeId) {
+      try {
+        const customToken = await verifyEmailPhoneOtp(emailOtpChallengeId, fullOtp);
+        const auth = getLoginFirebaseAuth();
+        await setPersistence(auth, browserLocalPersistence);
+        const credential = await signInWithCustomToken(auth, customToken);
+        const firebaseUser = credential.user;
+        const result = await resolveFirebaseSession({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || cleanEmailIdentifier,
+          emailVerified: firebaseUser.emailVerified,
+          phoneNumber: firebaseUser.phoneNumber,
+          providerId: "phone",
+        }, { force: true });
+        if (result.status === "resolved") {
+          toast.success(`Welcome back, ${result.profile.name}!`);
+          void navigatePostLogin(result.profile.id);
+        } else {
+          setOtpError("The code was accepted, but the matching customer profile could not be loaded. Contact support.");
+        }
+      } catch (err: unknown) {
+        const message = getErrorMessage(err, "The code is invalid or expired.");
+        setOtpError(message);
+        toast.error(message);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     if (authMode === "mock") {
       try {
         const loggedIn = await login(
           `${countryCode}${cleanPhoneDigits}`,
           fullOtp,
-          referralApplied ? referralCode : undefined,
         );
         toast.success(`Welcome back, ${loggedIn.name}!`);
         void navigatePostLogin(loggedIn.id);
@@ -429,10 +528,21 @@ export function LoginPage() {
         toast.success(`Welcome back, ${result.profile.name}!`);
         void navigatePostLogin(result.profile.id);
       } else {
-        const userMsg =
-          describeIdentityResolutionState(result)?.userMessage ??
-          "Google sign-in succeeded, but customer registration could not be completed. No customer profile or identity mapping was created.";
-        setOtpError(userMsg);
+        if (identity.email && (result.status === "unlinked" || result.status === "missing_profile")) {
+          setEmail(identity.email);
+          setUnregisteredIdentity("email");
+          // Firebase exposes Google's basic profile name and any phone number already
+          // linked to the Firebase identity. Birthday is not part of this profile.
+          setGoogleSignupProfile({
+            ...(identity.displayName ? { name: identity.displayName } : {}),
+            ...(identity.phoneNumber ? { phone: identity.phoneNumber } : {}),
+          });
+        } else {
+          const userMsg =
+            describeIdentityResolutionState(result)?.userMessage ??
+            "Google sign-in succeeded, but customer registration could not be completed. No customer profile or identity mapping was created.";
+          setOtpError(userMsg);
+        }
       }
     } catch (err: unknown) {
       const message = getErrorMessage(err, "Google sign-in failed.");
@@ -462,8 +572,15 @@ export function LoginPage() {
       void navigatePostLogin(loggedIn.id);
     } catch (err: unknown) {
       const message = getErrorMessage(err, "Invalid email or password");
-      setEmailError(message);
-      toast.error(message || "Authentication failed");
+      const code = typeof err === "object" && err !== null && "code" in err
+        ? String((err as { code: unknown }).code)
+        : "";
+      if (code === "auth/user-not-found") {
+        setUnregisteredIdentity("email");
+      } else {
+        setEmailError(message);
+        toast.error(message || "Authentication failed");
+      }
     } finally {
       setIsEmailSubmitting(false);
     }
@@ -651,46 +768,65 @@ export function LoginPage() {
     }
   };
 
-  // Apply Referral Code
-  const handleApplyReferral = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!referralCode.trim()) return;
-    const res = await validateReferralCode(referralCode);
-    if (res.valid) {
-      setReferralApplied(true);
-      setReferralMessage(res.message);
-      toast.success(res.message);
-    } else {
-      setReferralApplied(false);
-      setReferralMessage(res.message);
-      toast.error(res.message);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-surface text-on-surface antialiased">
+      {unregisteredIdentity && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="unregistered-title" className="w-full max-w-sm rounded-2xl bg-surface-container-lowest p-6 shadow-2xl">
+            <h2 id="unregistered-title" className="text-lg font-bold text-on-surface">
+              {unregisteredIdentity === "phone" ? "Phone number is not registered" : "Email is not registered"}
+            </h2>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              This {unregisteredIdentity} is not registered with Sriman Smart Store. Sign up to create an account.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button type="button" onClick={() => setUnregisteredIdentity(null)} className="flex-1 rounded-xl border border-outline-variant/30 px-4 py-2.5 text-sm font-bold text-on-surface">Back to login</button>
+              <button type="button" onClick={() => {
+                if (unregisteredIdentity === "email") {
+                  if (googleSignupProfile.name) sessionStorage.setItem("signup-google-name", googleSignupProfile.name);
+                  if (googleSignupProfile.phone) sessionStorage.setItem("signup-google-phone", googleSignupProfile.phone);
+                }
+                const search = {
+                  ...(searchParams.redirect ? { redirect: searchParams.redirect } : {}),
+                  ...(searchParams.ref ? { ref: searchParams.ref } : {}),
+                  ...(unregisteredIdentity === "email" && email.trim() ? { email: email.trim() } : {}),
+                  ...(unregisteredIdentity === "phone" ? { phone: cleanPhoneDigits, countryCode } : {}),
+                };
+                navigate({ to: "/sign-up", search: search as any });
+              }} className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white">Sign up</button>
+            </div>
+          </section>
+        </div>
+      )}
       <main className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-4 sm:px-6 sm:py-12 lg:px-8">
         <div className="w-full max-w-xl rounded-[28px] border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-[0_24px_60px_rgba(17,24,39,0.08)] sm:p-8">
           {/* Header */}
-          <div className="mb-4 flex items-start justify-between gap-3 sm:mb-6">
+          <div className="mb-4 sm:mb-6">
+            <div className="mb-5 grid grid-cols-2 rounded-xl bg-surface-container-low p-1">
+              <Link
+                to="/login"
+                search={{ ...(searchParams.redirect ? { redirect: searchParams.redirect } : {}), ...(searchParams.ref ? { ref: searchParams.ref } : {}) } as any}
+                aria-current="page"
+                className="rounded-lg bg-surface-container-lowest px-4 py-2.5 text-center text-sm font-bold text-primary shadow-sm"
+              >
+                Login
+              </Link>
+              <Link
+                to="/sign-up"
+                search={{ ...(searchParams.redirect ? { redirect: searchParams.redirect } : {}), ...(searchParams.ref ? { ref: searchParams.ref } : {}) } as any}
+                className="rounded-lg px-4 py-2.5 text-center text-sm font-bold text-on-surface-variant transition-colors hover:text-on-surface"
+              >
+                Sign up
+              </Link>
+            </div>
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
-                Welcome back
-              </p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight text-on-surface sm:text-3xl">
-                Sign in to Sriman
+                Login to Sriman
               </h1>
               <p className="mt-1 text-xs text-on-surface-variant">
-                Choose your preferred sign-in method.
+                Continue with a one-time code or Google.
               </p>
             </div>
-            <Link
-              to="/sign-up"
-              search={searchParams.redirect ? ({ redirect: searchParams.redirect } as any) : undefined}
-              className="whitespace-nowrap rounded-full border border-primary/20 bg-primary/5 px-3.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
-            >
-              Create account
-            </Link>
           </div>
 
           {searchParams.redirect?.startsWith("/checkout") && (
@@ -746,11 +882,11 @@ export function LoginPage() {
             </div>
           )}
 
-          {/* Section A: Mobile OTP Authentication */}
+          {/* Phone number entry */}
           <div className="space-y-3 sm:space-y-4">
             <div id="login-recaptcha-container" aria-hidden="true" />
 
-            {!otpSent ? (
+            {!otpSent && (
               <div className="rounded-2xl border border-outline-variant/20 bg-[#ffffff] p-3 space-y-1.5 sm:p-3.5 sm:space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-on-surface" htmlFor="phone-input">
@@ -783,83 +919,10 @@ export function LoginPage() {
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => void handleSendOtp()}
-                  disabled={isSubmitting || isEmailSubmitting || !isPhoneValid}
-                  className="mt-0.5 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:bg-primary-container disabled:opacity-50 sm:mt-1 sm:py-3"
-                >
-                  {isSubmitting ? "Sending OTP..." : "Get OTP Passcode"}
-                </button>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 space-y-2 sm:p-4 sm:space-y-3">
-                <div className="flex items-center justify-between text-xs text-on-surface-variant">
-                  <span>Enter 6-digit OTP</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtpSent(false);
-                      setOtpDigits(["", "", "", "", "", ""]);
-                    }}
-                    className="font-bold text-primary hover:underline"
-                  >
-                    Change number
-                  </button>
-                </div>
-
-                <div
-                  id="otp-container"
-                  className="w-full max-w-md mx-auto grid grid-cols-6 gap-2 box-border"
-                >
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => {
-                        inputRefs.current[idx] = el;
-                      }}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      autoComplete={idx === 0 ? "one-time-code" : "off"}
-                      size={1}
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleDigitChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleDigitKeyDown(idx, e)}
-                      onPaste={(e) => handleDigitPaste(idx, e)}
-                      aria-label={`OTP Digit ${idx + 1}`}
-                      className="h-10 w-full min-w-0 max-w-full box-border px-0 py-0 rounded-xl border border-outline-variant/20 bg-surface-container-lowest text-center text-lg font-black text-primary focus:outline-none focus:ring-2 focus:ring-primary sm:h-11"
-                    />
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
-                  <span>
-                    Resend in <strong className="text-primary">00:{resendTimer < 10 ? `0${resendTimer}` : resendTimer}s</strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void handleResendOtp()}
-                    disabled={resendTimer > 0 || isSubmitting}
-                    className={`font-bold ${resendTimer > 0 ? "cursor-not-allowed text-on-surface-variant/60" : "text-primary hover:underline"}`}
-                  >
-                    Resend code
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => void handleVerifyOtp()}
-                  disabled={isSubmitting || otpDigits.join("").length < 6}
-                  className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-md transition-opacity hover:bg-primary-container disabled:opacity-50 sm:py-3.5"
-                >
-                  {isSubmitting ? "Verifying..." : "Verify & Continue"}
-                </button>
               </div>
             )}
 
-            {otpError && (
+            {!otpSent && otpError && (
               <div className="rounded-xl border border-error/20 bg-error/10 p-3 text-xs font-semibold text-error">
                 {otpError}
               </div>
@@ -874,29 +937,124 @@ export function LoginPage() {
             </span>
           </div>
 
-          {/* Section B: Email & Password */}
-          <form onSubmit={handleEmailLogin} className="space-y-3 sm:space-y-4">
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-on-surface" htmlFor="email-input">
+              Email address
+            </label>
+            <input
+              id="email-input"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={otpSent}
+              placeholder="Enter your email"
+              className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-low px-3.5 py-2 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60 sm:py-2.5"
+            />
+            <p className="text-[10px] leading-relaxed text-on-surface-variant">Enter your account email to send the code to its registered mobile number.</p>
+          </div>
+
+          {!otpSent && (
+            <button
+              type="button"
+              onClick={() => void handleSendOtp()}
+              disabled={isSubmitting || isEmailSubmitting || (!isPhoneValid && !isEmailValid) || (authMode === "mock" && isEmailValid && !isPhoneValid)}
+              className="mt-3 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:bg-primary-container disabled:opacity-50 sm:py-3"
+            >
+              {isSubmitting ? "Sending OTP..." : "Get OTP Passcode"}
+            </button>
+          )}
+
+          {otpSent && (
+            <div className="mt-4 space-y-2 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 sm:space-y-3 sm:p-4">
+              <div className="flex items-center justify-between gap-3 text-xs text-on-surface-variant">
+                <span>{emailOtpChallengeId ? "Enter the SMS code sent to your registered mobile" : "Enter 6-digit OTP"}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpSent(false);
+                    setOtpDigits(["", "", "", "", "", ""]);
+                    setEmailOtpChallengeId(null);
+                  }}
+                  className="shrink-0 font-bold text-primary hover:underline"
+                >
+                  Change email or number
+                </button>
+              </div>
+
+              <div id="otp-container" className="mx-auto grid w-full max-w-md grid-cols-6 gap-2 box-border">
+                {otpDigits.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => {
+                      inputRefs.current[idx] = el;
+                    }}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete={idx === 0 ? "one-time-code" : "off"}
+                    size={1}
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleDigitChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleDigitKeyDown(idx, e)}
+                    onPaste={(e) => handleDigitPaste(idx, e)}
+                    aria-label={`OTP Digit ${idx + 1}`}
+                    className="h-10 w-full min-w-0 max-w-full box-border rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-0 py-0 text-center text-lg font-black text-primary focus:outline-none focus:ring-2 focus:ring-primary sm:h-11"
+                  />
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
+                <span>
+                  Resend in <strong className="text-primary">00:{resendTimer < 10 ? `0${resendTimer}` : resendTimer}s</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void handleResendOtp()}
+                  disabled={resendTimer > 0 || isSubmitting}
+                  className={`font-bold ${resendTimer > 0 ? "cursor-not-allowed text-on-surface-variant/60" : "text-primary hover:underline"}`}
+                >
+                  Resend code
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleVerifyOtp()}
+                disabled={isSubmitting || otpDigits.join("").length < 6}
+                className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-md transition-opacity hover:bg-primary-container disabled:opacity-50 sm:py-3.5"
+              >
+                {isSubmitting ? "Verifying..." : "Verify & Continue"}
+              </button>
+            </div>
+          )}
+          {otpSent && otpError && (
+            <div className="mt-3 rounded-xl border border-error/20 bg-error/10 p-3 text-xs font-semibold text-error">
+              {otpError}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowPasswordLogin((visible) => !visible);
+              setEmailError("");
+            }}
+            aria-expanded={showPasswordLogin}
+            className="mt-4 w-full text-center text-xs font-bold text-primary hover:underline"
+          >
+            {showPasswordLogin ? "Hide password sign in" : "Use password to sign in"}
+          </button>
+
+          {/* Password sign-in stays hidden unless the customer asks for it. */}
+          {showPasswordLogin && <form onSubmit={handleEmailLogin} className="mt-3 space-y-3 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 sm:space-y-4 sm:p-4">
             {firebaseUser && identityResolution?.status === "unlinked" && identityNotice && (
               <div className="rounded-2xl border border-secondary/30 bg-secondary-fixed/25 p-4 text-xs">
                 <p className="font-bold text-secondary">{identityNotice.title}</p>
                 <p className="mt-1 text-on-surface">{identityNotice.userMessage}</p>
               </div>
             )}
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-on-surface" htmlFor="email-input">
-                Email address <span className="text-primary">*</span>
-              </label>
-              <input
-                id="email-input"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-low px-3.5 py-2 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary sm:py-2.5"
-              />
-            </div>
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -944,7 +1102,7 @@ export function LoginPage() {
             >
               {isEmailSubmitting ? "Signing in..." : "Sign in with Email"}
             </button>
-          </form>
+          </form>}
 
           {/* Section C: Google Auth */}
           <div className="mt-4 sm:mt-5">
@@ -976,39 +1134,7 @@ export function LoginPage() {
             </button>
           </div>
 
-          {/* Section D: Referral & Legal */}
-          <div className="mt-4 rounded-xl border border-outline-variant/15 bg-transparent p-3 sm:mt-5">
-            <button
-              type="button"
-              onClick={() => setIsReferralOpen((prev) => !prev)}
-              className="flex w-full items-center justify-between text-left text-xs font-bold text-on-surface"
-            >
-              <span>Have a referral code?</span>
-              <span className="text-primary">{isReferralOpen ? "Hide" : "Add"}</span>
-            </button>
-            {isReferralOpen && (
-              <form onSubmit={handleApplyReferral} className="mt-3 flex gap-2">
-                <input
-                  type="text"
-                  value={referralCode}
-                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                  placeholder="Enter referral code"
-                  className="flex-1 rounded-lg border border-outline-variant/20 bg-surface-container-lowest px-3 py-2 text-xs font-bold uppercase text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <button
-                  type="submit"
-                  className="rounded-lg bg-secondary px-3 py-2 text-xs font-bold text-on-secondary"
-                >
-                  Apply
-                </button>
-              </form>
-            )}
-            {referralMessage && (
-              <p className={`mt-2 text-[11px] ${referralApplied ? "text-primary" : "text-error"}`}>
-                {referralMessage}
-              </p>
-            )}
-          </div>
+          {/* Account creation and referral codes are handled on the sign-up page. */}
 
           <p className="mt-4 text-center text-[11px] text-on-surface-variant sm:mt-6">
             By continuing, you agree to the Sriman Smart Store{" "}

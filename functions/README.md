@@ -46,6 +46,17 @@ firebase deploy --only functions:customer-registration:checkCustomerPhoneEligibi
 The `customer-registration` segment is required because `firebase.json` assigns
 the Functions source to that codebase.
 
+## Referral records and rewards
+
+The same codebase contains an `onlineCustomers/{customerId}` creation trigger
+that creates a referrer's `referrals/{referredCustomerId}` subcollection record
+and grants the referred customer the 50 Smart Coin welcome bonus. The order
+status trigger awards the referrer 50 Smart Coins when that customer's order
+reaches `delivered`. Referral and coin writes use deterministic document IDs
+for retry safety. Customers can read their own referral history; Cloud
+Functions own all referral and coin writes. These triggers are not deployed to
+production.
+
 ## Existing customer phone synchronization
 
 `updateCustomerVerifiedPhone` accepts only `{ verifiedE164Phone }`. It derives
@@ -70,6 +81,35 @@ The callable rate-limits by SHA-256 hashes of the caller IP and normalized phone
 number and stores only short-lived counters in `phoneLookupRateLimits`; configure Firestore TTL on its
 `expiresAt` field so expired counters are removed. Unknown and ineligible numbers receive
 the same response shape. The client requests no OTP unless `eligible` is true.
+
+## Email identifier with SMS OTP
+
+`requestCustomerEmailPhoneOtp` accepts an email and a Firebase app-verification
+token. It looks up exactly one customer profile server-side, verifies the UID
+mapping, a verified Firebase Auth email, and verified phone ownership, then asks
+Firebase Identity Toolkit to send the SMS. The stored phone number is never
+returned to the browser. Eligible and ineligible email addresses receive the
+same generic response. Accounts without both a verified Auth email and phone
+linked to the same Firebase UID cannot use this option until their identities
+are securely linked.
+
+`verifyCustomerEmailPhoneOtp` verifies the short-lived Identity Toolkit session
+and code server-side. It returns a Firebase custom token only if the verified
+phone still belongs to the existing mapped customer UID. It does not create a
+new customer profile. Code attempts are limited, and OTP requests are rate-limited
+by hashed IP and email identifiers. Configure Firestore TTL on `expiresAt` in
+`emailPhoneOtpChallenges` and `emailOtpRateLimits`.
+
+The functions require the public Firebase Web API key as the `IDENTITY_TOOLKIT_WEB_API_KEY`
+parameter. For local development, place it in `functions/.env.demo-sri-amman-store`;
+for production deployment, Firebase prompts for the parameter (or reads the
+project-specific Functions dotenv file). The browser never supplies the key to
+the callable. The project must have Firebase Phone Authentication enabled,
+authorized web domains configured, and SMS regions restricted to the regions
+the store serves. In the Auth Emulator, the Functions Emulator uses
+`FIREBASE_AUTH_EMULATOR_HOST` and the emulator API key. For emulator-only
+sign-in, the function returns an unsigned custom token accepted by the Auth
+Emulator; production always uses the Admin SDK signed custom token.
 
 ## Customer ID sequence prerequisite
 

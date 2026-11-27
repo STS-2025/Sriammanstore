@@ -255,6 +255,13 @@ export function normalizeLegacyItems(rawItems: unknown): OrderItem[] {
       );
       const unit = String(it["unit"] || "unit");
       const unitSize = String(it["unitSize"] ?? it["packSize"] ?? it["weight"] ?? "");
+      const barcodeValue = it["barcode"];
+      const barcode =
+        typeof barcodeValue === "string" && barcodeValue.trim()
+          ? barcodeValue.trim()
+          : typeof barcodeValue === "number" && Number.isFinite(barcodeValue)
+            ? String(barcodeValue)
+            : undefined;
       const price = Number(it["price"] ?? it["sellingPrice"] ?? it["mrp"] ?? 0);
       const quantity = Math.max(1, Number(it["quantity"] ?? it["qty"] ?? 1));
 
@@ -272,6 +279,7 @@ export function normalizeLegacyItems(rawItems: unknown): OrderItem[] {
 
       return {
         productId,
+        ...(barcode ? { barcode } : {}),
         name,
         unit,
         unitSize,
@@ -293,6 +301,8 @@ export function normalizeLegacyAddress(doc: Record<string, unknown>): {
   landmark?: string;
   city: string;
   pincode: string;
+  lat?: number;
+  lng?: number;
 } {
   const addr =
     (doc["deliveryAddress"] as Record<string, unknown>) ||
@@ -312,6 +322,8 @@ export function normalizeLegacyAddress(doc: Record<string, unknown>): {
     addr["pincode"] || addr["zip"] || addr["postalCode"] || ""
   );
   const landmark = addr["landmark"] ? String(addr["landmark"]) : undefined;
+  const lat = Number(addr["lat"] ?? addr["latitude"]);
+  const lng = Number(addr["lng"] ?? addr["longitude"]);
 
   return {
     houseNo,
@@ -319,6 +331,7 @@ export function normalizeLegacyAddress(doc: Record<string, unknown>): {
     ...(landmark ? { landmark } : {}),
     city,
     pincode,
+    ...(Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : {}),
   };
 }
 

@@ -15,6 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { findDeliveryLocation, getDeliveryAreaSuggestions } from "../lib/deliveryLocations";
 import { LocationPinPicker } from "../components/location/LocationPinPicker";
+import { reverseGeocodeCoordinates } from "../services/reverseGeocodingService";
 
 export const Route = createFileRoute("/addresses")({
   validateSearch: (
@@ -22,9 +23,25 @@ export const Route = createFileRoute("/addresses")({
   ): {
     redirect?: string | undefined;
     action?: string | undefined;
+    lat?: number | undefined;
+    lng?: number | undefined;
+    makeDefault?: boolean | undefined;
   } => ({
     redirect: typeof search["redirect"] === "string" ? search["redirect"] : undefined,
     action: typeof search["action"] === "string" ? search["action"] : undefined,
+    lat:
+      typeof search["lat"] === "number" && Number.isFinite(search["lat"])
+        ? search["lat"]
+        : typeof search["lat"] === "string" && Number.isFinite(Number(search["lat"]))
+          ? Number(search["lat"])
+          : undefined,
+    lng:
+      typeof search["lng"] === "number" && Number.isFinite(search["lng"])
+        ? search["lng"]
+        : typeof search["lng"] === "string" && Number.isFinite(Number(search["lng"]))
+          ? Number(search["lng"])
+          : undefined,
+    makeDefault: search["makeDefault"] === true || search["makeDefault"] === "true",
   }),
   head: () => ({
     meta: [
@@ -58,8 +75,10 @@ export function AddressesPage() {
   const [pincode, setPincode] = useState("");
   const [lat, setLat] = useState(0);
   const [lng, setLng] = useState(0);
+  const [reverseGeocodeRequest, setReverseGeocodeRequest] = useState(0);
+  const [isResolvingAddress, setIsResolvingAddress] = useState(false);
 
-  const handleOpenAddModal = () => {
+  const handleOpenAddModal = (position?: { lat: number; lng: number }) => {
     setEditingAddress(null);
     setName(user?.name || "");
     setPhone(user?.phone || "");
@@ -68,8 +87,9 @@ export function AddressesPage() {
     setLandmark("");
     setCity(deliveryConfig.serviceAreaDistrict);
     setPincode("");
-    setLat(0);
-    setLng(0);
+    setLat(position?.lat ?? 0);
+    setLng(position?.lng ?? 0);
+    if (position) setReverseGeocodeRequest((request) => request + 1);
     setTag("Home");
     setShowModal(true);
   };
@@ -100,9 +120,43 @@ export function AddressesPage() {
 
   useEffect(() => {
     if (searchParams.action === "add" || searchParams.action === "new") {
-      handleOpenAddModal();
+      const position =
+        searchParams.lat !== undefined && searchParams.lng !== undefined
+          ? { lat: searchParams.lat, lng: searchParams.lng }
+          : undefined;
+      handleOpenAddModal(position);
     }
-  }, [searchParams.action]);
+  }, [searchParams.action, searchParams.lat, searchParams.lng]);
+
+  useEffect(() => {
+    if (reverseGeocodeRequest === 0 || (lat === 0 && lng === 0)) return;
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setIsResolvingAddress(true);
+      void reverseGeocodeCoordinates({ lat, lng })
+        .then((address) => {
+          if (!active) return;
+          if (address.houseNo) setHouseNo(address.houseNo);
+          if (address.street) setStreet(address.street);
+          if (address.city) setCity(address.city);
+          if (address.pincode) setPincode(address.pincode);
+        })
+        .catch((error: unknown) => {
+          if (active) {
+            toast.error(error instanceof Error ? error.message : "Could not look up this address.");
+          }
+        })
+        .finally(() => {
+          if (active) setIsResolvingAddress(false);
+        });
+    }, 700);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [reverseGeocodeRequest, lat, lng]);
 
   const loadAddresses = async () => {
     if (!user) {
@@ -193,7 +247,7 @@ export function AddressesPage() {
         await addressService.addAddress({
           ...addressData,
           userId: user.id,
-          isDefault: addresses.length === 0,
+          isDefault: addresses.length === 0 || searchParams.makeDefault === true,
         });
         toast.success("Address added successfully!");
       }
@@ -458,8 +512,14 @@ export function AddressesPage() {
               onChange={(position) => {
                 setLat(position.lat);
                 setLng(position.lng);
+                setReverseGeocodeRequest((request) => request + 1);
               }}
             />
+            <p aria-live="polite" className="-mt-2 text-[10px] text-on-surface-variant">
+              {isResolvingAddress
+                ? "Looking up street and area details…"
+                : "Street and area details are filled from OpenStreetMap and can be edited."}
+            </p>
 
             <form onSubmit={handleSave} className="space-y-3 text-xs">
               <div>

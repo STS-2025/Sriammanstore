@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "../ui/button";
@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { authManager } from "../../services/authAdapter";
 import { authService } from "../../services/authService";
 import { customerIdentityService } from "../../services/customerIdentityService";
+import { referralAttribution } from "../../services/referralAttribution";
 import {
   customerRegistrationFormSchema,
   getCustomerRegistrationMethods,
@@ -38,28 +39,52 @@ interface FormFieldErrors {
   termsAccepted?: string;
 }
 
-export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string | undefined }) {
+export function CustomerRegistrationForm({
+  redirectTo,
+  initialEmail,
+  initialPhone,
+  initialCountryCode,
+  initialReferralCode,
+}: {
+  redirectTo?: string | undefined;
+  initialEmail?: string;
+  initialPhone?: string;
+  initialCountryCode?: string;
+  initialReferralCode?: string;
+}) {
   const { authMode, resolveFirebaseSession, logout } = useAuth();
   const navigate = useNavigate();
   const methods = getCustomerRegistrationMethods(authMode);
 
   // Form fields
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const googleName = typeof window !== "undefined" ? sessionStorage.getItem("signup-google-name") || "" : "";
+  const googlePhone = typeof window !== "undefined" ? sessionStorage.getItem("signup-google-phone") || "" : "";
+  const [fullName, setFullName] = useState(googleName);
+  const [email, setEmail] = useState(initialEmail ?? "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [countryCode, setCountryCode] = useState("+91");
-  const [phone, setPhone] = useState("");
+  const phonePrefill = initialPhone || googlePhone;
+  const inferredCountry = COUNTRY_CODES.find((item) => phonePrefill.startsWith(item.code));
+  const [countryCode, setCountryCode] = useState(
+    COUNTRY_CODES.some((item) => item.code === initialCountryCode) ? initialCountryCode! : inferredCountry?.code ?? "+91",
+  );
+  const [phone, setPhone] = useState(() => {
+    const digits = (phonePrefill || "").replace(/\D/g, "");
+    const prefixDigits = (COUNTRY_CODES.find((item) => phonePrefill.startsWith(item.code))?.code || "").replace(/\D/g, "");
+    const national = prefixDigits && digits.startsWith(prefixDigits) ? digits.slice(prefixDigits.length) : digits;
+    return national.length === 10 ? national : "";
+  });
   const [dob, setDob] = useState("");
   const [gender, setGender] = useState("");
-  const [referralCode, setReferralCode] = useState("");
+  const [referralCode, setReferralCode] = useState(
+    referralAttribution.get() || initialReferralCode || "",
+  );
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   // UI state
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FormFieldErrors>({});
@@ -68,7 +93,18 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
   // Partial failure recovery state
   const [partialAuth, setPartialAuth] = useState<PartialAuthSession | null>(null);
 
+  // The Google profile handoff is one-time and stays out of the signup URL.
+  useEffect(() => {
+    sessionStorage.removeItem("signup-google-name");
+    sessionStorage.removeItem("signup-google-phone");
+  }, []);
+
   const navigateAfterRegistration = () => {
+    if (redirectTo?.startsWith("/addresses?")) {
+      navigate({ to: redirectTo as never });
+      return;
+    }
+
     navigate({
       to: "/addresses",
       search: {
@@ -143,6 +179,8 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
       },
       { force: true },
     );
+
+    referralAttribution.clear();
 
     setStatus(`Welcome, ${profile.name || cleanName}! Your customer account is ready.`);
     setPartialAuth(null);
@@ -247,69 +285,6 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
     setStatus("");
   };
 
-  const handleGoogleSignUp = async () => {
-    setError("");
-    setStatus("");
-    setFieldErrors({});
-
-    if (!methods.google) {
-      setError("Google sign-up is unavailable in this session.");
-      return;
-    }
-
-    setIsGoogleSubmitting(true);
-    try {
-      setStatus("Signing in with Google…");
-      const identity = await authManager.signInWithGoogle();
-
-      // Check if existing profile is already linked
-      const resolution = await resolveFirebaseSession({
-        ...identity,
-        phoneNumber: identity.phoneNumber ?? null,
-        providerId: "firebase-google",
-      });
-
-      if (resolution.status === "resolved") {
-        setStatus("Welcome back! Redirecting to your account…");
-        navigateAfterRegistration();
-        return;
-      }
-
-      // Unlinked Google account: provision profile
-      setStatus("Setting up your customer profile…");
-      const cleanEmail = identity.email || "";
-      const cleanName = cleanEmail ? cleanEmail.split("@")[0] || "Customer" : "Customer";
-      const cleanPhone = identity.phoneNumber ? identity.phoneNumber.replace(/\D/g, "").slice(-10) : "";
-
-      await customerIdentityService.provisionCustomerAccount({
-        uid: identity.uid,
-        email: cleanEmail,
-        fullName: cleanName,
-        number: cleanPhone,
-        countryCode: "+91",
-        phoneVerified: Boolean(identity.phoneNumber),
-      });
-
-      await resolveFirebaseSession(
-        {
-          ...identity,
-          phoneNumber: identity.phoneNumber ?? null,
-          providerId: "firebase-google",
-        },
-        { force: true },
-      );
-
-      setStatus(`Welcome, ${cleanName}! Your customer account is ready.`);
-      setTimeout(() => {
-        navigateAfterRegistration();
-      }, 800);
-    } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : "Google sign-up failed.");
-    } finally {
-      setIsGoogleSubmitting(false);
-    }
-  };
-
   return (
     <div className="space-y-6" aria-label="Customer sign up">
       {/* Status banner */}
@@ -394,7 +369,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
             autoComplete="name"
             placeholder="e.g. Arun Kumar"
             value={fullName}
-            disabled={isSubmitting || isGoogleSubmitting}
+            disabled={isSubmitting}
             onChange={(e) => {
               setFullName(e.target.value);
               clearFieldError("fullName");
@@ -421,7 +396,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
             autoComplete="email"
             placeholder="e.g. arun@example.com"
             value={email}
-            disabled={isSubmitting || isGoogleSubmitting || Boolean(partialAuth)}
+            disabled={isSubmitting || Boolean(partialAuth)}
             onChange={(e) => {
               setEmail(e.target.value);
               clearFieldError("email");
@@ -450,7 +425,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
                 autoComplete="new-password"
                 placeholder="At least 6 characters"
                 value={password}
-                disabled={isSubmitting || isGoogleSubmitting || Boolean(partialAuth)}
+                disabled={isSubmitting || Boolean(partialAuth)}
                 onChange={(e) => {
                   setPassword(e.target.value);
                   clearFieldError("password");
@@ -488,7 +463,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
                 autoComplete="new-password"
                 placeholder="Re-enter password"
                 value={confirmPassword}
-                disabled={isSubmitting || isGoogleSubmitting || Boolean(partialAuth)}
+                disabled={isSubmitting || Boolean(partialAuth)}
                 onChange={(e) => {
                   setConfirmPassword(e.target.value);
                   clearFieldError("confirmPassword");
@@ -526,7 +501,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
               id="reg-countryCode"
               aria-label="Country code"
               value={countryCode}
-              disabled={isSubmitting || isGoogleSubmitting}
+              disabled={isSubmitting}
               onChange={(e) => setCountryCode(e.target.value)}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
@@ -545,7 +520,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
               maxLength={10}
               placeholder="10-digit mobile number"
               value={phone}
-              disabled={isSubmitting || isGoogleSubmitting}
+              disabled={isSubmitting}
               onChange={(e) => {
                 setPhone(e.target.value.replace(/\D/g, "").slice(0, 10));
                 clearFieldError("phone");
@@ -575,7 +550,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
               name="dob"
               type="date"
               value={dob}
-              disabled={isSubmitting || isGoogleSubmitting}
+              disabled={isSubmitting}
               onChange={(e) => {
                 setDob(e.target.value);
                 clearFieldError("dob");
@@ -598,7 +573,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
               id="reg-gender"
               name="gender"
               value={gender}
-              disabled={isSubmitting || isGoogleSubmitting}
+              disabled={isSubmitting}
               onChange={(e) => {
                 setGender(e.target.value);
                 clearFieldError("gender");
@@ -625,7 +600,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
             type="text"
             placeholder="e.g. SASS0000104 or AMMAN50"
             value={referralCode}
-            disabled={isSubmitting || isGoogleSubmitting}
+            disabled={isSubmitting}
             onChange={(e) => {
               setReferralCode(e.target.value.toUpperCase());
               setReferralFeedback(null);
@@ -646,7 +621,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
               name="termsAccepted"
               type="checkbox"
               checked={termsAccepted}
-              disabled={isSubmitting || isGoogleSubmitting}
+              disabled={isSubmitting}
               onChange={(e) => {
                 setTermsAccepted(e.target.checked);
                 clearFieldError("termsAccepted");
@@ -672,7 +647,7 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
         <Button
           type="submit"
           className="w-full text-base font-semibold py-6 shadow-sm"
-          disabled={isSubmitting || isGoogleSubmitting}
+          disabled={isSubmitting}
         >
           {isSubmitting ? (
             <>
@@ -685,53 +660,6 @@ export function CustomerRegistrationForm({ redirectTo }: { redirectTo?: string |
         </Button>
       </form>
 
-      {/* Divider */}
-      <div className="relative flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <span className="relative bg-surface-container-lowest px-3 text-xs uppercase tracking-wider text-muted-foreground">
-          Or continue with
-        </span>
-      </div>
-
-      {/* Google Sign-in Alternative */}
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full py-5 font-medium"
-        disabled={isGoogleSubmitting || isSubmitting || !methods.google}
-        onClick={() => void handleGoogleSignUp()}
-      >
-        {isGoogleSubmitting ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Connecting to Google…
-          </>
-        ) : (
-          <div className="flex items-center justify-center gap-2">
-            <svg className="h-4 w-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-            <span>Continue with Google</span>
-          </div>
-        )}
-      </Button>
     </div>
   );
 }

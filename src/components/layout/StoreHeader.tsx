@@ -6,14 +6,24 @@ import { useNotifications } from "../../context/NotificationContext";
 import { useLanguage } from "../../context/LanguageContext";
 import { productService } from "../../services/productService";
 import { addressService } from "../../services/addressService";
-import { settingsService, DEFAULT_DELIVERY_SETTINGS, type StoreDeliverySettings } from "../../services/settingsService";
+import {
+  settingsService,
+  DEFAULT_DELIVERY_SETTINGS,
+  type StoreDeliverySettings,
+} from "../../services/settingsService";
 import { calculateDistanceKm, STORE_COORDINATES } from "../../lib/haversine";
 import { getDrivingRoute } from "../../services/routingService";
+import {
+  reverseGeocodeCoordinates,
+  type ResolvedPostalAddress,
+} from "../../services/reverseGeocodingService";
 import { useCartFlyAnimation } from "../../hooks/useCartFlyAnimation";
 import { VoiceSearchButton } from "../search/VoiceSearchButton";
+import type { LocationCoordinates } from "../location/LocationPinPicker";
 import type { Address, Category } from "../../types";
 import { ChevronDown, MapPin, X } from "lucide-react";
-import logo from "../../assests/logo.png"
+import { toast } from "sonner";
+import logo from "../../assests/logo.png";
 
 export function StoreHeader() {
   const { user, isLoading } = useAuth();
@@ -25,11 +35,18 @@ export function StoreHeader() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
-  const [deliveryConfig, setDeliveryConfig] = useState<StoreDeliverySettings>(DEFAULT_DELIVERY_SETTINGS);
+  const [deliveryConfig, setDeliveryConfig] =
+    useState<StoreDeliverySettings>(DEFAULT_DELIVERY_SETTINGS);
   const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
   const [routeEtaMinutes, setRouteEtaMinutes] = useState<number | null>(null);
   const [isAddressPickerOpen, setIsAddressPickerOpen] = useState(false);
   const [addressSearch, setAddressSearch] = useState("");
+  const [isTrackingLocation, setIsTrackingLocation] = useState(false);
+  const [liveLocation, setLiveLocation] = useState<LocationCoordinates | null>(null);
+  const [liveLocationAccuracyMeters, setLiveLocationAccuracyMeters] = useState<number | null>(null);
+  const [resolvedLiveAddress, setResolvedLiveAddress] =
+    useState<ResolvedPostalAddress | null>(null);
+  const [isResolvingLiveAddress, setIsResolvingLiveAddress] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
@@ -37,8 +54,208 @@ export function StoreHeader() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownButtonRef = useRef<HTMLButtonElement>(null);
   const desktopCartTargetRef = useRef<HTMLDivElement>(null);
+  const locationWatchIdRef = useRef<number | null>(null);
+  const liveAddressLookupTimerRef = useRef<number | null>(null);
+  const isLiveAddressLookupRunningRef = useRef(false);
+  const liveAddressLookupRequestIdRef = useRef(0);
+  const latestLiveLocationRef = useRef<LocationCoordinates | null>(null);
+  const lastLiveAddressLookupAtRef = useRef(0);
   const showHeaderCartAdded = useCartFlyAnimation(desktopCartTargetRef, "desktop");
   const navigate = useNavigate();
+  const liveLocationServiceability = liveLocation
+    ? addressService.validateDeliveryServiceability(liveLocation, deliveryConfig)
+    : null;
+
+  const stopLiveLocation = useCallback(() => {
+    if (locationWatchIdRef.current !== null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(locationWatchIdRef.current);
+      locationWatchIdRef.current = null;
+    }
+    setIsTrackingLocation(false);
+  }, []);
+
+  const queueLiveAddressLookup = useCallback((coordinates: LocationCoordinates) => {
+    latestLiveLocationRef.current = coordinates;
+    if (liveAddressLookupTimerRef.current !== null) {
+      window.clearTimeout(liveAddressLookupTimerRef.current);
+    }
+
+    const lookup = () => {
+      liveAddressLookupTimerRef.current = null;
+      if (isLiveAddressLookupRunningRef.current) return;
+
+      const latestCoordinates = latestLiveLocationRef.current;
+      if (!latestCoordinates) return;
+      const waitForRateLimit = Math.max(
+        0,
+        10_000 - (Date.now() - lastLiveAddressLookupAtRef.current),
+      );
+      if (waitForRateLimit > 0) {
+        liveAddressLookupTimerRef.current = window.setTimeout(lookup, waitForRateLimit);
+        return;
+      }
+
+      isLiveAddressLookupRunningRef.current = true;
+      const requestId = ++liveAddressLookupRequestIdRef.current;
+      lastLiveAddressLookupAtRef.current = Date.now();
+      setIsResolvingLiveAddress(true);
+      void reverseGeocodeCoordinates(latestCoordinates)
+        .then((address) => {
+          if (requestId === liveAddressLookupRequestIdRef.current) {
+            setResolvedLiveAddress(address);
+          }
+        })
+        .catch((error) => {
+          if (requestId === liveAddressLookupRequestIdRef.current) {
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : "Could not find the address for this location.",
+            );
+          }
+        })
+        .finally(() => {
+          isLiveAddressLookupRunningRef.current = false;
+          if (requestId === liveAddressLookupRequestIdRef.current) {
+            setIsResolvingLiveAddress(false);
+          }
+          const newestCoordinates = latestLiveLocationRef.current;
+          if (
+            newestCoordinates &&
+            (requestId !== liveAddressLookupRequestIdRef.current ||
+              newestCoordinates.lat !== latestCoordinates.lat ||
+              newestCoordinates.lng !== latestCoordinates.lng)
+          ) {
+            queueLiveAddressLookup(newestCoordinates);
+          }
+        });
+    };
+
+    liveAddressLookupTimerRef.current = window.setTimeout(lookup, 500);
+  }, []);
+
+  useEffect(() => {
+    if (!isAddressPickerOpen) {
+      stopLiveLocation();
+      liveAddressLookupRequestIdRef.current += 1;
+      if (liveAddressLookupTimerRef.current !== null) {
+        window.clearTimeout(liveAddressLookupTimerRef.current);
+        liveAddressLookupTimerRef.current = null;
+      }
+      latestLiveLocationRef.current = null;
+      setLiveLocation(null);
+      setLiveLocationAccuracyMeters(null);
+      setResolvedLiveAddress(null);
+    }
+  }, [isAddressPickerOpen, stopLiveLocation]);
+
+  useEffect(
+    () => () => {
+      if (locationWatchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(locationWatchIdRef.current);
+      }
+      if (liveAddressLookupTimerRef.current !== null) {
+        window.clearTimeout(liveAddressLookupTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const toggleLiveLocation = () => {
+    if (isTrackingLocation) {
+      stopLiveLocation();
+      liveAddressLookupRequestIdRef.current += 1;
+      if (liveAddressLookupTimerRef.current !== null) {
+        window.clearTimeout(liveAddressLookupTimerRef.current);
+        liveAddressLookupTimerRef.current = null;
+      }
+      latestLiveLocationRef.current = null;
+      setLiveLocation(null);
+      setLiveLocationAccuracyMeters(null);
+      setResolvedLiveAddress(null);
+      setIsResolvingLiveAddress(false);
+      return;
+    }
+    if (!navigator.geolocation) {
+      toast.error("This browser does not provide location tracking.");
+      return;
+    }
+
+    setLiveLocation(null);
+    setLiveLocationAccuracyMeters(null);
+    setResolvedLiveAddress(null);
+    setIsTrackingLocation(true);
+    try {
+      locationWatchIdRef.current = navigator.geolocation.watchPosition(
+        ({ coords }) => {
+          const coordinates = { lat: coords.latitude, lng: coords.longitude };
+          setLiveLocation(coordinates);
+          setLiveLocationAccuracyMeters(coords.accuracy);
+          queueLiveAddressLookup(coordinates);
+        },
+        (error) => {
+          stopLiveLocation();
+          toast.error(
+            error.code === error.PERMISSION_DENIED
+              ? "Allow location access to track your live location."
+              : "Could not track your location. Please try again.",
+          );
+        },
+        { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 },
+      );
+    } catch {
+      stopLiveLocation();
+      toast.error("Location tracking could not start. Try again from a secure connection.");
+    }
+  };
+
+  const setLiveLocationAsAddress = async () => {
+    if (!liveLocation) return;
+    const position = liveLocation;
+    const serviceability = addressService.validateDeliveryServiceability(position, deliveryConfig);
+    if (!serviceability.eligible) {
+      toast.error(
+        serviceability.reason ||
+          `This location is approximately ${serviceability.distanceKm} km from ${deliveryConfig.storeName}, beyond the delivery radius.`,
+      );
+      return;
+    }
+    setIsSavingAddress(true);
+    try {
+      const resolved = resolvedLiveAddress || (await reverseGeocodeCoordinates(position));
+      const addressData = {
+        tag: "Other" as const,
+        name: "Current location",
+        phone: user?.phone || "",
+        houseNo: resolved.houseNo || "Current location",
+        street: resolved.street || "Pinned location",
+        city: resolved.city,
+        pincode: resolved.pincode,
+        lat: position.lat,
+        lng: position.lng,
+        isDefault: true,
+      };
+
+      if (user?.id) {
+        const savedAddress = await addressService.addAddress({ ...addressData, userId: user.id });
+        setAddresses((current) => [
+          ...current.map((address) => ({ ...address, isDefault: false })),
+          savedAddress,
+        ]);
+        setDefaultAddress(savedAddress);
+      } else {
+        setDefaultAddress({ ...addressData, id: "live-location", userId: "" });
+      }
+
+      stopLiveLocation();
+      setIsAddressPickerOpen(false);
+      toast.success("Delivery location updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not set this delivery location.");
+    } finally {
+      setIsSavingAddress(false);
+    }
+  };
 
   const fetchCategories = useCallback(async (forceRefresh = false) => {
     setCategoriesLoading(true);
@@ -48,9 +265,7 @@ export function StoreHeader() {
       setCategories(data || []);
     } catch (err: any) {
       console.error("Failed to load categories from Firebase:", err);
-      setCategoriesError(
-        err?.message || "Failed to load categories from Firebase database."
-      );
+      setCategoriesError(err?.message || "Failed to load categories from Firebase database.");
     } finally {
       setCategoriesLoading(false);
     }
@@ -63,10 +278,15 @@ export function StoreHeader() {
 
   useEffect(() => {
     let cancelled = false;
-    settingsService.getDeliveryConfiguration()
-      .then((config) => { if (!cancelled) setDeliveryConfig(config); })
+    settingsService
+      .getDeliveryConfiguration()
+      .then((config) => {
+        if (!cancelled) setDeliveryConfig(config);
+      })
       .catch((error) => console.error("Failed to load delivery settings for the header:", error));
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -103,14 +323,18 @@ export function StoreHeader() {
     const directDistance = calculateDistanceKm(address.lat, address.lng, store.lat, store.lng);
     setRouteDistanceKm(directDistance);
     setRouteEtaMinutes(null);
-    void getDrivingRoute(store, address).then((route) => {
-      if (!cancelled && route) {
-        setRouteDistanceKm(route.distanceKm);
-        setRouteEtaMinutes(route.durationMinutes + 12);
-      }
-    }).catch(() => undefined);
+    void getDrivingRoute(store, address)
+      .then((route) => {
+        if (!cancelled && route) {
+          setRouteDistanceKm(route.distanceKm);
+          setRouteEtaMinutes(route.durationMinutes + 12);
+        }
+      })
+      .catch(() => undefined);
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [defaultAddress, deliveryConfig]);
 
   const filteredAddresses = addresses.filter((address) =>
@@ -126,7 +350,9 @@ export function StoreHeader() {
     setIsSavingAddress(true);
     try {
       await addressService.setDefaultAddress(address.id, user.id);
-      setAddresses((current) => current.map((item) => ({ ...item, isDefault: item.id === address.id })));
+      setAddresses((current) =>
+        current.map((item) => ({ ...item, isDefault: item.id === address.id })),
+      );
       setDefaultAddress({ ...address, isDefault: true });
       setIsAddressPickerOpen(false);
       setAddressSearch("");
@@ -191,14 +417,17 @@ export function StoreHeader() {
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-surface-container-lowest/95 backdrop-blur-md shadow-[0_10px_25px_-5px_rgba(11,122,83,0.06),0_4px_6px_-2px_rgba(15,23,42,0.02)]">
-
       {/* Main Navigation Bar */}
       <div className="h-19 w-full px-2 sm:px-4 flex items-center justify-between gap-2 sm:gap-space-md">
         {/* Brand & Location */}
         <div className="flex min-w-0 items-center gap-2 sm:gap-space-lg">
           <Link to="/" className="flex shrink-0 items-center gap-space-sm group">
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-black text-xl shadow-md group-hover:scale-105 transition-transform">
-              <img src={logo} alt="Sriman Smart Store" className="h-full w-full rounded-xl object-contain" />
+              <img
+                src={logo}
+                alt="Sriman Smart Store"
+                className="h-full w-full rounded-xl object-contain"
+              />
             </div>
             <div className="flex flex-col">
               <span className="font-headline-md text-headline-md tracking-tight text-primary font-bold">
@@ -236,16 +465,18 @@ export function StoreHeader() {
                   {routeDistanceKm !== null ? `${routeDistanceKm} km` : "Distance pending"}
                   {routeEtaMinutes !== null
                     ? ` · ~${routeEtaMinutes} min`
-                    : routeDistanceKm !== null && routeDistanceKm <= Math.min(
-                        deliveryConfig.deliveryRadiusKm,
-                        STORE_COORDINATES.maxRadiusKm,
-                      )
+                    : routeDistanceKm !== null &&
+                        routeDistanceKm <=
+                          Math.min(deliveryConfig.deliveryRadiusKm, STORE_COORDINATES.maxRadiusKm)
                       ? " · ~60 min"
                       : ""}
                 </span>
               )}
             </div>
-            <ChevronDown size={16} className="ml-1 hidden shrink-0 text-on-surface-variant sm:block" />
+            <ChevronDown
+              size={16}
+              className="ml-1 hidden shrink-0 text-on-surface-variant sm:block"
+            />
           </button>
         </div>
 
@@ -273,7 +504,6 @@ export function StoreHeader() {
 
         {/* Right Actions & Navigation */}
         <div className="flex items-center gap-0 sm:gap-space-md shrink-0">
-
           {/* Notifications Bell */}
           <Link
             to="/notifications"
@@ -353,7 +583,7 @@ export function StoreHeader() {
           </Link>
         </div>
       </div>
-      
+
       {isAddressPickerOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-start justify-center bg-black/45 px-4 pt-24 sm:pt-32"
@@ -368,11 +598,13 @@ export function StoreHeader() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="address-picker-title"
-            className="w-full max-w-lg overflow-hidden rounded-2xl bg-surface-container-lowest text-on-surface shadow-2xl"
+            className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-surface-container-lowest text-on-surface shadow-2xl"
           >
             <div className="bg-surface-container-low px-5 py-4 sm:px-6">
               <div className="mb-4 flex items-center justify-between">
-                <h2 id="address-picker-title" className="text-lg font-bold">Change delivery location</h2>
+                <h2 id="address-picker-title" className="text-lg font-bold">
+                  Change delivery location
+                </h2>
                 <button
                   type="button"
                   onClick={() => setIsAddressPickerOpen(false)}
@@ -393,7 +625,82 @@ export function StoreHeader() {
               />
             </div>
 
-            <div className="max-h-[55vh] overflow-y-auto">
+            <div className="border-b border-outline-variant/15 p-4 sm:px-6">
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined mt-0.5 text-[22px] text-primary">
+                  my_location
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold">Track live location</p>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">
+                    Allow location access to find and use your current delivery address.
+                  </p>
+                  {isTrackingLocation && liveLocation && (
+                    <p aria-live="polite" className="mt-1 text-[11px] font-medium text-primary">
+                      Tracking your location…
+                    </p>
+                  )}
+                  {liveLocation && liveLocationAccuracyMeters !== null && (
+                    <p className={`mt-1 text-[11px] ${liveLocationAccuracyMeters > 1000 ? "font-semibold text-error" : "text-on-surface-variant"}`}>
+                      Device reports +/-{Math.round(liveLocationAccuracyMeters)} m accuracy; coordinates: {liveLocation.lat.toFixed(5)}, {liveLocation.lng.toFixed(5)}
+                      {liveLocationAccuracyMeters > 1000 && " This fix may be approximate; enable precise location or set the pin manually."}
+                    </p>
+                  )}
+                  {isResolvingLiveAddress && (
+                    <p aria-live="polite" className="mt-1 text-[11px] text-on-surface-variant">
+                      Finding your address…
+                    </p>
+                  )}
+                  {!isResolvingLiveAddress && resolvedLiveAddress && (
+                    <p aria-live="polite" className="mt-1 text-[11px] font-medium text-primary">
+                      {[resolvedLiveAddress.houseNo, resolvedLiveAddress.street, resolvedLiveAddress.city, resolvedLiveAddress.pincode]
+                        .filter(Boolean)
+                        .join(", ") || "Address details unavailable"}
+                    </p>
+                  )}
+                  {liveLocationServiceability && (
+                    <p
+                      aria-live="polite"
+                      className={`mt-1 text-[11px] font-medium ${
+                        liveLocationServiceability.eligible ? "text-primary" : "text-error"
+                      }`}
+                    >
+                      {liveLocationServiceability.eligible
+                        ? `${liveLocationServiceability.distanceKm} km from ${deliveryConfig.storeName} · within delivery area`
+                        : liveLocationServiceability.reason}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleLiveLocation}
+                  className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${
+                    isTrackingLocation
+                      ? "bg-surface-container text-on-surface-variant"
+                      : "bg-primary text-white"
+                  }`}
+                >
+                  {isTrackingLocation ? "Stop" : "Start tracking"}
+                </button>
+              </div>
+              {liveLocation && (
+                <button
+                  type="button"
+                  onClick={() => void setLiveLocationAsAddress()}
+                  disabled={
+                    !liveLocation ||
+                    !liveLocationServiceability?.eligible ||
+                    isSavingAddress ||
+                    isResolvingLiveAddress
+                  }
+                  className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSavingAddress ? "Finding address…" : "Use this location"}
+                </button>
+              )}
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {filteredAddresses.length > 0 ? (
                 filteredAddresses.map((address) => (
                   <button
@@ -414,7 +721,13 @@ export function StoreHeader() {
                         )}
                       </span>
                       <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">
-                        {[address.houseNo, address.street, address.landmark, address.city, address.pincode]
+                        {[
+                          address.houseNo,
+                          address.street,
+                          address.landmark,
+                          address.city,
+                          address.pincode,
+                        ]
                           .filter(Boolean)
                           .join(", ")}
                       </span>
@@ -423,7 +736,9 @@ export function StoreHeader() {
                 ))
               ) : (
                 <p className="px-6 py-8 text-center text-sm text-on-surface-variant">
-                  {addresses.length ? "No saved addresses match your search." : "You have no saved addresses yet."}
+                  {addresses.length
+                    ? "No saved addresses match your search."
+                    : "You have no saved addresses yet."}
                 </p>
               )}
             </div>
@@ -443,4 +758,3 @@ export function StoreHeader() {
     </header>
   );
 }
-

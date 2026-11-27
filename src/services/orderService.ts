@@ -18,6 +18,7 @@ import { authService } from "./authService";
 import { authManager } from "./authAdapter";
 import { productionOrderReader } from "./productionOrderReader";
 import { getCustomerProfileEndpoint, resolveCustomerDataSource } from "./customerDataSourceResolver";
+import { productService } from "./productService";
 
 export const orderService = {
   async getOrders(userId?: string, legacySassId?: string): Promise<Order[]> {
@@ -313,6 +314,18 @@ export const orderService = {
       // Best effort check
     }
 
+    const itemBarcodes = await Promise.all(
+      params.cartItems.map(async (item) => {
+        try {
+          return await productService.getProductBarcodeById(item.productId, item.optionIndex);
+        } catch {
+          throw new Error(
+            `Could not load the barcode for ${item.name}. Refresh the cart and try again.`,
+          );
+        }
+      }),
+    );
+
     const newOrder: Order = {
       id: orderId,
       orderId,
@@ -329,6 +342,9 @@ export const orderService = {
           : {}),
         city: params.address.city,
         pincode: params.address.pincode,
+        ...(typeof params.address.lat === "number" && typeof params.address.lng === "number"
+          ? { lat: params.address.lat, lng: params.address.lng }
+          : {}),
       },
       delivery: {
         type: params.deliverySlot.type,
@@ -347,8 +363,9 @@ export const orderService = {
             ? "awaiting_verification"
             : "pending_cod",
       },
-      items: params.cartItems.map((item) => ({
+      items: params.cartItems.map((item, index) => ({
         productId: item.productId,
+        ...(itemBarcodes[index] ? { barcode: itemBarcodes[index]! } : {}),
         name: item.name,
         unit: item.unit,
         unitSize: item.unitSize,

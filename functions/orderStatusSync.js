@@ -9,6 +9,7 @@ const SUPPORTED_STATUSES = new Set([
   "cancelled",
   "returned",
 ]);
+const { createReferralOrderRewardHandler } = require("./referralHandlers");
 
 function normalizeCustomerId(value) {
   const customerId = String(value || "").trim();
@@ -22,7 +23,7 @@ function normalizeStatusSlug(status) {
   return status.trim().toLowerCase().replace(/\s+/g, "_");
 }
 
-function createOrderStatusSyncHandler({ db }) {
+function createOrderStatusSyncHandler({ db, FieldValue = require("firebase-admin/firestore").FieldValue }) {
   return async (event) => {
     const before = event.data?.before?.data();
     const after = event.data?.after?.data();
@@ -70,11 +71,16 @@ function createOrderStatusSyncHandler({ db }) {
           timestamp: now,
         }
       : null;
+    const shouldProcessReferralReward = newStatus === "delivered" && previousStatus !== "delivered";
+    const awardReferralReward = createReferralOrderRewardHandler({ db, FieldValue });
 
     await db.runTransaction(async (transaction) => {
       const existingNotification = notificationRef
         ? await transaction.get(notificationRef)
         : null;
+      if (shouldProcessReferralReward) {
+        await awardReferralReward(transaction, after, canonicalOrderId);
+      }
       transaction.set(orderRef, {
         ...after,
         id: orderId,

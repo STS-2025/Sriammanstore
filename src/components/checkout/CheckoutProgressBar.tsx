@@ -8,6 +8,7 @@ export interface CheckoutProgressBarProps {
   selectedAddressText?: string;
   className?: string;
   hideCartStep?: boolean;
+  combinedCheckout?: boolean;
 }
 
 export function CheckoutProgressBar({
@@ -18,6 +19,7 @@ export function CheckoutProgressBar({
   selectedAddressText = "",
   className = "",
   hideCartStep = false,
+  combinedCheckout = false,
 }: CheckoutProgressBarProps) {
   const steps: Array<{
     id: 1 | 2 | 3 | 4;
@@ -65,7 +67,25 @@ export function CheckoutProgressBar({
     }
   };
 
-  const visibleSteps = hideCartStep ? steps.filter((step) => step.id !== 1) : steps;
+  const combinedSteps = [
+    {
+      id: 2 as const,
+      title: "1. Review Cart, Address & Delivery",
+      subtitle: cartItemCount > 0 ? `${cartItemCount} items · ${selectedAddressText || "Choose delivery"}` : "Review cart and delivery",
+      icon: "shopping_bag",
+    },
+    {
+      id: 4 as const,
+      title: "2. Confirm & Pay",
+      subtitle: "Confirm details and payment",
+      icon: "payments",
+    },
+  ];
+  const visibleSteps = combinedCheckout
+    ? combinedSteps
+    : hideCartStep
+      ? steps.filter((step) => step.id !== 1)
+      : steps;
 
   return (
     <div
@@ -147,7 +167,7 @@ export function CheckoutProgressBar({
                   >
                     {hideCartStep ? (
                       <>
-                        <span className="sm:hidden">{step.id === 2 ? "Address" : step.id === 3 ? "Confirm" : "Payment"}</span>
+                        <span className="sm:hidden">{combinedCheckout ? (step.id === 2 ? "Review & Delivery" : "Confirm & Pay") : step.id === 2 ? "Address" : step.id === 3 ? "Confirm" : "Payment"}</span>
                         <span className="hidden sm:inline">{step.title}</span>
                       </>
                     ) : step.title}

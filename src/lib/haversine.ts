@@ -88,6 +88,29 @@ export function validateDeliveryServiceability(
   const storeAddress = options.storeAddress ?? STORE_COORDINATES.storeAddress;
   const targetDistrict = options.serviceAreaDistrict ?? STORE_COORDINATES.serviceAreaDistrict;
 
+  // Live and pinned points use exact coordinates, so validate their distance
+  // before considering neighborhood names or postal data.
+  if (typeof address.lat === "number" && typeof address.lng === "number" && (address.lat !== 0 || address.lng !== 0)) {
+    const distanceKm = calculateDistanceKm(address.lat, address.lng, storeLat, storeLng);
+    if (distanceKm > maxRadiusKm) {
+      return {
+        eligible: false,
+        distanceKm,
+        maxRadiusKm,
+        reason: `Delivery is unavailable beyond ${maxRadiusKm} km from ${storeName} at ${storeAddress}. This location is approximately ${distanceKm} km away.`,
+        storeName,
+        storeAddress,
+      };
+    }
+    return {
+      eligible: true,
+      distanceKm,
+      maxRadiusKm,
+      storeName,
+      storeAddress,
+    };
+  }
+
   // Admin-managed delivery zones are neighborhoods, so match them against
   // customer-entered address text before consulting any legacy GPS defaults.
   const deliveryZones = options.deliveryZones?.filter(Boolean) ?? [];
@@ -124,29 +147,7 @@ export function validateDeliveryServiceability(
     };
   }
 
-  // 1. If coordinates are provided, validate distance via Haversine formula
-  if (typeof address.lat === "number" && typeof address.lng === "number" && (address.lat !== 0 || address.lng !== 0)) {
-    const distanceKm = calculateDistanceKm(address.lat, address.lng, storeLat, storeLng);
-    if (distanceKm > maxRadiusKm) {
-      return {
-        eligible: false,
-        distanceKm,
-        maxRadiusKm,
-        reason: `Delivery is not available for this address. We deliver up to ${maxRadiusKm} km from our store in Gobichettipalayam, Erode. (Your location is approximately ${distanceKm} km away).`,
-        storeName,
-        storeAddress,
-      };
-    }
-    return {
-      eligible: true,
-      distanceKm,
-      maxRadiusKm,
-      storeName,
-      storeAddress,
-    };
-  }
-
-  // 2. If coordinates are not provided, validate service area (district/state/pincode)
+  // Without coordinates, validate service area (district/state/pincode).
   const pincode = (address.pincode || "").trim();
   const city = (address.city || "").trim().toLowerCase();
   const district = (address.district || "").trim().toLowerCase();

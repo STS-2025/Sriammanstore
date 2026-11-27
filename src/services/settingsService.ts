@@ -1,6 +1,7 @@
 import { apiClient } from "./apiClient";
 import type { DeliverySettings, DeliverySlot, StoreInfo } from "../types";
 import { STORE_COORDINATES } from "../lib/haversine";
+import { geocodeStoreAddress } from "./reverseGeocodingService";
 
 export interface StoreDeliverySettings {
   deliveryEnabled: boolean;
@@ -393,10 +394,7 @@ export const settingsService = {
     );
   },
 
-  /**
-   * Combines admin-managed store identity and neighborhood zones with optional
-   * legacy coordinates used only when the admin document has no zone list.
-   */
+  /** Combines business settings, store coordinates, and legacy delivery policy. */
   async getDeliveryConfiguration(): Promise<StoreDeliverySettings> {
     try {
       const businessSettings = await this.getBusinessSettings();
@@ -409,34 +407,85 @@ export const settingsService = {
           String(deliveryDoc?.["storeAddress"] || DEFAULT_DELIVERY_SETTINGS.storeAddress),
         );
         const radius = Number(
+          businessSettings["deliveryRadiusKm"] ??
+          businessSettings["deliveryRadius"] ??
+          businessSettings["maxRadiusKm"] ??
           deliveryDoc?.["deliveryRadiusKm"] ??
           deliveryDoc?.["radiusKm"] ??
           deliveryDoc?.["deliveryRadius"] ??
           deliveryDoc?.["maxRadiusKm"]
         );
+        const businessCoordinates = (businessSettings["storeCoordinates"] ||
+          businessSettings["storeLocation"] || {}) as Record<string, unknown>;
+        const legacyCoordinates = (deliveryDoc?.["storeCoordinates"] ||
+          deliveryDoc?.["storeLocation"] || {}) as Record<string, unknown>;
+        const parseCoordinate = (values: unknown[]): number | null => {
+          for (const value of values) {
+            if (value === undefined || value === null || value === "") continue;
+            const parsed = Number(value);
+            if (Number.isFinite(parsed)) return parsed;
+          }
+          return null;
+        };
+        const businessLat = parseCoordinate([
+          businessCoordinates["lat"],
+          businessCoordinates["latitude"],
+          businessCoordinates["centerLat"],
+          businessSettings["storeLat"],
+          businessSettings["storeLatitude"],
+          businessSettings["centerLat"],
+          businessSettings["latitude"],
+          businessSettings["lat"],
+        ]);
+        const businessLng = parseCoordinate([
+          businessCoordinates["lng"],
+          businessCoordinates["longitude"],
+          businessCoordinates["centerLng"],
+          businessSettings["storeLng"],
+          businessSettings["storeLongitude"],
+          businessSettings["centerLng"],
+          businessSettings["longitude"],
+          businessSettings["lng"],
+        ]);
+        const hasValidBusinessCoordinates =
+          businessLat !== null &&
+          businessLng !== null &&
+          Math.abs(businessLat) <= 90 &&
+          Math.abs(businessLng) <= 180 &&
+          (businessLat !== 0 || businessLng !== 0);
 
-        const storeLat = Number(
-          (deliveryDoc?.["storeCoordinates"] as any)?.lat ??
-          (deliveryDoc?.["storeLocation"] as any)?.latitude ??
-          deliveryDoc?.["storeLat"] ??
-          DEFAULT_DELIVERY_SETTINGS.storeCoordinates.lat
-        );
+        let configuredStoreCoordinates: { lat: number; lng: number } | null = hasValidBusinessCoordinates
+          ? { lat: businessLat as number, lng: businessLng as number }
+          : await geocodeStoreAddress(storeAddress);
 
-        const storeLng = Number(
-          (deliveryDoc?.["storeCoordinates"] as any)?.lng ??
-          (deliveryDoc?.["storeLocation"] as any)?.longitude ??
-          deliveryDoc?.["storeLng"] ??
-          DEFAULT_DELIVERY_SETTINGS.storeCoordinates.lng
-        );
+        if (!configuredStoreCoordinates) {
+          const legacyLat = parseCoordinate([
+            legacyCoordinates["lat"],
+            legacyCoordinates["latitude"],
+            deliveryDoc?.["storeLat"],
+          ]);
+          const legacyLng = parseCoordinate([
+            legacyCoordinates["lng"],
+            legacyCoordinates["longitude"],
+            deliveryDoc?.["storeLng"],
+          ]);
+          if (
+            legacyLat !== null &&
+            legacyLng !== null &&
+            Math.abs(legacyLat) <= 90 &&
+            Math.abs(legacyLng) <= 180 &&
+            (legacyLat !== 0 || legacyLng !== 0)
+          ) {
+            configuredStoreCoordinates = { lat: legacyLat, lng: legacyLng };
+          }
+        }
+        configuredStoreCoordinates ||= DEFAULT_DELIVERY_SETTINGS.storeCoordinates;
 
         return {
           deliveryEnabled: deliveryDoc?.["deliveryEnabled"] !== false,
           deliveryZones: parseCommaSeparatedSetting(businessSettings["deliveryZones"]),
           deliveryRadiusKm: Number.isFinite(radius) && radius > 0 ? radius : DEFAULT_DELIVERY_SETTINGS.deliveryRadiusKm,
-          storeCoordinates: {
-            lat: Number.isFinite(storeLat) ? storeLat : DEFAULT_DELIVERY_SETTINGS.storeCoordinates.lat,
-            lng: Number.isFinite(storeLng) ? storeLng : DEFAULT_DELIVERY_SETTINGS.storeCoordinates.lng,
-          },
+          storeCoordinates: configuredStoreCoordinates,
           storeName: textSetting(businessSettings, ["storeName"], String(deliveryDoc?.["storeName"] || DEFAULT_DELIVERY_SETTINGS.storeName)),
           storeAddress,
           serviceAreaDistrict: getDistrictFromStoreAddress(storeAddress) || String(deliveryDoc?.["serviceAreaDistrict"] || DEFAULT_DELIVERY_SETTINGS.serviceAreaDistrict),

@@ -8,9 +8,11 @@ import {
   fetchProductionProductPreview,
   fetchFullProductionCatalogue,
   fetchProductionProductById,
+  fetchProductionProductBarcodeById,
   type ApprovedProductionProductId,
   type ProductionCatalogueResult,
 } from "./productionPreviewService";
+import { getProductBarcodeFromRawRecord } from "../lib/productBarcode";
 import {
   resolveProductionCategories,
   type ProductionCategoryResolverResult,
@@ -215,6 +217,29 @@ export class CatalogDataSource {
         return null;
       }
       throw err;
+    }
+  }
+
+  /** Resolves a barcode for an order snapshot without exposing it on the storefront Product model. */
+  public async getProductBarcodeById(id: string, optionIndex = 0): Promise<string | null> {
+    if (this.mode === "production-readonly") {
+      return fetchProductionProductBarcodeById(id, optionIndex, { optIn: true });
+    }
+
+    if (this.mode === "production-preview") {
+      if (!APPROVED_PRODUCTION_PRODUCT_IDS.includes(id as ApprovedProductionProductId)) {
+        return null;
+      }
+      return fetchProductionProductBarcodeById(id, optionIndex, { optIn: true });
+    }
+
+    try {
+      const rawProduct = await apiClient.get<unknown>(`/products/${encodeURIComponent(id)}`);
+      if (!rawProduct || typeof rawProduct !== "object" || Array.isArray(rawProduct)) return null;
+      return getProductBarcodeFromRawRecord(rawProduct as Record<string, unknown>, optionIndex);
+    } catch (error: any) {
+      if (error?.status === 404 || error?.message?.includes("404")) return null;
+      throw error;
     }
   }
 

@@ -14,14 +14,17 @@ import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 import { useLanguage } from "../context/LanguageContext";
 import { toast } from "sonner";
+import { referralAttribution } from "../services/referralAttribution";
 
 export const Route = createFileRoute("/product")({
   validateSearch: (
     search: Record<string, unknown>
   ): {
     id?: string | undefined;
+    ref?: string | undefined;
   } => ({
     id: (search["id"] as string) || undefined,
+    ref: (search["ref"] as string) || undefined,
   }),
   head: () => ({
     meta: [
@@ -35,6 +38,10 @@ export const Route = createFileRoute("/product")({
 function ProductDetailsPage() {
   const searchParams = useSearch({ from: "/product" });
   const productId = searchParams.id || "prod_groundnut_oil";
+
+  useEffect(() => {
+    if (searchParams.ref) referralAttribution.capture(searchParams.ref);
+  }, [searchParams.ref]);
 
   const { user } = useAuth();
   const { addToCart } = useCart();
@@ -528,27 +535,6 @@ function ProductDetailsPage() {
                     ₹{currentPrice}
                   </span>
                   </div>
-                  {currentOption.stock > 0 && (
-                    <div className="flex shrink-0 translate-y-2 items-center justify-center gap-1 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-0.5 shadow-sm sm:hidden">
-                      <button
-                        type="button"
-                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                        aria-label="Decrease quantity"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-container-low text-on-surface"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">remove</span>
-                      </button>
-                      <span className="w-7 text-center text-lg font-extrabold text-on-surface">{quantity}</span>
-                      <button
-                        type="button"
-                        onClick={() => setQuantity((q) => Math.min(currentOption.stock, q + 1))}
-                        aria-label="Increase quantity"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-container-low text-on-surface"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">add</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {/* VIP Price Highlight Box */}
@@ -617,10 +603,11 @@ function ProductDetailsPage() {
                 <div className="contents sm:flex sm:items-center sm:gap-2">
                   {/* Stepper (only when in stock) */}
                   {currentOption.stock > 0 && (
-                    <div className="hidden items-center rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-1 shadow-sm sm:flex">
+                    <div className="flex h-10 shrink-0 items-center rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-0.5 shadow-sm sm:h-auto sm:rounded-2xl sm:p-1">
                       <button
                         type="button"
                         onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                        aria-label="Decrease quantity"
                         className="w-9 h-9 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-extrabold text-lg flex items-center justify-center transition-colors cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[18px]">remove</span>
@@ -633,6 +620,7 @@ function ProductDetailsPage() {
                         onClick={() =>
                           setQuantity((q) => Math.min(currentOption.stock, q + 1))
                         }
+                        aria-label="Increase quantity"
                         className="w-9 h-9 rounded-xl bg-surface-container-low hover:bg-surface-container text-on-surface font-extrabold text-lg flex items-center justify-center transition-colors cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[18px]">add</span>
@@ -664,16 +652,6 @@ function ProductDetailsPage() {
                   )}
                 </div>
 
-                {currentOption.stock > 0 && (
-                  <Link
-                    to="/checkout"
-                    className="flex min-h-10 w-full flex-1 items-center justify-center gap-1 rounded-xl bg-on-surface px-1.5 py-2.5 text-center font-headline-sm text-[10px] font-bold text-on-primary shadow-sm transition-all hover:bg-inverse-surface active:scale-[0.98] sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm sm:gap-2"
-                  >
-                    <span className="material-symbols-outlined text-[15px] sm:text-[20px]">bolt</span>
-                    <span className="sm:hidden">Express Checkout</span>
-                    <span className="hidden sm:inline">Instant Express Checkout</span>
-                  </Link>
-                )}
               </div>
             </div>
           </div>

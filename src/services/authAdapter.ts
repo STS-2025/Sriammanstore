@@ -32,6 +32,7 @@ export const PRODUCTION_AUTH_APP_NAME = PRODUCTION_SDK_APP_NAME;
 export interface AuthUserIdentity {
   uid: string;
   email: string | null;
+  displayName?: string | null;
   emailVerified: boolean;
   phoneNumber?: string | null;
   providerId: string;
@@ -348,7 +349,10 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
       return this.mapFirebaseUserToIdentity(credential.user);
     } catch (err: unknown) {
       const friendlyMessage = mapFirebaseAuthError(err);
-      throw new Error(friendlyMessage);
+      const code = typeof err === "object" && err !== null && "code" in err
+        ? String((err as { code: unknown }).code)
+        : undefined;
+      throw Object.assign(new Error(friendlyMessage), code ? { code } : {});
     }
   }
 
@@ -436,6 +440,7 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
     return {
       uid: user.uid,
       email: user.email,
+      displayName: user.displayName,
       emailVerified: Boolean(user.emailVerified),
       phoneNumber: user.phoneNumber,
       providerId,

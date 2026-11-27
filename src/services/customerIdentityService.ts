@@ -1226,7 +1226,7 @@ export const customerIdentityService = {
       throw new Error("Access denied: You cannot modify another customer's phone number.");
     }
 
-    const functions = getFunctions(authManager.getProductionAdapter().getAuthInstance().app);
+    const functions = getFunctions(authManager.getProductionAdapter().getAuthInstance().app, "asia-south1");
     const updatePhone = httpsCallable<
       { verifiedE164Phone: string },
       { ok: true }

@@ -2,13 +2,13 @@
 
 ## Customer address capture
 
-The signup and first-login flows open the address form when the customer has no saved address. The address book and checkout forms use a Leaflet pin picker with OpenStreetMap tiles. Customers can request their current browser location or tap/drag the pin, then save its coordinates with the typed address. Browser location access is only requested after the customer taps **Use current location**.
+The signup and first-login flows open the address form when the customer has no saved address. The address book and checkout forms use a Leaflet pin picker with OpenStreetMap tiles. Customers can request their current browser location or tap/drag the pin; the selected coordinates are reverse-geocoded to prefill the house number, street, locality, city, and postal code, which remain editable. Browser location access is only requested after the customer taps **Use current location**.
 
 ## Distance and ETA
 
 The home header shows the selected default address and its distance from the configured store. When `VITE_OSRM_BASE_URL` points to the store's self-hosted OSRM service, the header uses its driving route distance and duration, adding the existing 12-minute packing allowance. Without OSRM, distance is straight-line and the existing 60-minute estimate is shown only within both the configured delivery radius and the store's 6 km express area.
 
-Set `VITE_OSM_TILE_URL` and `VITE_OSRM_BASE_URL` in the deployment environment. The sample OSM tile endpoint is replaceable. OpenStreetMap's standard tile service is community-funded, has no service-level guarantee, and has usage requirements; production traffic should use tiles the store hosts or a provider whose terms fit the store's usage.
+Set `VITE_OSM_TILE_URL`, `VITE_NOMINATIM_BASE_URL`, and `VITE_OSRM_BASE_URL` in the deployment environment. The sample OSM tile and reverse-geocoding endpoints are replaceable. The public Nominatim service has a one-request-per-second limit and is intended for moderate, user-triggered use; use a self-hosted or suitable hosted geocoder if the store's aggregate traffic may exceed it. OpenStreetMap's standard tile service is community-funded, has no service-level guarantee, and has usage requirements; production traffic should use tiles the store hosts or a provider whose terms fit the store's usage.
 
 ## Traccar driver tracking prerequisite
 

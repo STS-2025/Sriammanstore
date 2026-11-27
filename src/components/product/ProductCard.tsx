@@ -167,6 +167,8 @@ export function ProductCard({
 
     const url = new URL("/product", window.location.origin);
     url.searchParams.set("id", product.id);
+    const referralCode = user?.referralCode || user?.id;
+    if (referralCode) url.searchParams.set("ref", referralCode);
     setShareUrl(url.toString());
     setShowShareDialog(true);
   };
@@ -194,6 +196,13 @@ export function ProductCard({
   const isVipCustomer = !!user?.isVIP;
   const showVipPrice =
     currentOption.specialPrice && currentOption.specialPrice < currentOption.offerPrice;
+  const mobileProductTags = [
+    ...(readOnly ? [{ label: "Preview", color: "bg-amber-600 tracking-wide" }] : []),
+    ...(product.isNew === true ? [{ label: "New", color: "bg-sky-600" }] : []),
+    ...(product.isBestSeller === true ? [{ label: "Best Seller", color: "bg-amber-500" }] : []),
+    ...(product.isFeatured === true ? [{ label: "Featured", color: "bg-violet-600" }] : []),
+    ...(product.isOffer === true ? [{ label: "Offer", color: "bg-emerald-700 tracking-wide" }] : []),
+  ];
 
   const hasGenuineRating =
     typeof product.rating === "number" &&
@@ -271,7 +280,7 @@ export function ProductCard({
           {product.isOffer === true && (
             <span
               aria-label="Offer"
-              className="absolute -left-5 top-2 z-10 w-20 -rotate-45 bg-emerald-700 py-0.5 text-center text-[8px] font-black uppercase tracking-wide text-white shadow-md sm:-left-7 sm:top-3 sm:w-28 sm:py-1 sm:text-[10px]"
+              className="absolute -left-5 top-2 z-10 hidden w-20 -rotate-45 bg-emerald-700 py-0.5 text-center text-[8px] font-black uppercase tracking-wide text-white shadow-md sm:-left-7 sm:top-3 sm:block sm:w-28 sm:py-1 sm:text-[10px]"
             >
               Offer
             </span>
@@ -280,7 +289,7 @@ export function ProductCard({
         </div>
 
         {(readOnly || product.isNew === true || product.isBestSeller === true || product.isFeatured === true) && (
-          <div className="mb-2 flex flex-wrap gap-1">
+          <div className="mb-2 hidden flex-wrap gap-1 sm:flex">
             {readOnly && (
               <span className="whitespace-nowrap rounded-full bg-amber-600 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm sm:px-2 sm:text-[10px]">
                 Preview
@@ -336,9 +345,37 @@ export function ProductCard({
             <ProductNameSlider name={t(product.name, product.tamilName)} />
           </h3>
         </Link>
-        <p className="font-body-sm text-[10px] sm:text-xs text-on-surface-variant mb-1 sm:mb-space-sm line-clamp-1">
-          {product.brand}
-        </p>
+        <div className="mb-1 grid min-w-0 grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-center gap-1 sm:mb-space-sm sm:flex">
+          <p className="min-w-0 truncate font-body-sm text-[10px] text-on-surface-variant sm:flex-1 sm:text-xs">
+            {product.brand}
+          </p>
+          {mobileProductTags.length > 0 && (
+            <div
+              role="group"
+              aria-label="Product tags"
+              className="product-tag-scroller min-w-0 overflow-hidden whitespace-nowrap pb-0.5 sm:hidden"
+            >
+              <div className="product-tag-track">
+                {[false, true].map((isDuplicate) => (
+                  <span
+                    key={isDuplicate ? "duplicate" : "original"}
+                    aria-hidden={isDuplicate || undefined}
+                    className="product-tag-set"
+                  >
+                    {mobileProductTags.map((tag) => (
+                      <span
+                        key={tag.label}
+                        className={`product-tag-shimmer shrink-0 rounded-full px-1.5 py-0.5 text-[7px] font-bold uppercase text-white shadow-sm ${tag.color}`}
+                      >
+                        {tag.label}
+                      </span>
+                    ))}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Variant / Option Selector Pills (if product has multiple options) */}
         {product.options.length > 1 && (

@@ -52,8 +52,65 @@
   animation-play-state: paused;
 }
 
+.product-tag-shimmer {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.product-tag-scroller {
+  mask-image: linear-gradient(to right, #000 92%, transparent 100%);
+}
+
+.product-tag-track {
+  display: flex;
+  width: max-content;
+  animation: product-tag-marquee 10s linear infinite;
+}
+
+.product-tag-set {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.25rem;
+}
+
+@keyframes product-tag-marquee {
+  to { transform: translateX(-50%); }
+}
+
+.product-tag-shimmer::after {
+  position: absolute;
+  top: -35%;
+  bottom: -35%;
+  left: -40%;
+  width: 36%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 78%), transparent);
+  content: "";
+  pointer-events: none;
+  transform: skewX(-20deg);
+  animation: product-tag-shine 2.8s ease-in-out infinite;
+}
+
+.product-tag-shimmer:nth-child(2)::after { animation-delay: 0.25s; }
+.product-tag-shimmer:nth-child(3)::after { animation-delay: 0.5s; }
+.product-tag-shimmer:nth-child(4)::after { animation-delay: 0.75s; }
+.product-tag-shimmer:nth-child(5)::after { animation-delay: 1s; }
+
+@keyframes product-tag-shine {
+  0%, 48% { transform: translateX(-120%) skewX(-20deg); }
+  100% { transform: translateX(460%) skewX(-20deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .product-tag-track { animation: none; }
+  .product-tag-shimmer::after { animation: none; }
+}
+
 @media (min-width: 640px) {
   .benefits-track { animation: none; }
+  .product-tag-track { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

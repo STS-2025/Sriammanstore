@@ -313,6 +313,12 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Referral history is readable by its owner and written only by trusted Functions.
+      match /referrals/{referralId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow write: if false;
+      }
+
       // Shopping Cart Subcollection: owner read, create, update, delete with validation
       match /cart/{cartDocId} {
         allow read: if isAuthorizedOnlineCustomer(customerId);
@@ -387,6 +393,11 @@ service cloud.firestore {
       }
 
       match /orders/{orderDocId} {
+        allow read: if isAuthorizedCustomer(userId);
+        allow write: if false;
+      }
+
+      match /referrals/{referralId} {
         allow read: if isAuthorizedCustomer(userId);
         allow write: if false;
       }

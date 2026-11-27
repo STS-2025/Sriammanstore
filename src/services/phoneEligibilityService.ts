@@ -3,7 +3,7 @@ import { authManager } from "./authAdapter";
 
 export async function checkCustomerPhoneEligibility(phoneNumber: string): Promise<boolean> {
   const app = authManager.getProductionAdapter().getAuthInstance().app;
-  const functions = getFunctions(app);
+  const functions = getFunctions(app, "asia-south1");
   const checkEligibility = httpsCallable<{ phoneNumber: string }, { eligible: boolean }>(
     functions,
     "checkCustomerPhoneEligibility",

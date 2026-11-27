@@ -203,6 +203,8 @@ export interface Address {
 
 export interface OrderItem {
   productId: string;
+  /** POS barcode snapshot for fulfillment; never included in storefront Product/cart data. */
+  barcode?: string;
   name: string;
   unit: string;
   unitSize: string;
@@ -249,6 +251,8 @@ export interface Order {
     landmark?: string;
     city: string;
     pincode: string;
+    lat?: number;
+    lng?: number;
   };
   delivery: {
     type: "standard" | "express";

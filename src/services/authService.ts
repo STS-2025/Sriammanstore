@@ -122,7 +122,7 @@ export const authService = {
     if (
       cleanCode === "AMMAN50" ||
       cleanCode === "AMMAN100" ||
-      cleanCode.startsWith("SASS")
+      /^(?:SASS\d{7}|ONCUS\d{6,7})$/.test(cleanCode)
     ) {
       const bonus = cleanCode === "AMMAN100" ? 100 : 50;
       return {

@@ -24,7 +24,9 @@ import type { Address, DeliverySlot } from "../types";
 import { toast } from "sonner";
 import { PhoneVerificationModal } from "../components/auth/PhoneVerificationModal";
 import { findDeliveryLocation, getDeliveryAreaSuggestions } from "../lib/deliveryLocations";
-import { LocationPinPicker } from "../components/location/LocationPinPicker";
+import { getBookableDeliverySlots } from "../lib/deliverySlots";
+import { LocationPinPicker, type LocationCoordinates } from "../components/location/LocationPinPicker";
+import { reverseGeocodeCoordinates } from "../services/reverseGeocodingService";
 
 /**
  * Safely normalizes and humanizes checkout errors so that internal Firestore
@@ -107,8 +109,9 @@ export const Route = createFileRoute("/checkout")({
   } => {
     const raw = search["step"];
     let step: 2 | 3 | 4 = 2;
-    if (raw === 3 || raw === "3" || raw === "confirm") step = 3;
-    if (raw === 4 || raw === "4" || raw === "payment") step = 4;
+    // Step 3 was the old confirmation-only screen; route legacy links to the
+    // new combined confirmation and payment screen.
+    if (raw === 3 || raw === "3" || raw === "confirm" || raw === 4 || raw === "4" || raw === "payment") step = 4;
     return {
       step,
       newAddress: search["newAddress"] === true || search["newAddress"] === "true",
@@ -168,7 +171,12 @@ export function CheckoutPage() {
   const currentStep: 2 | 3 | 4 = searchParams.step === 4 ? 4 : searchParams.step === 3 ? 3 : 2;
 
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [deliverySlots, setDeliverySlots] = useState<DeliverySlot[]>([]);
+  const [configuredDeliverySlots, setConfiguredDeliverySlots] = useState<DeliverySlot[]>([]);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const deliverySlots = useMemo(
+    () => getBookableDeliverySlots(configuredDeliverySlots, currentTime),
+    [configuredDeliverySlots, currentTime],
+  );
   const [deliveryConfig, setDeliveryConfig] = useState<StoreDeliverySettings>(DEFAULT_DELIVERY_SETTINGS);
   const [paymentConfig, setPaymentConfig] = useState<StorePaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
   const codAmountLimit = paymentConfig.maxCodAmount ?? DEFAULT_PAYMENT_SETTINGS.maxCodAmount;
@@ -195,6 +203,18 @@ export function CheckoutPage() {
   const [newPincode, setNewPincode] = useState("");
   const [newLat, setNewLat] = useState(0);
   const [newLng, setNewLng] = useState(0);
+  const [pinnedAddress, setPinnedAddress] = useState<Address | null>(null);
+  const [showPinnedAddressPicker, setShowPinnedAddressPicker] = useState(false);
+  const [pinnedAddressStage, setPinnedAddressStage] = useState<"choice" | "map">("choice");
+  const [pinnedCoordinates, setPinnedCoordinates] = useState<LocationCoordinates | null>(null);
+  const [pinnedLocationAccuracyMeters, setPinnedLocationAccuracyMeters] = useState<number | null>(null);
+  const [isGettingPinnedLocation, setIsGettingPinnedLocation] = useState(false);
+  const [isApplyingPinnedAddress, setIsApplyingPinnedAddress] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     async function loadCheckoutData() {
@@ -219,21 +239,16 @@ export function CheckoutPage() {
         if (pConfig) setPaymentConfig(pConfig);
 
         // Restore or initialize selected address
-        if (selectedAddressId && addrList?.some((a) => a.id === selectedAddressId)) {
+        if (pinnedAddress?.id === selectedAddressId) {
+          // Keep a pin-selected checkout location in place for this checkout session.
+        } else if (selectedAddressId && addrList?.some((a) => a.id === selectedAddressId)) {
           // Keep current selected address
         } else {
           const defaultAddr = addrList?.find((a) => a.isDefault) || addrList?.[0];
           if (defaultAddr) setSelectedAddressId(defaultAddr.id);
         }
 
-        setDeliverySlots(slots || []);
-        if (
-          slots?.length > 0 &&
-          slots[0] &&
-          !slots.some((slot) => slot.id === selectedSlotId)
-        ) {
-          setSelectedSlotId(slots[0].id);
-        }
+        setConfiguredDeliverySlots(slots || []);
       } catch (err) {
         console.error("Failed to load checkout data:", err);
       } finally {
@@ -241,7 +256,13 @@ export function CheckoutPage() {
       }
     }
     loadCheckoutData();
-  }, [user, authLoading, isResolvingIdentity, selectedAddressId, selectedSlotId, setSelectedAddressId, setSelectedSlotId]);
+  }, [user, authLoading, isResolvingIdentity, selectedAddressId, selectedSlotId, pinnedAddress, setSelectedAddressId, setSelectedSlotId]);
+
+  useEffect(() => {
+    if (deliverySlots.length > 0 && !deliverySlots.some((slot) => slot.id === selectedSlotId)) {
+      setSelectedSlotId(deliverySlots[0].id);
+    }
+  }, [deliverySlots, selectedSlotId, setSelectedSlotId]);
 
   useEffect(() => {
     if (
@@ -253,8 +274,9 @@ export function CheckoutPage() {
   }, [paymentMethod, paymentConfig.codEnabled, codAmountLimit, finalTotal, setPaymentMethod]);
 
   const selectedAddress = useMemo(() => {
+    if (pinnedAddress?.id === selectedAddressId) return pinnedAddress;
     return addresses.find((a) => a.id === selectedAddressId) || addresses[0] || null;
-  }, [addresses, selectedAddressId]);
+  }, [addresses, pinnedAddress, selectedAddressId]);
   const selectedAddressPhone = normalizePhoneForComparison(selectedAddress?.phone || user?.phone);
   const isDeliveryPhoneVerified = Boolean(
     user?.phoneVerified &&
@@ -297,7 +319,12 @@ export function CheckoutPage() {
     return addressService.validateDeliveryServiceability(selectedAddress, deliveryConfig);
   }, [selectedAddress, deliveryConfig]);
 
-  // Step 3 confirms the selected delivery details; Step 4 is payment.
+  const pinnedLocationServiceability = useMemo(() => {
+    if (!pinnedCoordinates) return null;
+    return addressService.validateDeliveryServiceability(pinnedCoordinates, deliveryConfig);
+  }, [pinnedCoordinates, deliveryConfig]);
+
+  // Step 2 collects the cart and delivery choices; Step 4 confirms and pays.
   const canGoToPayment = useMemo(() => {
     return selectedAddress !== null && geofenceStatus.eligible && items.length > 0 && isDeliveryPhoneVerified;
   }, [selectedAddress, geofenceStatus.eligible, items.length, isDeliveryPhoneVerified]);
@@ -354,7 +381,7 @@ export function CheckoutPage() {
   }, [searchParams.newAddress, user]);
 
   const validateDeliveryDetails = () => {
-    if (!selectedAddress || addresses.length === 0) {
+    if (!selectedAddress) {
       handleOpenNewAddressModal();
       toast.info("Please add a delivery address to proceed.");
       return false;
@@ -392,7 +419,7 @@ export function CheckoutPage() {
 
   const handleContinueToConfirmDetails = () => {
     if (!validateDeliveryDetails() || !validateOrderLimits()) return;
-    navigate({ to: "/checkout", search: { step: 3 } as any });
+    navigate({ to: "/checkout", search: { step: 4 } as any });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -411,11 +438,10 @@ export function CheckoutPage() {
       navigate({ to: "/checkout", search: { step: 2 } as any });
       return;
     }
-    if (targetStep === 3) {
+    if (targetStep === 3 || targetStep === 4) {
       void handleContinueToConfirmDetails();
       return;
     }
-    if (currentStep === 3) void handleContinueToPayment();
   };
   const handleSaveAddress = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -443,6 +469,7 @@ export function CheckoutPage() {
           userId: user!.id,
         });
         setAddresses((prev) => prev.map((address) => address.id === updated.id ? updated : address));
+        setPinnedAddress(null);
         setSelectedAddressId(updated.id);
         toast.success("Delivery address updated!");
       } else {
@@ -452,6 +479,7 @@ export function CheckoutPage() {
           isDefault: true,
         });
         setAddresses((prev) => [added, ...prev]);
+        setPinnedAddress(null);
         setSelectedAddressId(added.id);
         toast.success("New delivery address saved!");
       }
@@ -464,6 +492,89 @@ export function CheckoutPage() {
     } catch (err: any) {
       toast.error(err.message || "Failed to save address");
     }
+  };
+
+  const openPinnedAddressPicker = () => {
+    setPinnedCoordinates(null);
+    setPinnedLocationAccuracyMeters(null);
+    setPinnedAddressStage("choice");
+    setShowPinnedAddressPicker(true);
+  };
+
+  const chooseCurrentPinnedLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("This browser does not provide location access.");
+      return;
+    }
+
+    setIsGettingPinnedLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setPinnedCoordinates({ lat: coords.latitude, lng: coords.longitude });
+        setPinnedLocationAccuracyMeters(coords.accuracy);
+        setPinnedAddressStage("map");
+        setIsGettingPinnedLocation(false);
+      },
+      (error) => {
+        setIsGettingPinnedLocation(false);
+        toast.error(
+          error.code === error.PERMISSION_DENIED
+            ? "Allow location access to use your current location."
+            : "Could not get your location. You can mark it on the map instead.",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
+  };
+
+  const openPinMap = () => {
+    // Start manual placement without reusing possibly stale coordinates from the selected address.
+    setPinnedCoordinates(null);
+    setPinnedLocationAccuracyMeters(null);
+    setPinnedAddressStage("map");
+  };
+
+  const handlePinnedCoordinatesChange = (coordinates: LocationCoordinates) => {
+    setPinnedCoordinates(coordinates);
+    setPinnedLocationAccuracyMeters(null);
+  };
+
+  const applyPinnedDeliveryAddress = async () => {
+    if (!pinnedCoordinates) {
+      toast.info("Choose your delivery point on the map first.");
+      return;
+    }
+
+    setIsApplyingPinnedAddress(true);
+    let postalAddress = null;
+    try {
+      postalAddress = await reverseGeocodeCoordinates(pinnedCoordinates);
+    } catch {
+      // The pin coordinates remain the authoritative delivery destination if lookup is unavailable.
+    }
+
+    const coordinatesText = `${pinnedCoordinates.lat.toFixed(6)}, ${pinnedCoordinates.lng.toFixed(6)}`;
+    const nextPinnedAddress: Address = {
+      id: `pinned-delivery-${Date.now()}`,
+      userId: user?.id || "",
+      tag: "Other",
+      name: user?.name || "Pinned delivery location",
+      phone: user?.phone || "",
+      houseNo: postalAddress?.houseNo || "Pinned location",
+      street: postalAddress?.street || "Pinned map location",
+      landmark: `Pinned coordinates: ${coordinatesText}`,
+      city: postalAddress?.city || deliveryConfig.serviceAreaDistrict,
+      pincode: postalAddress?.pincode || "",
+      lat: pinnedCoordinates.lat,
+      lng: pinnedCoordinates.lng,
+      isDefault: false,
+    };
+
+    setPinnedAddress(nextPinnedAddress);
+    setSelectedAddressId(nextPinnedAddress.id);
+    setIsApplyingPinnedAddress(false);
+    setShowPinnedAddressPicker(false);
+    toast.success("Pinned delivery location selected");
   };
 
   const handlePlaceOrder = async () => {
@@ -803,7 +914,7 @@ export function CheckoutPage() {
               Delivery settings could not be loaded. The legacy default charges are being shown. {deliverySettingsError}
             </div>
           )} */}
-          {/* Address, confirmation, and payment progress */}
+          {/* Combined cart/delivery and confirmation/payment progress */}
           <div className="mb-8">
             <CheckoutProgressBar
               currentStep={currentStep}
@@ -814,18 +925,18 @@ export function CheckoutPage() {
                   : "No address selected"
               }
               hideCartStep
+              combinedCheckout
               onStepClick={handleStepNavigation}
               canNavigateToStep={(s) => {
-                if (s <= 2) return true;
-                if (s === 3) return canContinueToPayment;
-                return currentStep === 3 && canContinueToPayment;
+                if (s === 2) return true;
+                return s === 4 && canContinueToPayment;
               }}
             />
           </div>
 
           {/* Desktop Two-Column Checkout Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            {/* Step 2: Delivery details, Step 3: Confirmation, Step 4: Payment */}
+            {/* Step 2: Cart, address and delivery. Step 4: confirmation and payment. */}
             <div className="lg:col-span-8 space-y-6">
               {currentStep === 2 ? (
                 /* ================= STEP 2: ADDRESS & SLOT ================= */
@@ -867,6 +978,31 @@ export function CheckoutPage() {
                       </button>
                     </div>
                   )}
+
+                  {/* Cart review */}
+                  <section className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary text-[22px]">shopping_bag</span>
+                        <h2 className="font-headline-sm text-base font-extrabold text-on-surface">Review Cart ({cartCount})</h2>
+                      </div>
+                      <Link to="/cart" className="shrink-0 text-primary text-xs font-bold hover:underline">Edit cart</Link>
+                    </div>
+                    <div className="divide-y divide-outline-variant/15">
+                      {items.map((item) => (
+                        <div key={item.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                          <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-outline-variant/15 bg-white p-1.5">
+                            <img src={item.image} alt={item.name} className="h-full w-full object-contain" loading="lazy" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="break-words text-xs font-bold text-on-surface">{item.name}</p>
+                            <p className="text-[10px] text-on-surface-variant">{item.unitSize} {item.unit} · Qty: {item.quantity}</p>
+                          </div>
+                          <span className="shrink-0 text-xs font-extrabold text-on-surface">₹{(item.price * item.quantity).toLocaleString("en-IN")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
 
                   {/* Delivery Address Section */}
                   <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
@@ -962,7 +1098,10 @@ export function CheckoutPage() {
                           <div
                             key={addr.id}
                             data-testid={`address-card-${addr.id}`}
-                            onClick={() => setSelectedAddressId(addr.id)}
+                            onClick={() => {
+                              setPinnedAddress(null);
+                              setSelectedAddressId(addr.id);
+                            }}
                             className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3.5 ${
                               isSelected
                                 ? "border-primary bg-primary/5 shadow-sm"
@@ -973,7 +1112,10 @@ export function CheckoutPage() {
                               type="radio"
                               name="selected_address"
                               checked={isSelected}
-                              onChange={() => setSelectedAddressId(addr.id)}
+                              onChange={() => {
+                                setPinnedAddress(null);
+                                setSelectedAddressId(addr.id);
+                              }}
                               className="mt-1 accent-primary cursor-pointer"
                             />
 
@@ -1036,6 +1178,63 @@ export function CheckoutPage() {
                           </div>
                         );
                       }))}
+
+                      {pinnedAddress && (
+                        <label
+                          className={`flex cursor-pointer items-start gap-3.5 rounded-2xl border p-4 transition-all ${
+                            selectedAddressId === pinnedAddress.id
+                              ? "border-primary bg-primary/5 shadow-sm"
+                              : "border-outline-variant/20 bg-surface-container-low/40 hover:border-primary/40"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="selected_address"
+                            checked={selectedAddressId === pinnedAddress.id}
+                            onChange={() => setSelectedAddressId(pinnedAddress.id)}
+                            className="mt-1 accent-primary"
+                          />
+                          <span className="material-symbols-outlined text-primary">location_on</span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-bold text-on-surface">
+                              Pinned delivery location
+                            </span>
+                            <span className="mt-1 block text-xs leading-relaxed text-on-surface-variant">
+                              {pinnedAddress.street}, {pinnedAddress.city} {pinnedAddress.pincode}
+                            </span>
+                            <span className="mt-1 block text-[10px] text-on-surface-variant">
+                              {pinnedAddress.landmark}
+                            </span>
+                            {selectedAddressId === pinnedAddress.id && (
+                              <span
+                                className={`mt-1 block text-[10px] font-semibold ${
+                                  geofenceStatus.eligible ? "text-primary" : "text-error"
+                                }`}
+                              >
+                                {geofenceStatus.eligible
+                                  ? `${geofenceStatus.distanceKm} km from ${deliveryConfig.storeName} · within delivery area`
+                                  : geofenceStatus.reason}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={openPinnedAddressPicker}
+                        className="flex w-full items-start gap-3 rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4 text-left transition-colors hover:bg-primary/10"
+                      >
+                        <span className="material-symbols-outlined text-primary">pin_drop</span>
+                        <span>
+                          <span className="block text-sm font-bold text-primary">
+                            Use pin pointed address for delivery
+                          </span>
+                          <span className="mt-1 block text-xs text-on-surface-variant">
+                            Use your current location or mark the delivery point on a map.
+                          </span>
+                        </span>
+                      </button>
 
                       {/* Clear Out-of-Zone Explanation Banner */}
                       {!geofenceStatus.eligible && selectedAddress && (
@@ -1219,7 +1418,7 @@ export function CheckoutPage() {
                       onClick={handleContinueToConfirmDetails}
                       className="whitespace-nowrap px-4 sm:px-6 py-3 rounded-2xl bg-primary text-white font-headline-sm text-xs font-bold hover:bg-primary-container transition-all flex items-center gap-2 shadow-md cursor-pointer"
                     >
-                      <span>Continue to Confirm Details</span>
+                      <span>Continue to Confirm & Payment</span>
                       <span className="material-symbols-outlined text-[16px]">
                         arrow_forward
                       </span>
@@ -1329,8 +1528,58 @@ export function CheckoutPage() {
                   </div>
                 </>
               ) : (
-                /* ================= STEP 4: PAYMENT ================= */
+                /* ================= STEP 4: CONFIRM DETAILS & PAYMENT ================= */
                 <>
+                  <section className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
+                    <div className="mb-4 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-primary text-[22px]">fact_check</span>
+                      <h2 className="font-headline-sm text-base font-extrabold text-on-surface">Confirm Details</h2>
+                    </div>
+                    <div className="mb-3 rounded-2xl border border-outline-variant/15 bg-surface-container-low/40 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <h3 className="text-xs font-bold text-on-surface">Items ({cartCount})</h3>
+                        <button type="button" onClick={() => handleStepNavigation(2)} className="text-[11px] font-bold text-primary hover:underline">Edit cart</button>
+                      </div>
+                      <div className="divide-y divide-outline-variant/15">
+                        {items.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                            <p className="min-w-0 text-xs font-semibold text-on-surface">{item.name} <span className="font-normal text-on-surface-variant">× {item.quantity}</span></p>
+                            <span className="shrink-0 text-xs font-bold text-on-surface">₹{(item.price * item.quantity).toLocaleString("en-IN")}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {selectedAddress ? (
+                      <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-low/40 p-3 sm:p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-headline-sm text-sm font-bold text-on-surface">{selectedAddress.name}</span>
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{selectedAddress.tag || "Home"}</span>
+                        </div>
+                        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                          {selectedAddress.houseNo}, {selectedAddress.street}{selectedAddress.landmark ? `, ${selectedAddress.landmark}` : ""}, {selectedAddress.city} {selectedAddress.pincode}
+                        </p>
+                        <p className="mt-1 text-[11px] text-on-surface-variant">{selectedAddress.phone}</p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-error">Select a delivery address to continue.</p>
+                    )}
+                    <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-outline-variant/15 bg-surface-container-low/40 p-3">
+                      <div className="min-w-0">
+                        <p className="font-headline-sm text-xs font-bold text-on-surface">{selectedSlot.title}</p>
+                        <p className="mt-0.5 text-[11px] text-on-surface-variant">
+                          {deliverySpeed === "express" ? "Express delivery" : "Standard delivery"} · {deliveryFee > 0 ? `Delivery fee ₹${deliveryFee}` : "Free delivery"}
+                        </p>
+                      </div>
+                      <button type="button" onClick={() => handleStepNavigation(2)} className="shrink-0 text-primary text-xs font-bold hover:underline">Change</button>
+                    </div>
+                    <label className="mt-4 flex items-start gap-2.5 rounded-2xl border border-outline-variant/15 p-3">
+                      <input type="checkbox" checked={includeGstin} onChange={(event) => setIncludeGstin(event.target.checked)} className="mt-0.5 accent-primary" />
+                      <span className="min-w-0 flex-1 text-xs font-bold text-on-surface">Include GSTIN for Business Purchase
+                        {includeGstin && <input type="text" value={gstinNumber} onChange={(event) => setGstinNumber(event.target.value.toUpperCase())} placeholder="Enter 15-digit GSTIN" className="mt-2 block w-full max-w-sm rounded-xl border border-outline-variant/20 bg-surface px-3 py-2 text-xs font-bold uppercase focus:outline-none focus:ring-1 focus:ring-primary" />}
+                      </span>
+                    </label>
+                  </section>
+
                   {/* Payment Method Section (Screenshot 4) */}
                   <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm space-y-3 sm:space-y-4">
                     <div className="flex items-center justify-between mb-2">
@@ -1650,12 +1899,12 @@ export function CheckoutPage() {
                   <div className="flex items-center justify-between gap-2 pt-2">
                     <button
                       type="button"
-                      onClick={() => handleStepNavigation(3)}
+                      onClick={() => handleStepNavigation(2)}
                       className="shrink-0 whitespace-nowrap px-3 sm:px-5 py-2.5 rounded-2xl border border-outline-variant/30 text-xs font-bold text-on-surface hover:bg-surface-container transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[16px]">arrow_back</span>
                       <span className="sm:hidden">Back</span>
-                      <span className="hidden sm:inline">Back to Confirm Details</span>
+                      <span className="hidden sm:inline">Back to Cart & Delivery</span>
                     </button>
 
                     <button
@@ -1716,7 +1965,7 @@ export function CheckoutPage() {
                 hideCtaOnMobile
                 ctaText={
                   currentStep === 2
-                    ? "Continue to Confirm Details"
+                    ? "Continue to Confirm & Payment"
                     : currentStep === 3
                     ? "Continue to Payment"
                     : `Pay ${String.fromCharCode(8377)}${finalTotal.toLocaleString("en-IN")} & Place Order`
@@ -1729,15 +1978,125 @@ export function CheckoutPage() {
                     : handlePlaceOrder
                 }
                 isSubmitting={isSubmitting}
-                disabled={
-                  currentStep === 2
-                    ? items.length === 0 || isSubmitting
-                    : !canContinueToPayment || isSubmitting
-                }
+                disabled={currentStep === 2 ? items.length === 0 || isSubmitting : !canContinueToPayment || isSubmitting}
               />
             </div>
           </div>
         </div>
+
+        {showPinnedAddressPicker && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="pinned-delivery-title"
+              className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-surface-container-lowest p-5 shadow-2xl sm:p-6"
+            >
+              <div className="mb-5 flex items-center justify-between border-b border-outline-variant/15 pb-3">
+                <div>
+                  <h2 id="pinned-delivery-title" className="font-headline-sm text-base font-extrabold text-on-surface">
+                    Pin your delivery location
+                  </h2>
+                  <p className="mt-1 text-xs text-on-surface-variant">
+                    Your order will include the exact map coordinates.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPinnedAddressPicker(false)}
+                  aria-label="Close pinned delivery location"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-outline hover:bg-surface-container"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              {pinnedAddressStage === "choice" ? (
+                <div className="space-y-3">
+                  <p className="mb-4 text-sm text-on-surface-variant">
+                    Choose how to mark the place where your delivery should arrive.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={chooseCurrentPinnedLocation}
+                    disabled={isGettingPinnedLocation}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 text-left hover:bg-primary/10 disabled:opacity-60"
+                  >
+                    <span className="material-symbols-outlined text-primary">my_location</span>
+                    <span>
+                      <span className="block text-sm font-bold text-on-surface">
+                        {isGettingPinnedLocation ? "Finding your location…" : "Track current location"}
+                      </span>
+                      <span className="mt-1 block text-xs text-on-surface-variant">
+                        Allow location access, then review the pin on the map.
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openPinMap}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-outline-variant/30 p-4 text-left hover:border-primary/40 hover:bg-surface-container-low"
+                  >
+                    <span className="material-symbols-outlined text-primary">add_location_alt</span>
+                    <span>
+                      <span className="block text-sm font-bold text-on-surface">Mark your area with a pin</span>
+                      <span className="mt-1 block text-xs text-on-surface-variant">
+                        Tap the map or drag the marker to the delivery point.
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <button
+                    type="button"
+                    onClick={() => setPinnedAddressStage("choice")}
+                    className="text-xs font-bold text-primary hover:underline"
+                  >
+                    Change location method
+                  </button>
+                  <LocationPinPicker
+                    position={pinnedCoordinates}
+                    onChange={handlePinnedCoordinatesChange}
+                    accuracyMeters={pinnedLocationAccuracyMeters}
+                  />
+                  {pinnedLocationServiceability && (
+                    <p
+                      className={`text-xs font-semibold ${
+                        pinnedLocationServiceability.eligible ? "text-primary" : "text-error"
+                      }`}
+                    >
+                      {pinnedLocationServiceability.eligible
+                        ? `${pinnedLocationServiceability.distanceKm} km from ${deliveryConfig.storeName} · within delivery area`
+                        : pinnedLocationServiceability.reason}
+                    </p>
+                  )}
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowPinnedAddressPicker(false)}
+                      className="rounded-xl border border-outline-variant/30 px-4 py-2.5 text-xs font-bold text-on-surface-variant hover:bg-surface-container-low"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void applyPinnedDeliveryAddress()}
+                      disabled={
+                        !pinnedCoordinates ||
+                        !pinnedLocationServiceability?.eligible ||
+                        isApplyingPinnedAddress
+                      }
+                      className="rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isApplyingPinnedAddress ? "Setting location…" : "Use this delivery point"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
 
         {/* Modal: Add New Address */}
         {showAddressModal && (

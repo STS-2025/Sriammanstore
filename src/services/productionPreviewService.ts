@@ -14,6 +14,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import type { Product } from "../types";
+import { getProductBarcodeFromRawRecord } from "../lib/productBarcode";
 import {
   normalizeLegacyProduct,
   deriveCategorySlug,
@@ -67,6 +68,9 @@ export const EXPECTED_STORAGE_BUCKET = "sri-amman-smart-store.firebasestorage.ap
 export const EXPECTED_APP_ID = "1:1018585256480:web:1312d2d636b0672098a245";
 
 export const PRODUCTION_SDK_APP_NAME = "sri-amman-prod-preview-isolated";
+
+// Keep raw catalog documents private to this module; only the order-only barcode accessor is exported.
+const rawProductionProductsById = new Map<string, Record<string, unknown>>();
 
 /**
  * Validates whether a target document path is strictly within the approved
@@ -1311,6 +1315,7 @@ export async function fetchFullProductionCatalogue(
     ];
     allPathsMap.set(id, combinedPaths);
     chosenRawDocsMap.set(id, selectedEntry.data);
+    rawProductionProductsById.set(id, selectedEntry.data);
 
     previewItems.push({
       docId: id,
@@ -1539,6 +1544,12 @@ export async function fetchProductionProductById(
         : nestedDoc.data;
       if (topData) mergeProductTagFlags(mergedData, [topData, nestedDoc.data]);
 
+      const barcodeSource = topData?.["barcode"] || nestedDoc.data["barcode"];
+      if (barcodeSource !== undefined && barcodeSource !== null && barcodeSource !== "") {
+        mergedData["barcode"] = barcodeSource;
+      }
+      rawProductionProductsById.set(productId, mergedData);
+
       const parentCat = nestedDoc.parentCategory;
       const catMapping = resolveProductCategoryMapping(mergedData, categoryDocsMap, parentCat);
       return normalizeLegacyProduct(mergedData, {
@@ -1559,6 +1570,7 @@ export async function fetchProductionProductById(
 
   // 3. If topData exists without a nested match, attempt normalization directly
   if (topData) {
+    rawProductionProductsById.set(productId, topData);
     const catMapping = resolveProductCategoryMapping(topData, categoryDocsMap);
     return normalizeLegacyProduct(topData, {
       docId: productId,
@@ -1570,6 +1582,28 @@ export async function fetchProductionProductById(
   }
 
   return null;
+}
+
+/**
+ * Returns barcode data only for an order item snapshot, without adding POS fields to Product.
+ * Reuses raw product documents already read for the catalog and fetches the product if needed.
+ */
+export async function fetchProductionProductBarcodeById(
+  productId: string,
+  optionIndex = 0,
+  options?: ProductionPreviewOptions,
+): Promise<string | null> {
+  if (!isProductionPreviewOptedIn(options)) {
+    throw new Error("SAFETY GUARD ACTIVE: Production barcode reads require explicit opt-in.");
+  }
+
+  let rawProduct = rawProductionProductsById.get(productId);
+  if (!rawProduct) {
+    await fetchProductionProductById(productId, options);
+    rawProduct = rawProductionProductsById.get(productId);
+  }
+
+  return rawProduct ? getProductBarcodeFromRawRecord(rawProduct, optionIndex) : null;
 }
 
 

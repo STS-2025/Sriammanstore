@@ -419,6 +419,11 @@ service cloud.firestore {
         allow read: if isAuthorizedCustomer(userId);
         allow write: if false; // Milestone requirement: strictly read-only! No order creation, checkout writes, or status updates in this milestone.
       }
+
+      match /referrals/{referralId} {
+        allow read: if isAuthorizedCustomer(userId);
+        allow write: if false; // Referral attribution and rewards are server-managed.
+      }
     }
 
     // ========================================================================
@@ -438,6 +443,11 @@ service cloud.firestore {
       match /coinsHistory/{txId} {
         allow read: if isAuthorizedOnlineCustomer(customerId);
         allow write: if false;
+      }
+
+      match /referrals/{referralId} {
+        allow read: if isAuthorizedOnlineCustomer(customerId);
+        allow write: if false; // Referral attribution and rewards are server-managed.
       }
 
       match /cart/{cartDocId} {
