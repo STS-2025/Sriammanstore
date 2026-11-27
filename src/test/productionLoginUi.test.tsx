@@ -57,6 +57,7 @@ vi.mock("firebase/auth", async (importOriginal) => {
     signInWithPhoneNumber: otpMocks.signInWithPhoneNumber,
     RecaptchaVerifier: class {
       constructor() {}
+      render() { return Promise.resolve(1); }
       clear() {}
     },
   };
@@ -91,8 +92,8 @@ describe("Login UI: restored app-shell layout", () => {
       );
     });
 
-    expect(screen.getByText("Sign in to Sriman")).toBeDefined();
-    expect(screen.getByText("Choose your preferred sign-in method.")).toBeDefined();
+    expect(screen.getByText("Login to Sriman")).toBeDefined();
+    expect(screen.getByText("Continue with mobile OTP, email and password, or Google.")).toBeDefined();
     // Tabs must be completely removed
     expect(screen.queryByRole("tab")).toBeNull();
     // Both methods must be visible simultaneously
@@ -115,7 +116,7 @@ describe("Login UI: restored app-shell layout", () => {
       );
     });
 
-    expect(screen.getByText("Sign in to Sriman")).toBeDefined();
+    expect(screen.getByText("Login to Sriman")).toBeDefined();
     expect(screen.queryByText(/Existing Customer Production Login/i)).toBeNull();
     expect(screen.queryByText(/Safe Read-Only Verification/i)).toBeNull();
     // Both authentication buttons visible simultaneously without switching tabs
@@ -136,7 +137,7 @@ describe("Login UI: restored app-shell layout", () => {
     fireEvent.change(screen.getByLabelText(/Mobile number/), { target: { value: "9876543210" } });
     fireEvent.click(screen.getByRole("button", { name: /Get OTP Passcode/i }));
 
-    expect(await screen.findByText("No account registered with this mobile number")).toBeDefined();
+    expect(await screen.findByText("No account registered with this phone number")).toBeDefined();
     expect(otpMocks.checkEligibility).toHaveBeenCalledWith("+919876543210");
     expect(otpMocks.signInWithPhoneNumber).not.toHaveBeenCalled();
   });
@@ -170,7 +171,7 @@ describe("Login UI: restored app-shell layout", () => {
     finishEligibility(true);
     await vi.waitFor(() => expect(otpMocks.signInWithPhoneNumber).toHaveBeenCalledTimes(1));
     finishOtp({ confirm: vi.fn() });
-    await screen.findByText("Enter 6-digit OTP");
+    await screen.findByText("Enter the 6-digit SMS code sent to your mobile");
     expect(otpMocks.signInWithPhoneNumber).toHaveBeenCalledTimes(1);
   });
 });

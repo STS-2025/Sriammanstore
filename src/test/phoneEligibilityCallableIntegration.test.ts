@@ -29,7 +29,7 @@ describe("Phone eligibility callable integration", () => {
     mocks.calls.length = 0;
     const { checkCustomerPhoneEligibility } = await import("../services/phoneEligibilityService");
     await expect(checkCustomerPhoneEligibility("+919876543210")).resolves.toBe(true);
-    expect(mocks.getFunctions).toHaveBeenCalledWith(mocks.app);
+    expect(mocks.getFunctions).toHaveBeenCalledWith(mocks.app, "asia-south1");
     expect(mocks.calls).toEqual(["callable:checkCustomerPhoneEligibility", "invoke"]);
   });
 
@@ -43,7 +43,7 @@ describe("Phone eligibility callable integration", () => {
     const callablePosition = source.indexOf('"updateCustomerVerifiedPhone"');
     expect(callablePosition).toBeGreaterThanOrEqual(0);
     expect(source).toContain(
-      "getFunctions(authManager.getProductionAdapter().getAuthInstance().app)",
+      'getFunctions(authManager.getProductionAdapter().getAuthInstance().app, "asia-south1")',
     );
     expect(source).not.toContain("customerPhoneIndex");
   });

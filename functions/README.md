@@ -82,34 +82,8 @@ number and stores only short-lived counters in `phoneLookupRateLimits`; configur
 `expiresAt` field so expired counters are removed. Unknown and ineligible numbers receive
 the same response shape. The client requests no OTP unless `eligible` is true.
 
-## Email identifier with SMS OTP
-
-`requestCustomerEmailPhoneOtp` accepts an email and a Firebase app-verification
-token. It looks up exactly one customer profile server-side, verifies the UID
-mapping, a verified Firebase Auth email, and verified phone ownership, then asks
-Firebase Identity Toolkit to send the SMS. The stored phone number is never
-returned to the browser. Eligible and ineligible email addresses receive the
-same generic response. Accounts without both a verified Auth email and phone
-linked to the same Firebase UID cannot use this option until their identities
-are securely linked.
-
-`verifyCustomerEmailPhoneOtp` verifies the short-lived Identity Toolkit session
-and code server-side. It returns a Firebase custom token only if the verified
-phone still belongs to the existing mapped customer UID. It does not create a
-new customer profile. Code attempts are limited, and OTP requests are rate-limited
-by hashed IP and email identifiers. Configure Firestore TTL on `expiresAt` in
-`emailPhoneOtpChallenges` and `emailOtpRateLimits`.
-
-The functions require the public Firebase Web API key as the `IDENTITY_TOOLKIT_WEB_API_KEY`
-parameter. For local development, place it in `functions/.env.demo-sri-amman-store`;
-for production deployment, Firebase prompts for the parameter (or reads the
-project-specific Functions dotenv file). The browser never supplies the key to
-the callable. The project must have Firebase Phone Authentication enabled,
-authorized web domains configured, and SMS regions restricted to the regions
-the store serves. In the Auth Emulator, the Functions Emulator uses
-`FIREBASE_AUTH_EMULATOR_HOST` and the emulator API key. For emulator-only
-sign-in, the function returns an unsigned custom token accepted by the Auth
-Emulator; production always uses the Admin SDK signed custom token.
+Mobile OTP sign-in uses `checkCustomerPhoneEligibility` before requesting an SMS
+directly through Firebase Phone Auth. Email sign-in uses the account password.
 
 ## Customer ID sequence prerequisite
 

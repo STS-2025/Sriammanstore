@@ -3,7 +3,6 @@ import {
   RecaptchaVerifier,
   browserLocalPersistence,
   setPersistence,
-  signInWithCustomToken,
   signInWithPhoneNumber,
   type ConfirmationResult,
 } from "firebase/auth";
@@ -17,7 +16,6 @@ import { authService, NO_PHONE_ACCOUNT_MESSAGE } from "../services/authService";
 import { formatToE164, mapPhoneAuthError } from "../services/phoneVerificationService";
 import { checkCustomerPhoneEligibility, mapPhoneEligibilityError } from "../services/phoneEligibilityService";
 import { emailLinkAuthService, EmailLinkAuthError } from "../services/emailLinkAuthService";
-import { requestEmailPhoneOtp, verifyEmailPhoneOtp } from "../services/emailPhoneOtpService";
 import { addressService } from "../services/addressService";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -102,7 +100,6 @@ export function LoginPage() {
   const [resendTimer, setResendTimer] = useState(30);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [otpError, setOtpError] = useState("");
-  const [emailOtpChallengeId, setEmailOtpChallengeId] = useState<string | null>(null);
   const phoneConfirmationRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const recaptchaReadyRef = useRef<Promise<RecaptchaVerifier> | null>(null);
@@ -122,7 +119,6 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
   const [unregisteredIdentity, setUnregisteredIdentity] = useState<"email" | "phone" | null>(null);
@@ -148,8 +144,6 @@ export function LoginPage() {
   // Phone validation helper
   const cleanPhoneDigits = phone.replace(/\D/g, "");
   const isPhoneValid = cleanPhoneDigits.length === 10;
-  const cleanEmailIdentifier = email.trim().toLowerCase();
-  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmailIdentifier);
   const getLoginFirebaseAuth = () => (
     authManager.getMode() === "production"
       ? authManager.getProductionAdapter().getAuthInstance().auth
@@ -262,18 +256,6 @@ export function LoginPage() {
     return true;
   };
 
-  const requestEmailOtp = async () => {
-    if (authMode === "mock") {
-      throw new Error("Email-to-phone OTP is available with Firebase authentication. Use your mobile number or password in mock mode.");
-    }
-    const recaptchaToken = authMode === "emulator"
-      ? "emulator"
-      : await (await ensureRecaptchaVerifier()).verify();
-    const challenge = await requestEmailPhoneOtp(cleanEmailIdentifier, recaptchaToken);
-    setEmailOtpChallengeId(challenge.challengeId);
-    return challenge;
-  };
-
   useEffect(() => {
     const targetMode = searchParams.authMode;
     if (targetMode === "production" || targetMode === "emulator" || targetMode === "mock") {
@@ -285,36 +267,10 @@ export function LoginPage() {
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (otpRequestInFlightRef.current) return;
-    if (isEmailValid && authMode !== "mock") {
-      setOtpError("");
-      otpRequestInFlightRef.current = true;
-      setIsSubmitting(true);
-      try {
-        const challenge = await requestEmailOtp();
-        toast.success(challenge.message);
-        setOtpSent(true);
-        setResendTimer(30);
-        setOtpDigits(["", "", "", "", "", ""]);
-        setTimeout(() => inputRefs.current[0]?.focus(), 100);
-      } catch (err: unknown) {
-        const message = getErrorMessage(err, "Could not request a sign-in code.");
-        setOtpError(message);
-        toast.error(message);
-      } finally {
-        otpRequestInFlightRef.current = false;
-        setIsSubmitting(false);
-      }
-      return;
-    }
     if (!isPhoneValid) {
-      setOtpError(
-        authMode === "mock" && isEmailValid
-          ? "Email-to-phone OTP requires Firebase mode. Enter a mobile number or use password sign in in mock mode."
-          : "Enter a valid email address or 10-digit mobile number.",
-      );
+      setOtpError("Enter a valid 10-digit mobile number.");
       return;
     }
-    setEmailOtpChallengeId(null);
     setOtpError("");
     otpRequestInFlightRef.current = true;
     setIsSubmitting(true);
@@ -368,24 +324,6 @@ export function LoginPage() {
     otpRequestInFlightRef.current = true;
     setIsSubmitting(true);
 
-    if (emailOtpChallengeId) {
-      try {
-        const challenge = await requestEmailOtp();
-        toast.success(challenge.message);
-        setResendTimer(30);
-        setOtpDigits(["", "", "", "", "", ""]);
-        inputRefs.current[0]?.focus();
-      } catch (err: unknown) {
-        const message = getErrorMessage(err, "Could not resend the sign-in code.");
-        setOtpError(message);
-        toast.error(message);
-      } finally {
-        otpRequestInFlightRef.current = false;
-        setIsSubmitting(false);
-      }
-      return;
-    }
-
     if (authMode === "mock") {
       try {
         await authService.requestOtp(`${countryCode}${cleanPhoneDigits}`);
@@ -436,36 +374,6 @@ export function LoginPage() {
     }
     setOtpError("");
     setIsSubmitting(true);
-
-    if (emailOtpChallengeId) {
-      try {
-        const customToken = await verifyEmailPhoneOtp(emailOtpChallengeId, fullOtp);
-        const auth = getLoginFirebaseAuth();
-        await setPersistence(auth, browserLocalPersistence);
-        const credential = await signInWithCustomToken(auth, customToken);
-        const firebaseUser = credential.user;
-        const result = await resolveFirebaseSession({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || cleanEmailIdentifier,
-          emailVerified: firebaseUser.emailVerified,
-          phoneNumber: firebaseUser.phoneNumber,
-          providerId: "phone",
-        }, { force: true });
-        if (result.status === "resolved") {
-          toast.success(`Welcome back, ${result.profile.name}!`);
-          void navigatePostLogin(result.profile.id);
-        } else {
-          setOtpError("The code was accepted, but the matching customer profile could not be loaded. Contact support.");
-        }
-      } catch (err: unknown) {
-        const message = getErrorMessage(err, "The code is invalid or expired.");
-        setOtpError(message);
-        toast.error(message);
-      } finally {
-        setIsSubmitting(false);
-      }
-      return;
-    }
 
     if (authMode === "mock") {
       try {
@@ -824,7 +732,7 @@ export function LoginPage() {
                 Login to Sriman
               </h1>
               <p className="mt-1 text-xs text-on-surface-variant">
-                Continue with a one-time code or Google.
+                Continue with mobile OTP, email and password, or Google.
               </p>
             </div>
           </div>
@@ -937,28 +845,11 @@ export function LoginPage() {
             </span>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-on-surface" htmlFor="email-input">
-              Email address
-            </label>
-            <input
-              id="email-input"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={otpSent}
-              placeholder="Enter your email"
-              className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-low px-3.5 py-2 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60 sm:py-2.5"
-            />
-            <p className="text-[10px] leading-relaxed text-on-surface-variant">Enter your account email to send the code to its registered mobile number.</p>
-          </div>
-
           {!otpSent && (
             <button
               type="button"
               onClick={() => void handleSendOtp()}
-              disabled={isSubmitting || isEmailSubmitting || (!isPhoneValid && !isEmailValid) || (authMode === "mock" && isEmailValid && !isPhoneValid)}
+              disabled={isSubmitting || isEmailSubmitting || !isPhoneValid}
               className="mt-3 w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:bg-primary-container disabled:opacity-50 sm:py-3"
             >
               {isSubmitting ? "Sending OTP..." : "Get OTP Passcode"}
@@ -968,17 +859,16 @@ export function LoginPage() {
           {otpSent && (
             <div className="mt-4 space-y-2 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 sm:space-y-3 sm:p-4">
               <div className="flex items-center justify-between gap-3 text-xs text-on-surface-variant">
-                <span>{emailOtpChallengeId ? "Enter the SMS code sent to your registered mobile" : "Enter 6-digit OTP"}</span>
+                <span>Enter the 6-digit SMS code sent to your mobile</span>
                 <button
                   type="button"
                   onClick={() => {
                     setOtpSent(false);
                     setOtpDigits(["", "", "", "", "", ""]);
-                    setEmailOtpChallengeId(null);
                   }}
                   className="shrink-0 font-bold text-primary hover:underline"
                 >
-                  Change email or number
+                  Change mobile number
                 </button>
               </div>
 
@@ -1035,26 +925,30 @@ export function LoginPage() {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowPasswordLogin((visible) => !visible);
-              setEmailError("");
-            }}
-            aria-expanded={showPasswordLogin}
-            className="mt-4 w-full text-center text-xs font-bold text-primary hover:underline"
-          >
-            {showPasswordLogin ? "Hide password sign in" : "Use password to sign in"}
-          </button>
-
-          {/* Password sign-in stays hidden unless the customer asks for it. */}
-          {showPasswordLogin && <form onSubmit={handleEmailLogin} className="mt-3 space-y-3 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 sm:space-y-4 sm:p-4">
+          {/* Email sign-in always uses the account password. */}
+          <form onSubmit={handleEmailLogin} className="mt-4 space-y-3 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 sm:space-y-4 sm:p-4">
             {firebaseUser && identityResolution?.status === "unlinked" && identityNotice && (
               <div className="rounded-2xl border border-secondary/30 bg-secondary-fixed/25 p-4 text-xs">
                 <p className="font-bold text-secondary">{identityNotice.title}</p>
                 <p className="mt-1 text-on-surface">{identityNotice.userMessage}</p>
               </div>
             )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-on-surface" htmlFor="email-input">
+                Email address <span className="text-primary">*</span>
+              </label>
+              <input
+                id="email-input"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-3.5 py-2 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary sm:py-2.5"
+              />
+            </div>
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -1100,9 +994,9 @@ export function LoginPage() {
               disabled={isEmailSubmitting || isSubmitting || !email.trim() || password.length < 6}
               className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-md transition-opacity hover:bg-primary-container disabled:opacity-50 sm:py-3.5"
             >
-              {isEmailSubmitting ? "Signing in..." : "Sign in with Email"}
+              {isEmailSubmitting ? "Signing in..." : "Sign in with Email and Password"}
             </button>
-          </form>}
+          </form>
 
           {/* Section C: Google Auth */}
           <div className="mt-4 sm:mt-5">

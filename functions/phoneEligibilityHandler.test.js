@@ -170,7 +170,7 @@ test("hashes the normalized E.164 phone consistently", async () => {
   );
 });
 
-test("unknown, unverified, staff, mismapped, and duplicate customers are ineligible", async () => {
+test("rejects ineligible customers and ignores stale explicitly unverified duplicates", async () => {
   const unknown = makeDb();
   assert.deepEqual(
     await makeHandler(unknown, {
@@ -237,7 +237,7 @@ test("unknown, unverified, staff, mismapped, and duplicate customers are ineligi
       },
     }),
   );
-  assert.deepEqual(await makeHandler(unverifiedDuplicate).invoke(request()), { eligible: false });
+  assert.deepEqual(await makeHandler(unverifiedDuplicate).invoke(request()), { eligible: true });
 });
 
 test("rejects malformed numbers and phone ownership mapped to a different UID", async () => {

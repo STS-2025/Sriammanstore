@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { authService, TEST_CREDENTIALS } from "../services/authService";
+import { authService, NO_PHONE_ACCOUNT_MESSAGE, TEST_CREDENTIALS } from "../services/authService";
 
 describe("Login & Authentication Service (Mock Mode)", () => {
   beforeEach(() => {
@@ -51,14 +51,14 @@ describe("Login & Authentication Service (Mock Mode)", () => {
     it("rejects an unregistered phone without creating a customer record", async () => {
       const newPhone = "9876543210";
       await expect(authService.verifyOtp(newPhone, TEST_CREDENTIALS.otp)).rejects.toThrow(
-        "No account registered with this mobile number",
+        NO_PHONE_ACCOUNT_MESSAGE,
       );
     });
 
     it("does not request a mock OTP for an unregistered phone", async () => {
       const newPhone = "9123456789";
       await expect(authService.requestOtp(newPhone)).rejects.toThrow(
-        "No account registered with this mobile number",
+        NO_PHONE_ACCOUNT_MESSAGE,
       );
     });
   });
@@ -162,7 +162,7 @@ describe("Login & Authentication Service (Mock Mode)", () => {
       expect(loginSource).toContain("maxLength={1}");
       expect(loginSource).toContain("onPaste={(e) => handleDigitPaste(idx, e)}");
       expect(loginSource).toContain("w-full min-w-0 max-w-full");
-      expect(loginSource).toContain("box-border px-0 py-0");
+      expect(loginSource).toMatch(/box-border[^\"]*px-0 py-0/);
       expect(loginSource).not.toMatch(/aspect-square[^>]*aria-label=\{`OTP Digit/);
     });
   });
