@@ -4,6 +4,7 @@ import {
   browserLocalPersistence,
   setPersistence,
   signInWithPhoneNumber,
+  type AuthCredential,
   type ConfirmationResult,
 } from "firebase/auth";
 import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-router";
@@ -72,6 +73,16 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function getPendingGoogleCredential(error: unknown): AuthCredential | null {
+  if (!error || typeof error !== "object") return null;
+  const candidate = error as { code?: unknown; pendingGoogleCredential?: unknown };
+  return candidate.code === "auth/account-exists-with-different-credential" &&
+    candidate.pendingGoogleCredential &&
+    typeof candidate.pendingGoogleCredential === "object"
+    ? candidate.pendingGoogleCredential as AuthCredential
+    : null;
+}
+
 export function LoginPage() {
   const {
     user,
@@ -118,6 +129,8 @@ export function LoginPage() {
   // Email & Password Form State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [pendingGoogleCredential, setPendingGoogleCredential] = useState<AuthCredential | null>(null);
+  const [pendingGoogleEmail, setPendingGoogleEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState("");
   const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
@@ -401,13 +414,35 @@ export function LoginPage() {
       if (!credential.user.phoneNumber) {
         throw new Error("Firebase did not return a verified phone number. Sign-in was stopped.");
       }
-      const result = await resolveFirebaseSession({
+      const identity = {
         uid: credential.user.uid,
         email: credential.user.email,
         emailVerified: credential.user.emailVerified,
         phoneNumber: credential.user.phoneNumber,
         providerId: "phone",
-      });
+      };
+      if (pendingGoogleCredential) {
+        const initialResolution = await resolveFirebaseSession(identity);
+        const linkedEmail = initialResolution.status === "resolved"
+          ? initialResolution.profile.email
+          : identity.email;
+        if (!linkedEmail || linkedEmail.trim().toLowerCase() !== pendingGoogleEmail.trim().toLowerCase()) {
+          throw new Error("That mobile number belongs to a different account. Verify the mobile number connected to the Google email, then try again.");
+        }
+        const linkedIdentity = await authManager.linkGoogleCredentialToCurrentUser(pendingGoogleCredential);
+        const result = await resolveFirebaseSession(linkedIdentity, { force: true });
+        if (result.status === "resolved") {
+          setPendingGoogleCredential(null);
+          setPendingGoogleEmail("");
+          toast.success("Google is linked to your existing account.");
+          toast.success(`Welcome back, ${result.profile.name}!`);
+          void navigatePostLogin(result.profile.id);
+        } else {
+          setOtpError("Google was linked, but your customer profile could not be refreshed. Please reload and sign in again.");
+        }
+        return;
+      }
+      const result = await resolveFirebaseSession(identity);
       if (result.status === "resolved") {
         toast.success(`Welcome back, ${result.profile.name}!`);
         void navigatePostLogin(result.profile.id);
@@ -453,6 +488,18 @@ export function LoginPage() {
         }
       }
     } catch (err: unknown) {
+      const pendingCredential = getPendingGoogleCredential(err);
+      if (pendingCredential) {
+        const conflict = err as { email?: unknown };
+        setPendingGoogleCredential(pendingCredential);
+        if (typeof conflict.email === "string") {
+          setEmail(conflict.email);
+          setPendingGoogleEmail(conflict.email);
+        }
+        setEmailError("");
+        toast.info("Sign in to your existing account below to link Google.");
+        return;
+      }
       const message = getErrorMessage(err, "Google sign-in failed.");
       setOtpError(message);
       if (!message.toLowerCase().includes("was cancelled")) toast.error(message);
@@ -476,6 +523,21 @@ export function LoginPage() {
     setIsEmailSubmitting(true);
     try {
       const loggedIn = await loginWithEmail(email, password);
+      if (pendingGoogleCredential) {
+        if (!pendingGoogleEmail || loggedIn.email.trim().toLowerCase() !== pendingGoogleEmail.trim().toLowerCase()) {
+          throw new Error("Sign in with the same email account you selected for Google to link it.");
+        }
+        const identity = await authManager.linkGoogleCredentialToCurrentUser(pendingGoogleCredential);
+        const resolution = await resolveFirebaseSession(identity, { force: true });
+        if (resolution.status !== "resolved") {
+          throw new Error("Google was linked, but your customer profile could not be refreshed. Please reload and sign in again.");
+        }
+        setPendingGoogleCredential(null);
+        setPendingGoogleEmail("");
+        toast.success("Google is linked to your existing account.");
+        void navigatePostLogin(resolution.profile.id);
+        return;
+      }
       toast.success(`Welcome back, ${loggedIn.name}!`);
       void navigatePostLogin(loggedIn.id);
     } catch (err: unknown) {
@@ -927,6 +989,11 @@ export function LoginPage() {
 
           {/* Email sign-in always uses the account password. */}
           <form onSubmit={handleEmailLogin} className="mt-4 space-y-3 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 sm:space-y-4 sm:p-4">
+            {pendingGoogleCredential && (
+              <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-on-surface">
+                Google confirmed this email already has an account. Enter its current password here, or verify the account with the mobile OTP above. Google will then be linked to that same account.
+              </div>
+            )}
             {firebaseUser && identityResolution?.status === "unlinked" && identityNotice && (
               <div className="rounded-2xl border border-secondary/30 bg-secondary-fixed/25 p-4 text-xs">
                 <p className="font-bold text-secondary">{identityNotice.title}</p>
@@ -994,7 +1061,9 @@ export function LoginPage() {
               disabled={isEmailSubmitting || isSubmitting || !email.trim() || password.length < 6}
               className="w-full rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-md transition-opacity hover:bg-primary-container disabled:opacity-50 sm:py-3.5"
             >
-              {isEmailSubmitting ? "Signing in..." : "Sign in with Email and Password"}
+              {isEmailSubmitting
+                ? pendingGoogleCredential ? "Linking Google..." : "Signing in..."
+                : pendingGoogleCredential ? "Sign in and link Google" : "Sign in with Email and Password"}
             </button>
           </form>
 
@@ -1003,7 +1072,7 @@ export function LoginPage() {
             <button
               type="button"
               onClick={() => void handleGoogleLogin()}
-              disabled={isSubmitting || isEmailSubmitting}
+              disabled={isSubmitting || isEmailSubmitting || Boolean(pendingGoogleCredential)}
               className="flex w-full items-center justify-center gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/50 disabled:opacity-50 sm:py-3"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24">

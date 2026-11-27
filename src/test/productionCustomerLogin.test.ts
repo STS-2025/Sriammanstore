@@ -139,6 +139,41 @@ describe("Phase 3A: Existing Customer Production Login & Authentication Verifica
       expect(result.providerId).toBe("firebase-auth-production");
     });
 
+    it("links Google to the active Firebase UID instead of starting a separate sign-in", async () => {
+      const adapter = new FirebaseAuthAdapter("production");
+      const existingUser = {
+        uid: "existing-email-phone-uid",
+        email: "customer@example.com",
+        emailVerified: true,
+        phoneNumber: "+919876543210",
+        providerData: [{ providerId: "password" }, { providerId: "phone" }],
+        isAnonymous: false,
+      } as unknown as FirebaseUser;
+      const linkedUser = {
+        ...existingUser,
+        providerData: [...existingUser.providerData, { providerId: "google.com" }],
+      } as FirebaseUser;
+      const mockDriver: FirebaseAuthDriver = {
+        signInWithGoogle: vi.fn(),
+        linkWithGoogle: vi.fn().mockResolvedValue({ user: linkedUser }),
+        signOut: vi.fn(),
+        onAuthStateChanged: vi.fn(),
+        getCurrentUser: vi.fn().mockReturnValue(existingUser),
+      };
+      adapter.setDriverForTesting(mockDriver);
+
+      const identity = await adapter.signInWithGoogle();
+
+      expect(mockDriver.linkWithGoogle).toHaveBeenCalledWith(existingUser);
+      expect(mockDriver.signInWithGoogle).not.toHaveBeenCalled();
+      expect(identity.uid).toBe(existingUser.uid);
+      expect(linkedUser.providerData.map(({ providerId }) => providerId)).toEqual([
+        "password",
+        "phone",
+        "google.com",
+      ]);
+    });
+
     it("intercepts invalid credential errors and maps them to customer-safe messages without leaking internal paths", async () => {
       const adapter = new FirebaseAuthAdapter("production");
 

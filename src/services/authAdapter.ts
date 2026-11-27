@@ -2,12 +2,16 @@ import type { FirebaseApp } from "firebase/app";
 import {
   signInWithEmailAndPassword,
   signInWithPopup,
+  linkWithPopup,
+  linkWithCredential,
+  GoogleAuthProvider,
   createUserWithEmailAndPassword as firebaseCreateUserWithEmailAndPassword,
   sendEmailVerification as firebaseSendEmailVerification,
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type Auth,
+  type AuthCredential,
   type User as FirebaseUser,
 } from "firebase/auth";
 import { getEmulatorAuth, type EmulatorConfig } from "../lib/firebaseEmulator";
@@ -86,6 +90,12 @@ export function mapFirebaseAuthError(error: unknown): string {
       return "Please enter a valid email address.";
     case "auth/user-disabled":
       return "This customer account has been disabled. Please contact Sriman Smart Store support.";
+    case "auth/account-exists-with-different-credential":
+      return "This email already has another sign-in method. Sign in with your existing password or verify its mobile number here to link Google.";
+    case "auth/credential-already-in-use":
+      return "This Google account is already linked to another Firebase account. Sign in to that account or contact support before linking it here.";
+    case "auth/provider-already-linked":
+      return "Google is already linked to this account.";
     case "auth/too-many-requests":
       return "Access to this account has been temporarily disabled due to many failed login attempts. Please try again later or reset your password.";
     case "auth/network-request-failed":
@@ -194,6 +204,8 @@ export interface IAuthAdapter {
 
 export interface FirebaseAuthDriver {
   signInWithGoogle?(auth: Auth): Promise<{ user: FirebaseUser }>;
+  linkWithGoogle?(user: FirebaseUser): Promise<{ user: FirebaseUser }>;
+  linkWithGoogleCredential?(user: FirebaseUser, credential: AuthCredential): Promise<{ user: FirebaseUser }>;
   signInWithEmailAndPassword(
     auth: Auth,
     email: string,
@@ -217,6 +229,12 @@ export interface FirebaseAuthDriver {
 class DefaultFirebaseAuthDriver implements FirebaseAuthDriver {
   signInWithGoogle(auth: Auth) {
     return signInWithPopup(auth, configuredGoogleProvider);
+  }
+  linkWithGoogle(user: FirebaseUser) {
+    return linkWithPopup(user, configuredGoogleProvider);
+  }
+  linkWithGoogleCredential(user: FirebaseUser, credential: AuthCredential) {
+    return linkWithCredential(user, credential);
   }
 
   signInWithEmailAndPassword(auth: Auth, email: string, password: string) {
@@ -359,6 +377,10 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
   async signInWithGoogle(): Promise<AuthUserIdentity> {
     try {
       const { auth } = this.getAuthInstance();
+      const currentUser = this.driver.getCurrentUser(auth);
+      if (currentUser) {
+        return await this.linkCurrentUserWithGoogle();
+      }
       if (!this.driver.signInWithGoogle) {
         throw new Error("Google sign-in is unavailable in this session.");
       }
@@ -368,7 +390,83 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
         providerId: "firebase-google",
       };
     } catch (err: unknown) {
+      const code = typeof err === "object" && err !== null && "code" in err
+        ? String((err as { code: unknown }).code)
+        : "";
+      const credential = code === "auth/account-exists-with-different-credential"
+        ? GoogleAuthProvider.credentialFromError(err)
+        : null;
+      if (credential) {
+        const customData = typeof err === "object" && err !== null && "customData" in err
+          ? (err as { customData?: { email?: string } }).customData
+          : undefined;
+        throw Object.assign(new Error(mapFirebaseAuthError(err)), {
+          code,
+          pendingGoogleCredential: credential,
+          ...(customData?.email ? { email: customData.email } : {}),
+        });
+      }
       throw new Error(mapFirebaseAuthError(err));
+    }
+  }
+
+  async linkCurrentUserWithGoogle(): Promise<AuthUserIdentity> {
+    const { auth } = this.getAuthInstance();
+    const currentUser = this.driver.getCurrentUser(auth);
+    if (!currentUser) {
+      throw new Error("Sign in with your existing account before linking Google.");
+    }
+    if (currentUser.providerData.some((provider) => provider.providerId === "google.com")) {
+      return {
+        ...this.mapFirebaseUserToIdentity(currentUser),
+        providerId: "firebase-google",
+      };
+    }
+    if (!this.driver.linkWithGoogle) {
+      throw new Error("Google account linking is unavailable in this session.");
+    }
+    try {
+      const linked = await this.driver.linkWithGoogle(currentUser);
+      return {
+        ...this.mapFirebaseUserToIdentity(linked.user),
+        providerId: "firebase-google",
+      };
+    } catch (error) {
+      const message = mapFirebaseAuthError(error);
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code: unknown }).code)
+        : undefined;
+      throw Object.assign(new Error(message), code ? { code } : {});
+    }
+  }
+
+  async linkGoogleCredentialToCurrentUser(credential: AuthCredential): Promise<AuthUserIdentity> {
+    const { auth } = this.getAuthInstance();
+    const currentUser = this.driver.getCurrentUser(auth);
+    if (!currentUser) {
+      throw new Error("Sign in with your existing account before linking Google.");
+    }
+    if (currentUser.providerData.some((provider) => provider.providerId === "google.com")) {
+      return {
+        ...this.mapFirebaseUserToIdentity(currentUser),
+        providerId: "firebase-google",
+      };
+    }
+    if (!this.driver.linkWithGoogleCredential) {
+      throw new Error("Google account linking is unavailable in this session.");
+    }
+    try {
+      const linked = await this.driver.linkWithGoogleCredential(currentUser, credential);
+      return {
+        ...this.mapFirebaseUserToIdentity(linked.user),
+        providerId: "firebase-google",
+      };
+    } catch (error) {
+      const message = mapFirebaseAuthError(error);
+      const code = typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code: unknown }).code)
+        : undefined;
+      throw Object.assign(new Error(message), code ? { code } : {});
     }
   }
 
@@ -650,6 +748,14 @@ export class AuthManager {
       throw new Error("Google sign-in is unavailable in mock authentication mode.");
     }
     return adapter.signInWithGoogle();
+  }
+
+  async linkGoogleCredentialToCurrentUser(credential: AuthCredential): Promise<AuthUserIdentity> {
+    const adapter = this.getActiveAdapter();
+    if (!(adapter instanceof FirebaseAuthAdapter)) {
+      throw new Error("Google account linking is unavailable in mock authentication mode.");
+    }
+    return adapter.linkGoogleCredentialToCurrentUser(credential);
   }
 
   async createUserWithEmailAndPassword(email: string, password: string): Promise<AuthUserIdentity> {
