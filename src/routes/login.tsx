@@ -884,7 +884,7 @@ export function LoginPage() {
                     maxLength={10}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Enter 10-digit number"
+                    placeholder="Enter your phone number"
                     className="w-full bg-surface-container-low px-2 py-1 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none"
                   />
                 </div>
@@ -897,14 +897,6 @@ export function LoginPage() {
                 {otpError}
               </div>
             )}
-          </div>
-
-          {/* Separator */}
-          <div className="relative my-4 flex items-center justify-center sm:my-6">
-            <div className="w-full border-t border-outline-variant/20" />
-            <span className="absolute bg-surface-container-lowest px-4 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-              OR
-            </span>
           </div>
 
           {!otpSent && (
@@ -988,7 +980,7 @@ export function LoginPage() {
           )}
 
           {/* Email sign-in always uses the account password. */}
-          <form onSubmit={handleEmailLogin} className="mt-4 space-y-3 rounded-2xl border border-outline-variant/20 bg-surface-container-low p-3 sm:space-y-4 sm:p-4">
+          <form onSubmit={handleEmailLogin} className="mt-4 space-y-3 rounded-2xl border border-outline-variant/20 bg-white p-3 sm:space-y-4 sm:p-4">
             {pendingGoogleCredential && (
               <div role="status" className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-on-surface">
                 Google confirmed this email already has an account. Enter its current password here, or verify the account with the mobile OTP above. Google will then be linked to that same account.
@@ -1000,6 +992,14 @@ export function LoginPage() {
                 <p className="mt-1 text-on-surface">{identityNotice.userMessage}</p>
               </div>
             )}
+
+            {/* Separator */}
+          <div className="relative my-2 flex items-center justify-center sm:my-2">
+            <div className="w-full border-t border-outline-variant/20" />
+            <span className="absolute bg-surface-container-lowest px-4 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+              OR
+            </span>
+          </div>
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-on-surface" htmlFor="email-input">
@@ -1013,7 +1013,7 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-3.5 py-2 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary sm:py-2.5"
+                className="w-full rounded-xl border bg-surface-container border-outline-variant/20 px-3.5 py-2 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary sm:py-2.5"
               />
             </div>
 
@@ -1029,7 +1029,7 @@ export function LoginPage() {
                   Forgot Password?
                 </Link>
               </div>
-              <div className="relative flex items-center rounded-xl border border-outline-variant/20 bg-surface-container-low px-3.5 py-2 focus-within:ring-2 focus-within:ring-primary sm:py-2.5">
+              <div className="relative flex items-center rounded-xl border bg-surface-container border-outline-variant/20 px-3.5 py-2 focus-within:ring-2 focus-within:ring-primary sm:py-2.5">
                 <input
                   id="pwd-input"
                   type={showPassword ? "text" : "password"}
@@ -1037,7 +1037,7 @@ export function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full bg-transparent pr-10 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none"
+                  className="w-full pr-10 text-sm font-bold text-on-surface placeholder:text-on-surface-variant focus:outline-none"
                 />
                 <button
                   type="button"
@@ -1073,7 +1073,7 @@ export function LoginPage() {
               type="button"
               onClick={() => void handleGoogleLogin()}
               disabled={isSubmitting || isEmailSubmitting || Boolean(pendingGoogleCredential)}
-              className="flex w-full items-center justify-center gap-3 rounded-xl border border-outline-variant/30 bg-surface-container-lowest py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/50 disabled:opacity-50 sm:py-3"
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-outline-variant/85 bg-surface-container-lowest py-2.5 text-sm font-bold text-on-surface transition-all hover:bg-surface-container-low hover:border-outline-variant/50 disabled:opacity-50 sm:py-3"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24">
                 <path

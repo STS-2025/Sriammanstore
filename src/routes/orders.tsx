@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { FormEvent, ReactNode } from "react";
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -266,9 +267,15 @@ export function OrdersPage() {
   const { user, isLoading: authLoading, isResolvingIdentity, refreshUser } = useAuth();
   const { refreshCart } = useCart();
   const { refreshNotifications } = useNotifications();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [ordersError, setOrdersError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const ordersQuery = useQuery({
+    queryKey: ["customer-orders", user?.id, user?.legacySassId],
+    enabled: Boolean(user?.id),
+    queryFn: () => user?.id ? orderService.getOrders(user.id, user.legacySassId) : Promise.resolve([]),
+  });
+  const orders = ordersQuery.data ?? [];
+  const ordersError = !ordersQuery.data && ordersQuery.error instanceof Error ? ordersQuery.error.message : null;
+  const loading = ordersQuery.isLoading;
   const [activeFilter, setActiveFilter] = useState<OrdersFilter>("all");
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [helpCategory, setHelpCategory] = useState("Delivery Query");
@@ -281,29 +288,11 @@ export function OrdersPage() {
   const [isReordering, setIsReordering] = useState(false);
 
   const loadOrders = useCallback(async () => {
-    if (!user) {
-      setOrders([]);
-      setLoading(false);
-      return;
+    await ordersQuery.refetch();
+    if (user?.id) {
+      await queryClient.invalidateQueries({ queryKey: ["account-summary", user.id] });
     }
-    setLoading(true);
-    setOrdersError(null);
-    try {
-      const loadedOrders = await orderService.getOrders(user.id, user.legacySassId);
-      setOrders(loadedOrders || []);
-    } catch (error) {
-      console.error("Failed to load orders:", error);
-      setOrdersError(error instanceof Error ? error.message : "Failed to load orders. Please retry.");
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (user) void loadOrders();
-    else if (!authLoading && !isResolvingIdentity) setLoading(false);
-  }, [user, authLoading, isResolvingIdentity, loadOrders]);
+  }, [ordersQuery.refetch, queryClient, user?.id]);
 
   const activeOrdersCount = useMemo(() => orders.filter((order) => ACTIVE_STATUSES.includes(order.status)).length, [orders]);
   const deliveredOrdersCount = useMemo(() => orders.filter((order) => order.status === "delivered").length, [orders]);
@@ -436,6 +425,9 @@ export function OrdersPage() {
           <nav aria-label="Breadcrumb" className="mb-5 hidden flex-wrap items-center gap-2 text-xs text-on-surface-variant md:flex">
             <Link to="/" className="hover:text-primary">Home</Link><span>/</span><Link to="/account" className="hover:text-primary">My Account</Link><span>/</span><span className="font-bold text-on-surface">My Orders</span>
           </nav>
+          {ordersQuery.isFetching && !loading && orders.length > 0 && (
+            <p role="status" className="mb-3 text-xs text-on-surface-variant">Refreshing your latest order details…</p>
+          )}
 
           {loading ? <LoadingState label="Loading your orders…" /> : ordersError ? (
             <div data-testid="orders-error-banner" role="alert" className="mx-auto max-w-xl rounded-3xl border border-red-200 bg-white p-8 text-center">
@@ -523,7 +515,7 @@ function PageShell({ children }: { children: ReactNode }) {
 }
 
 function LoadingState({ label }: { label: string }) {
-  return <div className="px-4 py-20 pt-20 text-center"><div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /><p className="text-sm text-on-surface-variant">{label}</p></div>;
+  return <div className="flex min-h-[calc(100dvh-5rem)] flex-col items-center justify-center px-4 pb-16 pt-20 text-center"><div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-4 border-primary border-t-transparent" /><p className="text-sm text-on-surface-variant">{label}</p></div>;
 }
 
 function FilterButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {

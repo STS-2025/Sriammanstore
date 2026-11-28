@@ -1,5 +1,7 @@
 import type { FirebaseApp } from "firebase/app";
 import {
+  browserLocalPersistence,
+  setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
   linkWithPopup,
@@ -107,6 +109,15 @@ export function mapFirebaseAuthError(error: unknown): string {
       return "Your browser blocked the Google sign-in window. Allow pop-ups for this site and try again.";
     case "auth/operation-not-allowed":
       return "This authentication method is currently disabled. Please sign in with Mobile OTP or contact support.";
+    case "auth/invalid-api-key":
+      return "Firebase rejected the app's API key. Check that the configured Firebase key belongs to the active project.";
+    case "auth/requests-to-this-api-are-blocked":
+      return "Firebase blocked this sign-in request because of the API key's website restrictions. Add localhost to the allowed referrers for the Firebase API key.";
+    case "auth/web-storage-unsupported":
+    case "auth/operation-not-supported-in-this-environment":
+      return "This browser environment does not support the storage required for sign-in. Allow site storage and try again.";
+    case "auth/internal-error":
+      return "Google sign-in failed inside Firebase. Check the Google provider setup and authorized domains in Firebase Authentication.";
     case "auth/email-already-in-use":
       return "An account may already exist for this email. Try signing in or password recovery.";
     case "auth/requires-recent-login":
@@ -122,6 +133,12 @@ export function mapFirebaseAuthError(error: unknown): string {
       }
       if (rawMessage.includes("ECONNREFUSED") || rawMessage.includes("Failed to fetch")) {
         return "Unable to connect to the authentication service. Please check your connection or emulator status.";
+      }
+      if (rawCode.startsWith("auth/")) {
+        // Keep the Firebase code visible for configuration errors that do not
+        // have a dedicated customer message yet. The code is safe to display
+        // and lets the issue be diagnosed without exposing error payloads.
+        return `Authentication failed (${rawCode}). Please check the Firebase sign-in configuration and try again.`;
       }
       return "Authentication failed. Please check your details and try again.";
   }
@@ -359,6 +376,7 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
 
     try {
       const { auth } = this.getAuthInstance();
+      await setPersistence(auth, browserLocalPersistence);
       const credential = await this.driver.signInWithEmailAndPassword(
         auth,
         cleanEmail,
@@ -377,6 +395,9 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
   async signInWithGoogle(): Promise<AuthUserIdentity> {
     try {
       const { auth } = this.getAuthInstance();
+      // Apply persistence before popup/link flows so this provider restores the
+      // same way as the phone OTP flow after a page refresh.
+      await setPersistence(auth, browserLocalPersistence);
       const currentUser = this.driver.getCurrentUser(auth);
       if (currentUser) {
         return await this.linkCurrentUserWithGoogle();
@@ -396,17 +417,20 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
       const credential = code === "auth/account-exists-with-different-credential"
         ? GoogleAuthProvider.credentialFromError(err)
         : null;
+      const friendlyMessage = code === "auth/invalid-credential"
+        ? "Google rejected this sign-in credential (auth/invalid-credential). Check the Google provider and OAuth client setup in Firebase."
+        : mapFirebaseAuthError(err);
       if (credential) {
         const customData = typeof err === "object" && err !== null && "customData" in err
           ? (err as { customData?: { email?: string } }).customData
           : undefined;
-        throw Object.assign(new Error(mapFirebaseAuthError(err)), {
+        throw Object.assign(new Error(friendlyMessage), {
           code,
           pendingGoogleCredential: credential,
           ...(customData?.email ? { email: customData.email } : {}),
         });
       }
-      throw new Error(mapFirebaseAuthError(err));
+      throw Object.assign(new Error(friendlyMessage), code ? { code } : {});
     }
   }
 
@@ -489,6 +513,7 @@ export class FirebaseAuthAdapter implements IAuthAdapter {
     if (!cleanEmail || !password) throw new Error("Enter a valid email address and password.");
     try {
       const { auth } = this.getAuthInstance();
+      await setPersistence(auth, browserLocalPersistence);
       if (!this.driver.createUserWithEmailAndPassword) {
         throw new Error("Firebase email/password registration is unavailable.");
       }

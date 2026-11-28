@@ -69,14 +69,20 @@ export function CheckoutProgressBar({
 
   const combinedSteps = [
     {
-      id: 2 as const,
-      title: "1. Review Cart, Address & Delivery",
-      subtitle: cartItemCount > 0 ? `${cartItemCount} items · ${selectedAddressText || "Choose delivery"}` : "Review cart and delivery",
+      id: 1 as const,
+      title: "1. Cart",
+      subtitle: cartItemCount > 0 ? `${cartItemCount} Fresh Items` : "Review Items",
       icon: "shopping_bag",
     },
     {
-      id: 4 as const,
-      title: "2. Confirm & Pay",
+      id: 2 as const,
+      title: "2. Review Cart & Delivery",
+      subtitle: cartItemCount > 0 ? `${cartItemCount} items · ${selectedAddressText || "Choose delivery"}` : "Review cart and delivery",
+      icon: "local_shipping",
+    },
+    {
+      id: 3 as const,
+      title: "3. Confirm & Pay",
       subtitle: "Confirm details and payment",
       icon: "payments",
     },
@@ -90,7 +96,7 @@ export function CheckoutProgressBar({
   return (
     <div
       data-testid="checkout-progress-bar"
-      className={`bg-surface-container-lowest border border-outline-variant/15 rounded-2xl px-3 py-2 sm:p-5 shadow-sm ${className}`}
+      className={`bg-surface-container-lowest border border-outline-variant/15 rounded-2xl px-2 py-0 sm:p-5 shadow-sm ${className}`}
     >
       <div className="flex items-center justify-between relative max-w-3xl mx-auto">
         {visibleSteps.map((step, idx) => {
@@ -132,21 +138,21 @@ export function CheckoutProgressBar({
               >
                 {/* Circle badge */}
                 <div
-                  className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 transition-transform ${
+                  className={`h-6 w-6 sm:h-11 sm:w-11 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm shrink-0 transition-transform ${
                     isCompleted
                       ? "bg-primary text-white shadow-sm group-hover:scale-105"
                       : isCurrent
-                        ? "bg-primary text-white ring-4 ring-primary/20 shadow-md scale-105"
+                        ? "bg-primary text-white ring-2 ring-primary/20 shadow-md scale-[1.02] sm:ring-4 sm:scale-105"
                         : "bg-surface-container-high text-on-surface-variant/80 border border-outline-variant/30"
                   }`}
                 >
                   {isCompleted ? (
-                    <span className="material-symbols-outlined text-[18px] sm:text-[20px] font-bold">
+                    <span className="material-symbols-outlined text-[12px] sm:text-[20px] font-bold">
                       check
                     </span>
                   ) : (
                     <span
-                      className="material-symbols-outlined text-[18px] sm:text-[20px]"
+                      className="material-symbols-outlined text-[12px] sm:text-[20px]"
                       style={isCurrent ? { fontVariationSettings: "'FILL' 1" } : {}}
                     >
                       {step.icon}
@@ -167,7 +173,7 @@ export function CheckoutProgressBar({
                   >
                     {hideCartStep ? (
                       <>
-                        <span className="sm:hidden">{combinedCheckout ? (step.id === 2 ? "Review & Delivery" : "Confirm & Pay") : step.id === 2 ? "Address" : step.id === 3 ? "Confirm" : "Payment"}</span>
+                        <span className="sm:hidden">{combinedCheckout ? (step.id === 1 ? "Cart" : step.id === 2 ? "Review & Delivery" : "Confirm & Pay") : step.id === 2 ? "Address" : step.id === 3 ? "Confirm" : "Payment"}</span>
                         <span className="hidden sm:inline">{step.title}</span>
                       </>
                     ) : step.title}

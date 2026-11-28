@@ -54,7 +54,7 @@ export function StoreHeader() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dropdownButtonRef = useRef<HTMLButtonElement>(null);
   const desktopCartTargetRef = useRef<HTMLDivElement>(null);
-  const locationWatchIdRef = useRef<number | null>(null);
+  const locationRequestIdRef = useRef(0);
   const liveAddressLookupTimerRef = useRef<number | null>(null);
   const isLiveAddressLookupRunningRef = useRef(false);
   const liveAddressLookupRequestIdRef = useRef(0);
@@ -67,10 +67,7 @@ export function StoreHeader() {
     : null;
 
   const stopLiveLocation = useCallback(() => {
-    if (locationWatchIdRef.current !== null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(locationWatchIdRef.current);
-      locationWatchIdRef.current = null;
-    }
+    locationRequestIdRef.current += 1;
     setIsTrackingLocation(false);
   }, []);
 
@@ -151,9 +148,7 @@ export function StoreHeader() {
 
   useEffect(
     () => () => {
-      if (locationWatchIdRef.current !== null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(locationWatchIdRef.current);
-      }
+      locationRequestIdRef.current += 1;
       if (liveAddressLookupTimerRef.current !== null) {
         window.clearTimeout(liveAddressLookupTimerRef.current);
       }
@@ -185,27 +180,31 @@ export function StoreHeader() {
     setLiveLocationAccuracyMeters(null);
     setResolvedLiveAddress(null);
     setIsTrackingLocation(true);
+    const requestId = ++locationRequestIdRef.current;
     try {
-      locationWatchIdRef.current = navigator.geolocation.watchPosition(
+      navigator.geolocation.getCurrentPosition(
         ({ coords }) => {
+          if (requestId !== locationRequestIdRef.current) return;
           const coordinates = { lat: coords.latitude, lng: coords.longitude };
           setLiveLocation(coordinates);
           setLiveLocationAccuracyMeters(coords.accuracy);
+          setIsTrackingLocation(false);
           queueLiveAddressLookup(coordinates);
         },
         (error) => {
+          if (requestId !== locationRequestIdRef.current) return;
           stopLiveLocation();
           toast.error(
             error.code === error.PERMISSION_DENIED
-              ? "Allow location access to track your live location."
-              : "Could not track your location. Please try again.",
+              ? "Allow location access to use your current location."
+              : "Could not get your location. Please try again.",
           );
         },
-        { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
       );
     } catch {
       stopLiveLocation();
-      toast.error("Location tracking could not start. Try again from a secure connection.");
+      toast.error("Could not get your location. Try again from a secure connection.");
     }
   };
 
@@ -631,13 +630,13 @@ export function StoreHeader() {
                   my_location
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold">Track live location</p>
+                  <p className="text-sm font-bold">Use current location</p>
                   <p className="mt-0.5 text-xs text-on-surface-variant">
-                    Allow location access to find and use your current delivery address.
+                    Use your device location once to find a nearby delivery address.
                   </p>
-                  {isTrackingLocation && liveLocation && (
+                  {isTrackingLocation && (
                     <p aria-live="polite" className="mt-1 text-[11px] font-medium text-primary">
-                      Tracking your location…
+                      Getting your current location…
                     </p>
                   )}
                   {liveLocation && liveLocationAccuracyMeters !== null && (
@@ -680,7 +679,7 @@ export function StoreHeader() {
                       : "bg-primary text-white"
                   }`}
                 >
-                  {isTrackingLocation ? "Stop" : "Start tracking"}
+                  {isTrackingLocation ? "Cancel" : "Get location"}
                 </button>
               </div>
               {liveLocation && (

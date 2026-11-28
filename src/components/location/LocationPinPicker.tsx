@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import { toast } from "sonner";
 import { STORE_COORDINATES } from "../../lib/haversine";
@@ -20,12 +20,13 @@ export interface LocationCoordinates {
 interface LocationPinPickerProps {
   position: LocationCoordinates | null;
   onChange: (position: LocationCoordinates) => void;
+  onAddressResolved?: (address: ResolvedPostalAddress) => void;
   accuracyMeters?: number | null;
 }
 
 const DEFAULT_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
-export function LocationPinPicker({ position, onChange, accuracyMeters }: LocationPinPickerProps) {
+export function LocationPinPicker({ position, onChange, onAddressResolved, accuracyMeters }: LocationPinPickerProps) {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
   const googleMapRef = useRef<GoogleMapInstance | null>(null);
@@ -33,6 +34,7 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
   const googleMarkerRef = useRef<GoogleMarkerInstance | null>(null);
   const placePinRef = useRef<((position: LocationCoordinates) => void) | null>(null);
   const onChangeRef = useRef(onChange);
+  const onAddressResolvedRef = useRef(onAddressResolved);
   const positionRef = useRef(position);
   const [isLocating, setIsLocating] = useState(false);
   const [mapProvider, setMapProvider] = useState<"google" | "osm" | "osm-fallback" | null>(null);
@@ -41,6 +43,9 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
   const [isResolvingPreview, setIsResolvingPreview] = useState(false);
   const [nearbyPlaces, setNearbyPlaces] = useState<GoogleNearbyPlace[]>([]);
   const [nearbyPlacesState, setNearbyPlacesState] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
+  const nearbyPlacesRequestIdRef = useRef(0);
+  const positionLat = position?.lat;
+  const positionLng = position?.lng;
 
   positionRef.current = position;
 
@@ -49,8 +54,35 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
   }, [onChange]);
 
   useEffect(() => {
+    onAddressResolvedRef.current = onAddressResolved;
+  }, [onAddressResolved]);
+
+  useEffect(() => {
     setLocationAccuracyMeters(accuracyMeters ?? null);
   }, [accuracyMeters]);
+
+  const findNearbyPlaces = useCallback((coordinates: LocationCoordinates, provider: "google" | "osm" | "osm-fallback") => {
+    const requestId = ++nearbyPlacesRequestIdRef.current;
+    setNearbyPlaces([]);
+    if (provider !== "google") {
+      setNearbyPlacesState("unavailable");
+      return;
+    }
+
+    setNearbyPlacesState("loading");
+    void searchNearbyGooglePlaces(coordinates)
+      .then((places) => {
+        if (requestId !== nearbyPlacesRequestIdRef.current) return;
+        setNearbyPlaces(places);
+        setNearbyPlacesState("ready");
+      })
+      .catch(() => {
+        // Nearby Search can return a transient 503; keep the map and address picker usable.
+        if (requestId === nearbyPlacesRequestIdRef.current) {
+          setNearbyPlacesState("unavailable");
+        }
+      });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +126,11 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
               googleListeners.push(
                 googleMarkerRef.current.addListener("dragend", (event) => {
                   const point = event?.latLng;
-                  if (point) onChangeRef.current({ lat: point.lat(), lng: point.lng() });
+                if (point) {
+                  const coordinates = { lat: point.lat(), lng: point.lng() };
+                  onChangeRef.current(coordinates);
+                  findNearbyPlaces(coordinates, "google");
+                }
                 }),
               );
             }
@@ -109,6 +145,7 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
               const coordinates = { lat: point.lat(), lng: point.lng() };
               placePin(coordinates);
               onChangeRef.current(coordinates);
+              findNearbyPlaces(coordinates, "google");
             }),
           );
           setMapProvider("google");
@@ -154,7 +191,9 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
           markerRef.current.on("dragend", () => {
             const coordinates = markerRef.current?.getLatLng();
             if (coordinates) {
-              onChangeRef.current({ lat: coordinates.lat, lng: coordinates.lng });
+              const selectedCoordinates = { lat: coordinates.lat, lng: coordinates.lng };
+              onChangeRef.current(selectedCoordinates);
+              findNearbyPlaces(selectedCoordinates, googleMapFailed ? "osm-fallback" : "osm");
             }
           });
         }
@@ -166,6 +205,7 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
         const coordinates = { lat: event.latlng.lat, lng: event.latlng.lng };
         placePin(coordinates);
         onChangeRef.current(coordinates);
+        findNearbyPlaces(coordinates, googleMapFailed ? "osm-fallback" : "osm");
       });
 
       resizeFrame = window.requestAnimationFrame(() => map.invalidateSize());
@@ -181,6 +221,7 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
 
     return () => {
       cancelled = true;
+      nearbyPlacesRequestIdRef.current += 1;
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       googleListeners.forEach((listener) => listener.remove());
       googleMarkerRef.current?.setMap(null);
@@ -191,28 +232,32 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
       markerRef.current = null;
       placePinRef.current = null;
     };
-  }, []);
+  }, [findNearbyPlaces]);
 
   useEffect(() => {
-    if (!position || !mapProvider) {
+    if (positionLat === undefined || positionLng === undefined || !mapProvider) {
       setAddressPreview(null);
-      setNearbyPlaces([]);
-      setNearbyPlacesState("idle");
       setIsResolvingPreview(false);
+      if (positionLat === undefined || positionLng === undefined) {
+        nearbyPlacesRequestIdRef.current += 1;
+        setNearbyPlaces([]);
+        setNearbyPlacesState("idle");
+      }
       return;
     }
 
     let cancelled = false;
-    const pin = { ...position };
+    const pin = { lat: positionLat, lng: positionLng };
     setAddressPreview(null);
     setIsResolvingPreview(true);
-    setNearbyPlaces([]);
-    setNearbyPlacesState(mapProvider === "google" ? "loading" : "unavailable");
 
     const timer = window.setTimeout(() => {
       void reverseGeocodeCoordinates(pin)
         .then((address) => {
-          if (!cancelled) setAddressPreview(address);
+          if (!cancelled) {
+            setAddressPreview(address);
+            onAddressResolvedRef.current?.(address);
+          }
         })
         .catch(() => {
           if (!cancelled) setAddressPreview(null);
@@ -221,37 +266,25 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
           if (!cancelled) setIsResolvingPreview(false);
         });
 
-      if (mapProvider === "google") {
-        void searchNearbyGooglePlaces(pin)
-          .then((places) => {
-            if (!cancelled) {
-              setNearbyPlaces(places);
-              setNearbyPlacesState("ready");
-            }
-          })
-          .catch(() => {
-            // Nearby Search can return a transient 503; keep the map and address picker usable.
-            if (!cancelled) setNearbyPlacesState("unavailable");
-          });
-      }
     }, 650);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [position, mapProvider]);
+  }, [positionLat, positionLng, mapProvider]);
 
   useEffect(() => {
-    if (!position) return;
+    if (positionLat === undefined || positionLng === undefined) return;
+    const nextPosition = { lat: positionLat, lng: positionLng };
     if (googleMapRef.current) {
-      googleMapRef.current.setCenter(position);
+      googleMapRef.current.setCenter(nextPosition);
       googleMapRef.current.setZoom(18);
     } else if (mapRef.current) {
-      mapRef.current.setView([position.lat, position.lng]);
+      mapRef.current.setView([positionLat, positionLng]);
     }
-    placePinRef.current?.(position);
-  }, [position]);
+    placePinRef.current?.(nextPosition);
+  }, [positionLat, positionLng]);
 
   const useCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -268,6 +301,9 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
         mapRef.current?.setView([coordinates.lat, coordinates.lng], 18);
         placePinRef.current?.(coordinates);
         onChange(coordinates);
+        nearbyPlacesRequestIdRef.current += 1;
+        setNearbyPlaces([]);
+        setNearbyPlacesState("idle");
         setLocationAccuracyMeters(coords.accuracy);
         setIsLocating(false);
       },
@@ -358,6 +394,8 @@ export function LocationPinPicker({ position, onChange, accuracyMeters }: Locati
                   ? "Nearby place search is temporarily unavailable. The map pin and address still work."
                   : "Enable Google Maps and Places API (New) to search nearby places."}
               </p>
+            ) : nearbyPlacesState === "idle" ? (
+              <p className="mt-1 text-on-surface-variant">Tap or drag the pin on the map to search nearby places.</p>
             ) : nearbyPlaces.length ? (
               <ul className="mt-1 max-h-28 space-y-1 overflow-y-auto">
                 {nearbyPlaces.map((place, index) => {

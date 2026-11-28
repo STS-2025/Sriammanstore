@@ -137,7 +137,7 @@ export function CartDiscountControls({ className = "", accordionOnMobile = false
         </div>
         <div className={coinsContentClass}>
         <p className="hidden sm:block text-[11px] text-on-surface-variant mb-4 leading-relaxed">
-          Earn {checkoutSettings.smartCoinEarnRate} Smart Coin{checkoutSettings.smartCoinEarnRate === 1 ? "" : "s"} per eligible order. Redeem once your balance reaches {checkoutSettings.minCoinsToRedeem} coins, up to {checkoutSettings.maxCoinRedemptionPercent}% of your item subtotal. Coins expire after {checkoutSettings.coinValidityMonths} months.
+          Earn 1 Smart Coin for every ₹1 spent on items (delivery fee excluded). Redeem once your balance reaches {checkoutSettings.minCoinsToRedeem} coins, up to {checkoutSettings.maxCoinRedemptionPercent}% of your item subtotal. Coins expire after {checkoutSettings.coinValidityMonths} months.
         </p>
 
         <div

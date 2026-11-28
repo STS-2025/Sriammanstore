@@ -71,10 +71,10 @@ export interface LegacyCheckoutSettings {
 }
 
 export const LEGACY_CHECKOUT_DEFAULTS: LegacyCheckoutSettings = {
-  standardFreeThreshold: 499,
-  standardCharge: 40,
-  expressFreeThreshold: 1000,
-  expressCharge: 99,
+  standardFreeThreshold: 0,
+  standardCharge: 0,
+  expressFreeThreshold: 0,
+  expressCharge: 49,
   expressStartHour: 6,
   expressEndHour: 21,
   expressAutoThreshold: 4000,
@@ -104,6 +104,10 @@ const DEFAULT_STORE_INFO: StoreInfo = {
   vipSpendingThreshold: 5000,
 };
 
+const BUSINESS_SETTINGS_STALE_TIME_MS = 30_000;
+let pendingBusinessSettingsRequest: Promise<Record<string, unknown>> | null = null;
+let cachedBusinessSettings: { value: Record<string, unknown>; fetchedAt: number } | null = null;
+
 export function isLegacyExpressAvailable(
   hour: number,
   settings: LegacyCheckoutSettings,
@@ -112,17 +116,13 @@ export function isLegacyExpressAvailable(
 }
 
 export function calculateLegacyDeliveryCharge(
-  subtotal: number,
+  _subtotal: number,
   speed: "standard" | "express",
   itemCount: number,
-  settings: LegacyCheckoutSettings,
+  _settings: LegacyCheckoutSettings,
 ): number {
   if (itemCount <= 0) return 0;
-  const threshold = speed === "express"
-    ? settings.expressFreeThreshold
-    : settings.standardFreeThreshold;
-  const charge = speed === "express" ? settings.expressCharge : settings.standardCharge;
-  return subtotal >= threshold ? 0 : charge;
+  return speed === "express" ? 49 : 0;
 }
 
 function finiteSetting(
@@ -219,9 +219,34 @@ async function readLegacySetting(
 
 export const settingsService = {
   async getBusinessSettings(): Promise<Record<string, unknown>> {
-    return apiClient.get<Record<string, unknown>>(
-      "/businessSettings/businessSettings"
-    );
+    const cached = cachedBusinessSettings;
+    if (cached && Date.now() - cached.fetchedAt < BUSINESS_SETTINGS_STALE_TIME_MS) {
+      return cached.value;
+    }
+
+    const refresh = () => {
+      if (!pendingBusinessSettingsRequest) {
+        pendingBusinessSettingsRequest = apiClient
+          .get<Record<string, unknown>>("/businessSettings/businessSettings")
+          .then((value) => {
+            cachedBusinessSettings = { value, fetchedAt: Date.now() };
+            return value;
+          })
+          .finally(() => {
+            pendingBusinessSettingsRequest = null;
+          });
+      }
+      return pendingBusinessSettingsRequest;
+    };
+
+    if (cached) {
+      void refresh().catch((error) => {
+        console.warn("Could not refresh cached business settings:", error);
+      });
+      return cached.value;
+    }
+
+    return refresh();
   },
 
   async getDeliverySettings(): Promise<DeliverySettings> {
@@ -237,11 +262,7 @@ export const settingsService = {
         type: "standard" as const,
         title,
         subtitle: "Admin configured delivery window",
-        charge: numberSetting(
-          settings,
-          ["standardDeliveryFee"],
-          LEGACY_CHECKOUT_DEFAULTS.standardCharge,
-        ),
+        charge: 0,
       }));
     }
     return apiClient.get<DeliverySlot[]>("/deliverySlots");
@@ -296,43 +317,25 @@ export const settingsService = {
         ["vipSpendingThreshold", "vipThreshold"],
         DEFAULT_STORE_INFO.vipSpendingThreshold
       ),
-      minOrderForFreeDelivery: numberSetting(
-        [
-          "minOrderForFreeDelivery",
-          "freeDeliveryThreshold",
-          "standardFreeThreshold",
-        ],
-        0
-      ),
+      minOrderForFreeDelivery: 0,
     };
   },
 
-  /** Reads checkout policy from businessSettings and preserves legacy express-rate settings. */
+  /** Reads checkout policy while ignoring configurable delivery pricing for now. */
   async getLegacyCheckoutSettings(): Promise<LegacyCheckoutSettings> {
-    const [business, delivery, expressTimes, expressAuto] = await Promise.all([
+    const [business, expressTimes, expressAuto] = await Promise.all([
       this.getBusinessSettings(),
-      readLegacySetting("DeliverySettings").catch(() => null),
       readLegacySetting("ExpressTimeSlots").catch(() => null),
       readLegacySetting("ExpressAutoThreshold").catch(() => null),
     ]);
 
     return {
-      standardFreeThreshold: finiteSetting(
-        business["freeDeliveryThreshold"] ?? delivery?.["standardFreeThreshold"],
-        LEGACY_CHECKOUT_DEFAULTS.standardFreeThreshold,
-      ),
-      standardCharge: finiteSetting(
-        business["standardDeliveryFee"] ?? delivery?.["standardCharge"],
-        LEGACY_CHECKOUT_DEFAULTS.standardCharge,
-      ),
-      expressFreeThreshold: finiteSetting(
-        delivery?.["expressFreeThreshold"],
-        LEGACY_CHECKOUT_DEFAULTS.expressFreeThreshold,
-      ),
-      expressCharge: finiteSetting(
-        delivery?.["expressCharge"],
-        LEGACY_CHECKOUT_DEFAULTS.expressCharge,
-      ),
+      // Delivery pricing is fixed in the checkout flow for now; ignore
+      // configured free-delivery thresholds and delivery charges.
+      standardFreeThreshold: LEGACY_CHECKOUT_DEFAULTS.standardFreeThreshold,
+      standardCharge: LEGACY_CHECKOUT_DEFAULTS.standardCharge,
+      expressFreeThreshold: LEGACY_CHECKOUT_DEFAULTS.expressFreeThreshold,
+      expressCharge: LEGACY_CHECKOUT_DEFAULTS.expressCharge,
       expressStartHour: finiteSetting(
         expressTimes?.["startHour"],
         LEGACY_CHECKOUT_DEFAULTS.expressStartHour,
@@ -397,8 +400,10 @@ export const settingsService = {
   /** Combines business settings, store coordinates, and legacy delivery policy. */
   async getDeliveryConfiguration(): Promise<StoreDeliverySettings> {
     try {
-      const businessSettings = await this.getBusinessSettings();
-      const deliveryDoc = await readLegacySetting("delivery").catch(() => null);
+      const [businessSettings, deliveryDoc] = await Promise.all([
+        this.getBusinessSettings(),
+        readLegacySetting("delivery").catch(() => null),
+      ]);
 
       if (businessSettings || deliveryDoc) {
         const storeAddress = textSetting(
@@ -504,9 +509,11 @@ export const settingsService = {
    * Reads dynamic store payment configuration from Firestore `Settings/payment`.
    */
   async getPaymentConfiguration(): Promise<StorePaymentSettings> {
-    const businessSettings = await this.getBusinessSettings();
     try {
-      const paymentDoc = await readLegacySetting("payment").catch(() => null);
+      const [businessSettings, paymentDoc] = await Promise.all([
+        this.getBusinessSettings(),
+        readLegacySetting("payment").catch(() => null),
+      ]);
 
       if (businessSettings || paymentDoc) {
         return {

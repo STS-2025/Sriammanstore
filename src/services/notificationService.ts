@@ -9,6 +9,7 @@ import type {
   Order,
   OrderStatus,
 } from "../types";
+import { measureLoad } from "../lib/performanceDiagnostics";
 
 export interface NotificationPreferences {
   inAppAlerts: boolean;
@@ -243,13 +244,17 @@ export const notificationService = {
         // fallback
       }
       if (resolvedLegacySassId) {
-        return productionNotificationReader.getCustomerNotifications(
-          resolvedId,
-          undefined,
-          resolvedLegacySassId
+        return measureLoad("data notifications", () =>
+          productionNotificationReader.getCustomerNotifications(
+            resolvedId,
+            undefined,
+            resolvedLegacySassId
+          )
         );
       }
-      return productionNotificationReader.getCustomerNotifications(resolvedId);
+      return measureLoad("data notifications", () =>
+        productionNotificationReader.getCustomerNotifications(resolvedId)
+      );
     }
 
     const list = await apiClient.get<NotificationItem[]>("/notifications", {

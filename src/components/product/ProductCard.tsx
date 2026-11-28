@@ -286,6 +286,27 @@ export function ProductCard({
             </span>
           )}
 
+          {product.productType && (
+            <span
+              data-testid="product-type-symbol"
+              role="img"
+              aria-label={product.productType === "veg" ? "Vegetarian product" : "Non-vegetarian product"}
+              title={product.productType === "veg" ? "Vegetarian" : "Non-Vegetarian"}
+              className={`absolute bottom-1.5 right-1.5 z-10 flex h-4 w-4 items-center justify-center border bg-white shadow-sm sm:bottom-3 sm:right-3 sm:h-11 sm:w-11 ${
+                product.productType === "veg" ? "border-[#138a36]" : "border-[#a63c22]"
+              }`}
+            >
+              {product.productType === "veg" ? (
+                <span className="h-2.5 w-2.5 rounded-full bg-[#138a36] sm:h-6 sm:w-6" aria-hidden="true" />
+              ) : (
+                <span
+                  className="h-2.5 w-2.5 bg-[#a63c22] sm:h-6 sm:w-6"
+                  style={{ clipPath: "polygon(50% 0%, 100% 100%, 0% 100%)" }}
+                  aria-hidden="true"
+                />
+              )}
+            </span>
+          )}
         </div>
 
         {(readOnly || product.isNew === true || product.isBestSeller === true || product.isFeatured === true) && (

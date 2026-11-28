@@ -96,6 +96,8 @@ export interface Product {
   isFeatured?: boolean;
   /** Promotional offer indicator */
   isOffer?: boolean;
+  /** Dietary classification from Firestore (for example: "veg" or "non-veg"). */
+  productType?: "veg" | "non-veg";
 }
 
 export interface Category {

@@ -99,7 +99,7 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cartError, setCartError] = useState<string | null>(null);
@@ -202,6 +202,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [selectedUpiId, setSelectedUpiIdState] = useState<string>(() =>
     getStored(upiKey, "")
   );
+
+  useEffect(() => {
+    setSelectedAddressIdState(getStored(addressKey, ""));
+    setSelectedSlotIdState(getStored(slotKey, "slot_exp"));
+    setPaymentMethodState(getStored(paymentKey, "upi"));
+    setSelectedUpiIdState(getStored(upiKey, ""));
+
+    const saved = getStored<string | null>(speedKey, null);
+    const legacy = getStored<string>("deliveryOption", "standard");
+    const value = (saved ?? legacy).toLowerCase();
+    setDeliverySpeedState(value === "express" || value === "fast" ? "express" : "standard");
+  }, [addressKey, slotKey, paymentKey, upiKey, speedKey]);
 
   // Sync state with storage
   const setRedeemCoins = useCallback(
@@ -311,9 +323,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     isSyncingGuestCart || (!!user?.id && cartSyncAttemptedCustomerId !== user.id);
 
   useEffect(() => {
+    // Do not load the guest cart while Firebase is still restoring a signed-in
+    // customer. Otherwise the cart briefly switches to the empty guest cart.
+    if (authLoading) return;
     if (user?.id) void syncGuestCart();
     else void refreshCart();
-  }, [user?.id, refreshCart, syncGuestCart]);
+  }, [authLoading, user?.id, refreshCart, syncGuestCart]);
 
   const addToCart = async (
     product: Product,

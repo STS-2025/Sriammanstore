@@ -367,7 +367,7 @@ export function WishlistPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-20 max-w-[1000px] mx-auto px-margin-desktop py-20 text-center">
+        <main className="mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[1000px] flex-col items-center justify-center px-margin-desktop pb-16 pt-20 text-center">
           <div className="w-9 h-9 border-3 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">
             Loading your wishlist...

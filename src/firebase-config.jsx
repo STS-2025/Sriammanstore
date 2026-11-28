@@ -1,6 +1,11 @@
 // Firebase config and initialization
 import { getApps, initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  getAuth,
+  GoogleAuthProvider,
+  setPersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -16,7 +21,13 @@ const firebaseConfig = {
 const app =
   getApps().find((firebaseApp) => firebaseApp.name === "[DEFAULT]") ??
   initializeApp(firebaseConfig);
+// Use Firebase's standard browser Auth initialization so popup sign-in gets
+// its popup resolver. Explicitly use browser-local persistence so the
+// authenticated customer remains signed in after a full page refresh.
 export const auth = getAuth(app);
+void setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.warn("Could not enable persistent Firebase Auth storage:", error);
+});
 export const db = getFirestore(app);
 export const provider = new GoogleAuthProvider();
 export { app };

@@ -19,6 +19,7 @@ import { authManager } from "./authAdapter";
 import { productionOrderReader } from "./productionOrderReader";
 import { getCustomerProfileEndpoint, resolveCustomerDataSource } from "./customerDataSourceResolver";
 import { productService } from "./productService";
+import { measureLoad } from "../lib/performanceDiagnostics";
 
 export const orderService = {
   async getOrders(userId?: string, legacySassId?: string): Promise<Order[]> {
@@ -41,9 +42,11 @@ export const orderService = {
       const currentUser = authService.getCurrentUser();
       const finalLegacySassId = resolvedLegacySassId || currentUser?.legacySassId;
       if (finalLegacySassId) {
-        return productionOrderReader.getCustomerOrders(resolvedUserId, authUser?.uid, undefined, finalLegacySassId);
+        return measureLoad("data orders", () =>
+          productionOrderReader.getCustomerOrders(resolvedUserId, authUser?.uid, undefined, finalLegacySassId)
+        );
       }
-      return productionOrderReader.getCustomerOrders(resolvedUserId, authUser?.uid);
+      return measureLoad("data orders", () => productionOrderReader.getCustomerOrders(resolvedUserId, authUser?.uid));
     }
 
     const orders = await apiClient.get<Order[]>("/orders", { userId: resolvedUserId });
@@ -446,8 +449,8 @@ export const orderService = {
       }
     }
 
-    // Award the configured Smart Coin amount once per eligible order.
-    const earnedCoins = Math.floor(checkoutSettings.smartCoinEarnRate);
+    // Award one Smart Coin per rupee of purchased items, excluding delivery.
+    const earnedCoins = Math.floor(Math.max(0, params.subtotal));
     if (earnedCoins > 0 && !alreadyEarned) {
       try {
         const earnedAt = createdOrder?.createdAt || new Date().toISOString();

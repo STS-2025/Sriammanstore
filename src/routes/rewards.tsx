@@ -237,7 +237,7 @@ export function RewardsPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-20 max-w-[1000px] mx-auto px-margin-desktop py-20 text-center">
+        <main className="mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[1000px] flex-col items-center justify-center px-margin-desktop pb-16 pt-20 text-center">
           <div className="w-9 h-9 border-3 border-[#005f3f] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">
             Loading Amman rewards & coins...
@@ -838,11 +838,11 @@ export function RewardsPage() {
                     1. Shop Farm Fresh & Staples
                   </h4>
                   <p className="mb-3 text-[11px] leading-relaxed text-on-surface-variant sm:mb-4 sm:text-xs">
-                    Earn {coinPolicy.smartCoinEarnRate} Smart Coins for every eligible order.
+                    Earn 1 Smart Coin for every ₹1 spent on items, excluding delivery fees.
                   </p>
                 </div>
                 <span className="inline-block w-fit rounded-full border border-emerald-200/60 bg-emerald-50 px-2.5 py-1 text-[9px] font-bold text-emerald-800 sm:px-3 sm:text-[10px]">
-                  Earn rate: {coinPolicy.smartCoinEarnRate} coins per order
+                  Earn rate: 1 coin per ₹1 of item purchases
                 </span>
               </div>
 

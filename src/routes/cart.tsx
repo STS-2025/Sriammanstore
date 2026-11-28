@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
@@ -14,7 +14,9 @@ import { useWishlist } from "../context/WishlistContext";
 import { useLanguage } from "../context/LanguageContext";
 import { productService } from "../services/productService";
 import { authManager } from "../services/authAdapter";
-import type { Product } from "../types";
+import { settingsService, DEFAULT_DELIVERY_SETTINGS, type StoreDeliverySettings } from "../services/settingsService";
+import { getBookableDeliverySlots } from "../lib/deliverySlots";
+import type { DeliverySlot, Product } from "../types";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/cart")({
@@ -38,18 +40,66 @@ export function CartPage() {
     cartCount,
     cartSubtotal,
     cartTotalSavings,
+    deliverySpeed,
+    standardDeliveryFee,
+    expressDeliveryFee,
+    isExpressDeliveryAvailable,
+    checkoutSettings,
+    selectedSlotId,
+    setDeliverySpeed,
+    setSelectedSlotId,
     updateQty,
     removeFromCart,
     clearCart,
     addToCart,
     refreshCart,
   } = useCart();
-  const { user } = useAuth();
+  const {
+    user,
+    firebaseUser,
+    identityNotice,
+    isLoading: authLoading,
+    isResolvingIdentity,
+    refreshUser,
+  } = useAuth();
   const { addToWishlist, isWishlisted } = useWishlist();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
   const [quickAddProducts, setQuickAddProducts] = useState<Product[]>([]);
+  const [configuredDeliverySlots, setConfiguredDeliverySlots] = useState<DeliverySlot[]>([]);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [deliveryConfig, setDeliveryConfig] = useState<StoreDeliverySettings>(DEFAULT_DELIVERY_SETTINGS);
+  const deliverySlots = useMemo(
+    () => getBookableDeliverySlots(configuredDeliverySlots, currentTime),
+    [configuredDeliverySlots, currentTime],
+  );
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      settingsService.getDeliverySlots(),
+      settingsService.getDeliveryConfiguration(),
+    ]).then(([slots, config]) => {
+      if (!active) return;
+      setConfiguredDeliverySlots(slots || []);
+      if (config) setDeliveryConfig(config);
+    }).catch((error) => {
+      console.error("Failed to load delivery slot options:", error);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (deliverySlots.length > 0 && !deliverySlots.some((slot) => slot.id === selectedSlotId)) {
+      setSelectedSlotId(deliverySlots[0].id);
+    }
+  }, [deliverySlots, selectedSlotId, setSelectedSlotId]);
 
   // Load quick-add staples
   useEffect(() => {
@@ -117,11 +167,16 @@ export function CartPage() {
     } as any);
   };
 
-  if (isLoading) {
+  if (isLoading || ((!user) && (authLoading || isResolvingIdentity))) {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-6 sm:py-12">
+        <main className="mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[1320px] flex-col justify-center px-margin-desktop pb-16 pt-20">
+          {(authLoading || isResolvingIdentity) && (
+            <p className="mb-4 text-center text-sm font-semibold text-on-surface-variant">
+              Checking your saved session…
+            </p>
+          )}
           <div className="animate-pulse space-y-6">
             <div className="h-10 bg-surface-container-low rounded-2xl w-1/4"></div>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -131,6 +186,32 @@ export function CartPage() {
               </div>
               <div className="lg:col-span-4 h-96 bg-surface-container-low rounded-3xl"></div>
             </div>
+          </div>
+        </main>
+        <StoreFooter />
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (!user && firebaseUser && identityNotice) {
+    return (
+      <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
+        <StoreHeader />
+        <main className="mx-auto w-full max-w-2xl px-4 py-24 text-center">
+          <div role="alert" className="rounded-3xl border border-amber-500/30 bg-surface-container-lowest p-6 shadow-sm sm:p-8">
+            <h1 className="text-xl font-extrabold">{identityNotice.title}</h1>
+            <p className="mt-2 text-sm text-on-surface-variant">{identityNotice.userMessage}</p>
+            {identityNotice.isRetryable && (
+              <button
+                type="button"
+                onClick={() => void refreshUser()}
+                disabled={isResolvingIdentity}
+                className="mt-5 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {isResolvingIdentity ? "Restoring account…" : "Try again"}
+              </button>
+            )}
           </div>
         </main>
         <StoreFooter />
@@ -167,7 +248,7 @@ export function CartPage() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="min-w-0 font-headline-lg text-lg font-extrabold tracking-tight text-on-surface sm:text-xl md:text-2xl">
-                    Review Cart
+                    Your Cart
                   </h1>
                   {cartCount > 0 && (
                     <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-black uppercase tracking-wider">
@@ -263,7 +344,7 @@ export function CartPage() {
                 <div className="order-1 bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-5 pb-3 border-b border-outline-variant/15">
                     <div>
-                      <h2 className="font-headline-sm text-base font-extrabold text-on-surface">
+                      <h2 className="font-headline-sm text-base font-extrabold text-on-surface hidden text-[500px]">
                         Items in Your Cart ({cartCount})
                       </h2>
                       <p className="text-[11px] text-on-surface-variant hidden min-[500px]:block">
@@ -405,7 +486,7 @@ export function CartPage() {
                   </div>
 
                   {/* Subtotal Banner inside Cart Card */}
-                  <div className="mt-6 pt-4 border-t border-outline-variant/15 flex flex-col items-start justify-between gap-2 text-xs bg-surface-container-low/50 p-3.5 rounded-2xl sm:flex-row sm:items-center">
+                  {/* <div className="mt-6 pt-4 border-t border-outline-variant/15 flex flex-col items-start justify-between gap-2 text-xs bg-surface-container-low/50 p-3.5 rounded-2xl sm:flex-row sm:items-center">
                     <span className="font-headline-sm font-bold text-on-surface flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-primary text-[18px]">
                         shopping_bag
@@ -417,7 +498,7 @@ export function CartPage() {
                         Catalog Savings: ₹{(cartTotalSavings ?? 0).toLocaleString("en-IN")} saved
                       </span>
                     )}
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* 4. Saved for Later & Quick Add */}
@@ -498,7 +579,74 @@ export function CartPage() {
               {/* RIGHT COLUMN: Coupon, Smart Coins, Bill Summary, Quality Promise */}
               <div className="contents lg:block lg:col-span-4 lg:space-y-6">
                 <CartDiscountControls className="hidden lg:block order-5" />
-                                {/* 3. Bill Summary Card */}
+                {/* Delivery selection sits immediately before the bill summary. */}
+                <section id="cart-delivery-slot" className="order-3 rounded-3xl border border-outline-variant/15 bg-surface-container-lowest p-4 shadow-sm sm:p-6">
+                  <div className="mb-3 flex items-center gap-2 sm:mb-4">
+                    <span className="material-symbols-outlined text-[20px] text-secondary">bolt</span>
+                    <h2 className="font-headline-sm text-[15px] font-extrabold text-on-surface sm:text-base">
+                      Delivery Speed &amp; Slot
+                    </h2>
+                  </div>
+                  <p className="mb-3 hidden text-[11px] font-semibold text-on-surface-variant sm:block">
+                    Orders for today must be placed by {checkoutSettings.orderCutoffTime}.
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+                    <label className={`flex cursor-pointer items-start gap-2 rounded-2xl border p-3 transition-colors ${deliverySpeed === "express" ? "border-primary bg-primary/5" : "border-outline-variant/20 bg-surface-container-low/40"} ${!isExpressDeliveryAvailable ? "cursor-not-allowed opacity-50" : ""}`}>
+                      <input
+                        type="radio"
+                        name="cart_delivery_speed"
+                        checked={deliverySpeed === "express"}
+                        disabled={!isExpressDeliveryAvailable}
+                        onChange={() => setDeliverySpeed("express")}
+                        className="mt-1 accent-primary"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2 text-xs font-bold text-on-surface">
+                          <span>Express 60-Min</span>
+                          <span>{expressDeliveryFee > 0 ? `₹${expressDeliveryFee}` : "FREE"}</span>
+                        </span>
+                        <span className="mt-1 block text-[11px] text-on-surface-variant">
+                          Arrives in 45–60 min
+                          {!isExpressDeliveryAvailable && (
+                            <> · Available daily from {checkoutSettings.expressStartHour}:00 to {checkoutSettings.expressEndHour}:00</>
+                          )}
+                        </span>
+                      </span>
+                    </label>
+
+                    <label className={`flex cursor-pointer items-start gap-2 rounded-2xl border p-3 transition-colors ${deliverySpeed === "standard" ? "border-primary bg-primary/5" : "border-outline-variant/20 bg-surface-container-low/40"}`}>
+                      <input
+                        type="radio"
+                        name="cart_delivery_speed"
+                        checked={deliverySpeed === "standard"}
+                        onChange={() => setDeliverySpeed("standard")}
+                        className="mt-1 accent-primary"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2 text-xs font-bold text-on-surface">
+                          <span>Standard Delivery</span>
+                          <span>{standardDeliveryFee > 0 ? `₹${standardDeliveryFee}` : "FREE"}</span>
+                        </span>
+                        <span className="mt-1 block text-[11px] text-on-surface-variant">Configured delivery window</span>
+                        {deliverySlots.length > 0 && (
+                          <select
+                            aria-label="Delivery time"
+                            value={deliverySlots.some((slot) => slot.id === selectedSlotId) ? selectedSlotId : deliverySlots[0].id}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => setSelectedSlotId(event.target.value)}
+                            className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-white px-2 py-2 text-xs font-semibold text-on-surface"
+                          >
+                            {deliverySlots.map((slot) => <option key={slot.id} value={slot.id}>{slot.title}</option>)}
+                          </select>
+                        )}
+                      </span>
+                    </label>
+                  </div>
+                  <p className="mt-3 font-semibold text-on-surface-variant hidden text-[500px]">
+                    Fulfilled by {deliveryConfig.storeName}
+                  </p>
+                </section>
+                {/* Bill Summary Card */}
                 <OrderBillSummary
                   className="order-4"
                   mode="cart"

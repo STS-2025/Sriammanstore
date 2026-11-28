@@ -109,28 +109,22 @@ export function OrderBillSummary({
           )}
 
           {/* Delivery Fee */}
-          <div className="flex justify-between items-center text-on-surface-variant">
-            <span className="flex items-center gap-1 font-medium">
-              {deliverySpeed === "express" ? "Express Delivery Fee" : "Delivery Fee"}
-              <span
-                className="material-symbols-outlined text-[14px] text-outline cursor-help"
-                title={
-                  deliverySpeed === "express"
-                    ? "Express 60-min delivery charge"
-                    : "Standard consolidated delivery"
-                }
-              >
-                info
+          {deliverySpeed === "express" && (
+            <div className="flex justify-between items-center text-on-surface-variant">
+              <span className="flex items-center gap-1 font-medium">
+                Express Delivery Fee
+                <span
+                  className="material-symbols-outlined text-[14px] text-outline cursor-help"
+                  title="Express 60-min delivery charge"
+                >
+                  info
+                </span>
               </span>
-            </span>
-            <span
-              className={`font-bold text-sm ${
-                deliveryFee === 0 ? "text-primary" : "text-on-surface"
-              }`}
-            >
-              {deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
-            </span>
-          </div>
+              <span className="font-bold text-sm text-on-surface">
+                &#8377;{deliveryFee.toLocaleString("en-IN")}
+              </span>
+            </div>
+          )}
 
           {/* Taxes & GST */}
           <div className="flex justify-between items-center text-on-surface-variant">

@@ -70,7 +70,7 @@ function ProfilePage() {
   if (isLoading || isResolvingIdentity) {
     return (
       <PageShell>
-        <div className="py-24 text-center text-sm text-on-surface-variant">Loading profile...</div>
+        <div className="flex min-h-[calc(100dvh-5rem)] flex-col items-center justify-center px-4 pb-16 pt-20 text-center text-sm text-on-surface-variant">Loading profile...</div>
       </PageShell>
     );
   }

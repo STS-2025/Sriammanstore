@@ -299,4 +299,44 @@ describe("ProductCard Polish & Production-Compatible Rendering", () => {
       expect(screen.getByText("₹1150")).toBeInTheDocument();
     });
   });
+
+  // ==========================================================================
+  // SUITE 5: Product dietary type overlay
+  // ==========================================================================
+  describe("Product dietary type overlay", () => {
+    it("normalizes veg productType and renders a vegetarian symbol", () => {
+      const vegProduct = normalizeLegacyProduct({
+        id: "prod-veg-1",
+        productName: "Turmeric Powder",
+        productType: "Veg",
+        unit: "g",
+        unitSize: "100",
+        offerPrice: 50,
+        mrp: 60,
+        stock: 10,
+      });
+
+      expect(vegProduct?.productType).toBe("veg");
+      render(<ProductCard product={vegProduct!} />);
+      expect(screen.getByTestId("product-type-symbol")).toHaveAttribute(
+        "aria-label",
+        "Vegetarian product"
+      );
+    });
+
+    it("normalizes non-veg productType and renders a non-vegetarian symbol", () => {
+      const nonVegProduct = {
+        ...turmericFixture,
+        id: "prod-nonveg-1",
+        name: "Chicken Masala",
+        productType: "non-veg" as const,
+      };
+
+      render(<ProductCard product={nonVegProduct} />);
+      expect(screen.getByTestId("product-type-symbol")).toHaveAttribute(
+        "aria-label",
+        "Non-vegetarian product"
+      );
+    });
+  });
 });

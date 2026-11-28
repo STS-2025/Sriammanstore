@@ -201,7 +201,7 @@ export function NotificationsPage() {
     return (
       <div className="bg-[#f8faf8] font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-20 max-w-[800px] mx-auto px-4 py-20 text-center">
+        <main className="mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[800px] flex-col items-center justify-center px-4 pb-16 pt-20 text-center">
           <div className="w-9 h-9 border-3 border-[#005f3f] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">
             Loading notifications...

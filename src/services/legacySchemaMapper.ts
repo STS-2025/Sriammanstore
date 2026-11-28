@@ -998,6 +998,14 @@ export function normalizeLegacyProduct(
   const isOffer =
     typeof rawDoc["isOffer"] === "boolean" ? rawDoc["isOffer"] : undefined;
 
+  const rawProductType = pickFirstString(rawDoc, ["productType", "product_type"])?.trim().toLowerCase();
+  const productType: "veg" | "non-veg" | undefined =
+    rawProductType && /^(veg|vegetarian|vegetable|pure[_ -]?veg)$/i.test(rawProductType)
+      ? "veg"
+      : rawProductType && /^(non[_ -]?veg|nonvegetarian|non[_ -]?vegetarian|meat|chicken|fish|egg)$/i.test(rawProductType)
+        ? "non-veg"
+        : undefined;
+
   const product: Product = {
     id,
     name,
@@ -1028,6 +1036,7 @@ export function normalizeLegacyProduct(
     ...(isBestSeller !== undefined ? { isBestSeller } : {}),
     ...(isFeatured !== undefined ? { isFeatured } : {}),
     ...(isOffer !== undefined ? { isOffer } : {}),
+    ...(productType !== undefined ? { productType } : {}),
   };
 
   return product;

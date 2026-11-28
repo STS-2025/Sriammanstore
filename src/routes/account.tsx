@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
@@ -42,21 +42,21 @@ const EMPTY_SUMMARY: AccountSummary = {
 };
 
 function AccountPage() {
-  const { user, isLoading: authLoading, isResolvingIdentity, logout } = useAuth();
+  const {
+    user,
+    firebaseUser,
+    identityNotice,
+    isLoading: authLoading,
+    isResolvingIdentity,
+    refreshUser,
+    logout,
+  } = useAuth();
   const navigate = useNavigate();
-  const [summary, setSummary] = useState<AccountSummary>(EMPTY_SUMMARY);
-  const [summaryLoading, setSummaryLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user?.id) {
-      setSummary(EMPTY_SUMMARY);
-      setSummaryLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setSummaryLoading(true);
-    const loadSummary = async () => {
+  const { data: summary = EMPTY_SUMMARY, isLoading: summaryLoading } = useQuery({
+    queryKey: ["account-summary", user?.id, user?.legacySassId],
+    enabled: Boolean(user?.id),
+    queryFn: async (): Promise<AccountSummary> => {
+      if (!user?.id) return EMPTY_SUMMARY;
       const [ordersResult, addressesResult, wishlistResult, notificationsResult, coinsResult] =
         await Promise.allSettled([
           orderService.getOrders(user.id, user.legacySassId),
@@ -66,14 +66,13 @@ function AccountPage() {
           coinService.getUserCoins(user.id, user.legacySassId),
         ]);
 
-      if (cancelled) return;
       const orders = ordersResult.status === "fulfilled" ? ordersResult.value || [] : [];
       const addresses = addressesResult.status === "fulfilled" ? addressesResult.value || [] : [];
       const wishlist = wishlistResult.status === "fulfilled" ? wishlistResult.value || [] : [];
       const notifications = notificationsResult.status === "fulfilled" ? notificationsResult.value || [] : [];
       const calculatedVip = coinService.calculateVIPStatus(orders, 5000).isVIP;
 
-      setSummary({
+      return {
         totalOrders: orders.length,
         activeOrders: orders.filter((order) =>
           ["pending", "processing", "packed", "in transit"].includes(order.status),
@@ -86,18 +85,9 @@ function AccountPage() {
             : user.smartCoins ?? user.coins ?? 0,
         unreadNotifications: notifications.filter((notification) => !notification.read).length,
         isVip: calculatedVip || Boolean(user.isVIP),
-      });
-      setSummaryLoading(false);
-    };
-
-    void loadSummary().catch((error) => {
-      console.warn("Could not load account menu counts:", error);
-      if (!cancelled) setSummaryLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id, user?.legacySassId, user?.smartCoins, user?.coins, user?.isVIP]);
+      };
+    },
+  });
 
   const handleLogout = async () => {
     if (!window.confirm("Are you sure you want to log out of your account?")) return;
@@ -110,13 +100,26 @@ function AccountPage() {
     }
   };
 
-  if (authLoading || isResolvingIdentity) {
+  if ((authLoading || isResolvingIdentity) && !user) {
     return (
       <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased">
         <StoreHeader />
-        <main className="mx-auto w-full max-w-2xl px-4 py-24 text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm text-on-surface-variant">Loading your account…</p>
+        <main className="mx-auto min-h-[calc(100dvh-5rem)] w-full max-w-5xl px-4 pb-20 pt-24 sm:px-6">
+          <div role="status" className="mb-6 flex items-center gap-3 text-sm text-on-surface-variant">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+            Loading account details…
+          </div>
+          <div className="animate-pulse space-y-5">
+            <div className="h-8 w-48 rounded-xl bg-surface-container-low" />
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className="h-28 rounded-3xl border border-outline-variant/15 bg-surface-container-lowest p-5 shadow-sm">
+                  <div className="h-4 w-2/3 rounded bg-surface-container-low" />
+                  <div className="mt-5 h-6 w-1/3 rounded bg-surface-container-low" />
+                </div>
+              ))}
+            </div>
+          </div>
         </main>
         <StoreFooter />
         <BottomNav />
@@ -140,6 +143,32 @@ function AccountPage() {
           >
             Sign In
           </Link>
+        </main>
+        <StoreFooter />
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (!user && firebaseUser && identityNotice) {
+    return (
+      <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased">
+        <StoreHeader />
+        <main className="mx-auto w-full max-w-2xl px-4 py-24 text-center">
+          <div role="alert" className="rounded-3xl border border-amber-500/30 bg-surface-container-lowest p-6 shadow-sm sm:p-8">
+            <h1 className="text-xl font-extrabold">{identityNotice.title}</h1>
+            <p className="mt-2 text-sm text-on-surface-variant">{identityNotice.userMessage}</p>
+            {identityNotice.isRetryable && (
+              <button
+                type="button"
+                onClick={() => void refreshUser()}
+                disabled={isResolvingIdentity}
+                className="mt-5 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {isResolvingIdentity ? "Restoring account…" : "Try again"}
+              </button>
+            )}
+          </div>
         </main>
         <StoreFooter />
         <BottomNav />

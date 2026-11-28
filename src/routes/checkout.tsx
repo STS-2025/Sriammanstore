@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { StoreHeader } from "../components/layout/StoreHeader";
 import { BottomNav } from "../components/layout/BottomNav";
@@ -109,8 +110,8 @@ export const Route = createFileRoute("/checkout")({
   } => {
     const raw = search["step"];
     let step: 2 | 3 | 4 = 2;
-    // Step 3 was the old confirmation-only screen; route legacy links to the
-    // new combined confirmation and payment screen.
+    // Step 3 is the final visible checkout step. Keep accepting step 4 for
+    // older checkout links and normalize it to the same confirmation screen.
     if (raw === 3 || raw === "3" || raw === "confirm" || raw === 4 || raw === "4" || raw === "payment") step = 4;
     return {
       step,
@@ -129,6 +130,7 @@ export const Route = createFileRoute("/checkout")({
 export function CheckoutPage() {
   const searchParams = useSearch({ from: "/checkout" });
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const {
     items,
@@ -145,9 +147,6 @@ export function CheckoutPage() {
     deliveryFee,
     deliverySettingsError,
     checkoutSettings,
-    isExpressDeliveryAvailable,
-    standardDeliveryFee,
-    expressDeliveryFee,
     finalTotal,
     selectedAddressId,
     selectedSlotId,
@@ -156,7 +155,6 @@ export function CheckoutPage() {
     isGuestCartSyncing,
     guestCartSyncError,
     syncGuestCart,
-    setDeliverySpeed,
     setSelectedAddressId,
     setSelectedSlotId,
     setPaymentMethod,
@@ -165,10 +163,29 @@ export function CheckoutPage() {
     resetDiscounts,
     revalidateCartItems,
   } = useCart();
-  const { user, isLoading: authLoading, isResolvingIdentity, refreshUser } = useAuth();
+  const {
+    user,
+    firebaseUser,
+    identityNotice,
+    isLoading: authLoading,
+    isResolvingIdentity,
+    refreshUser,
+  } = useAuth();
   const { refreshNotifications } = useNotifications();
 
   const currentStep: 2 | 3 | 4 = searchParams.step === 4 ? 4 : searchParams.step === 3 ? 3 : 2;
+  const progressStep: 2 | 3 = currentStep === 2 ? 2 : 3;
+
+  useEffect(() => {
+    const rawStep = new URLSearchParams(window.location.search).get("step");
+    if (rawStep === "4" || rawStep === "confirm" || rawStep === "payment") {
+      navigate({
+        to: "/checkout",
+        search: { step: 3, newAddress: searchParams.newAddress || undefined } as any,
+        replace: true,
+      });
+    }
+  }, [navigate, searchParams.newAddress]);
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [configuredDeliverySlots, setConfiguredDeliverySlots] = useState<DeliverySlot[]>([]);
@@ -182,6 +199,7 @@ export function CheckoutPage() {
   const codAmountLimit = paymentConfig.maxCodAmount ?? DEFAULT_PAYMENT_SETTINGS.maxCodAmount;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
 
   // Confirmation and payment form state
   const [includeGstin, setIncludeGstin] = useState(false);
@@ -294,15 +312,15 @@ export function CheckoutPage() {
         charge: deliveryFee,
       };
     }
-    return (
+    const standardSlot =
       deliverySlots.find((s) => s.id === selectedSlotId) ||
       deliverySlots[0] || {
         id: "slot_std_morning",
         type: "standard" as const,
         title: "Standard Morning (8:00 AM - 11:00 AM)",
-        charge: deliveryFee,
-      }
-    );
+        charge: 0,
+      };
+    return { ...standardSlot, charge: 0 };
   }, [deliverySlots, selectedSlotId, deliverySpeed, deliveryFee]);
 
   // Dynamic geofence and serviceability check using store configuration (50km)
@@ -419,13 +437,13 @@ export function CheckoutPage() {
 
   const handleContinueToConfirmDetails = () => {
     if (!validateDeliveryDetails() || !validateOrderLimits()) return;
-    navigate({ to: "/checkout", search: { step: 4 } as any });
+    navigate({ to: "/checkout", search: { step: 3 } as any });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleContinueToPayment = () => {
     if (!validateDeliveryDetails() || !validateOrderLimits()) return;
-    navigate({ to: "/checkout", search: { step: 4 } as any });
+    navigate({ to: "/checkout", search: { step: 3 } as any });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -442,6 +460,20 @@ export function CheckoutPage() {
       void handleContinueToConfirmDetails();
       return;
     }
+  };
+
+  const handleChangeDeliverySlot = () => {
+    navigate({ to: "/cart" });
+    let attempts = 0;
+    const scrollToDeliverySlot = () => {
+      const section = document.getElementById("cart-delivery-slot");
+      if (section) {
+        section.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (attempts++ < 40) {
+        window.setTimeout(scrollToDeliverySlot, 50);
+      }
+    };
+    window.setTimeout(scrollToDeliverySlot, 100);
   };
   const handleSaveAddress = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -682,20 +714,14 @@ export function CheckoutPage() {
         throw new Error("Order creation did not return a valid order identifier.");
       }
 
+      setPlacedOrderId(order.orderId);
+      void queryClient.invalidateQueries({ queryKey: ["customer-orders", user!.id] });
+      void queryClient.invalidateQueries({ queryKey: ["account-summary", user!.id] });
       // Clear customer's cart only after confirmed successful order creation
       await clearCart({ skipRemote: true });
       resetDiscounts();
       await refreshNotifications();
       await refreshUser();
-      toast.success(
-        chosenMethod === "upi"
-          ? `Order #${order.orderId} placed (Awaiting UPI Verification)!`
-          : `Order #${order.orderId} placed successfully!`
-      );
-      navigate({
-        to: "/orders",
-        search: { placed: order.orderId } as any,
-      });
     };
 
     setIsSubmitting(true);
@@ -789,9 +815,11 @@ export function CheckoutPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-20 text-center">
+        <main className="mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[1320px] flex-col items-center justify-center px-margin-desktop pb-16 pt-20 text-center">
           <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-xs text-on-surface-variant font-medium">Preparing checkout...</p>
+          <p className="text-xs text-on-surface-variant font-medium">
+            {authLoading || isResolvingIdentity ? "Checking your saved session…" : "Preparing checkout..."}
+          </p>
         </main>
         <StoreFooter />
         <BottomNav />
@@ -803,7 +831,7 @@ export function CheckoutPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-20 text-center">
+        <main className="mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[1320px] flex-col items-center justify-center px-margin-desktop pb-16 pt-20 text-center">
           <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-xs text-on-surface-variant font-medium">Syncing your saved cart with your account…</p>
         </main>
@@ -835,6 +863,32 @@ export function CheckoutPage() {
                 Review cart
               </Link>
             </div>
+          </div>
+        </main>
+        <StoreFooter />
+        <BottomNav />
+      </div>
+    );
+  }
+
+  if (!user && firebaseUser && identityNotice && !authLoading && !isResolvingIdentity) {
+    return (
+      <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
+        <StoreHeader />
+        <main className="mx-auto w-full max-w-2xl px-4 py-24 text-center">
+          <div role="alert" className="rounded-3xl border border-amber-500/30 bg-surface-container-lowest p-6 shadow-sm sm:p-8">
+            <h1 className="text-xl font-extrabold">{identityNotice.title}</h1>
+            <p className="mt-2 text-sm text-on-surface-variant">{identityNotice.userMessage}</p>
+            {identityNotice.isRetryable && (
+              <button
+                type="button"
+                onClick={() => void refreshUser()}
+                disabled={isResolvingIdentity}
+                className="mt-5 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {isResolvingIdentity ? "Restoring account…" : "Try again"}
+              </button>
+            )}
           </div>
         </main>
         <StoreFooter />
@@ -878,7 +932,7 @@ export function CheckoutPage() {
     );
   }
 
-  if (items.length === 0 && !loading) {
+  if (items.length === 0 && !loading && !placedOrderId) {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
@@ -908,7 +962,7 @@ export function CheckoutPage() {
       <StoreHeader />
 
       <main className="w-full pt-20 bg-surface min-h-[calc(100vh-80px)]">
-        <div className="max-w-[1320px] mx-auto px-margin-desktop py-space-xl">
+        <div className="max-w-[1320px] mx-auto px-margin-desktop py-4 sm:py-6">
           {/* {deliverySettingsError && (
             <div role="status" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900">
               Delivery settings could not be loaded. The legacy default charges are being shown. {deliverySettingsError}
@@ -917,7 +971,7 @@ export function CheckoutPage() {
           {/* Combined cart/delivery and confirmation/payment progress */}
           <div className="mb-8">
             <CheckoutProgressBar
-              currentStep={currentStep}
+              currentStep={progressStep}
               cartItemCount={cartCount}
               selectedAddressText={
                 selectedAddress
@@ -929,7 +983,7 @@ export function CheckoutPage() {
               onStepClick={handleStepNavigation}
               canNavigateToStep={(s) => {
                 if (s === 2) return true;
-                return s === 4 && canContinueToPayment;
+                return s === 3 && canContinueToPayment;
               }}
             />
           </div>
@@ -980,7 +1034,7 @@ export function CheckoutPage() {
                   )}
 
                   {/* Cart review */}
-                  <section className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
+                  {/* <section className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary text-[22px]">shopping_bag</span>
@@ -1002,7 +1056,7 @@ export function CheckoutPage() {
                         </div>
                       ))}
                     </div>
-                  </section>
+                  </section> */}
 
                   {/* Delivery Address Section */}
                   <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
@@ -1257,150 +1311,6 @@ export function CheckoutPage() {
                     </div>
                   </div>
 
-                  {/* Delivery Speed & Slot Section */}
-                  <div className="bg-surface-container-lowest border border-outline-variant/15 rounded-3xl p-4 sm:p-6 shadow-sm">
-                    <div className="flex items-start justify-between gap-3 mb-3 sm:mb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-secondary text-[22px]">
-                          bolt
-                        </span>
-                        <h3 className="font-headline-sm !text-[15px] leading-4 sm:!text-base sm:leading-normal font-extrabold text-on-surface">
-                          Delivery Speed & Slot
-                        </h3>
-                      </div>
-                      <span className="hidden sm:inline-flex px-2.5 py-0.5 rounded-full bg-secondary/15 text-secondary text-[10px] font-black uppercase tracking-wider">
-                        {deliveryConfig.storeName}
-                      </span>
-                    </div>
-
-                    <p className="hidden sm:block mb-3 text-[11px] font-semibold text-on-surface-variant">
-                      Orders for today's delivery must be placed by {checkoutSettings.orderCutoffTime}.
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                      {/* Express 60-Min */}
-                      <div
-                        onClick={() => {
-                          if (!isExpressDeliveryAvailable) return;
-                          setDeliverySpeed("express");
-                          setSelectedSlotId("slot_exp");
-                        }}
-                        className={`p-2.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-2 sm:gap-3 ${
-                          deliverySpeed === "express"
-                            ? "border-primary bg-primary/5 shadow-sm"
-                            : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/40"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          id="slot_opt_express"
-                          name="slot_selection"
-                          checked={deliverySpeed === "express"}
-                          disabled={!isExpressDeliveryAvailable}
-                          onChange={() => {
-                            setDeliverySpeed("express");
-                            setSelectedSlotId("slot_exp");
-                          }}
-                          className="mt-1 accent-primary cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <label
-                              htmlFor="slot_opt_express"
-                              className="font-headline-sm text-[12px] sm:text-xs font-bold text-on-surface flex items-center gap-0.5 sm:gap-1 cursor-pointer"
-                            >
-                              <span>Express 60–Min</span>
-                              <span className="text-secondary">⚡</span>
-                            </label>
-                            <span className="font-headline-sm text-[12px] font-extrabold text-on-surface">
-                              {expressDeliveryFee > 0 ? `₹${expressDeliveryFee}` : "FREE"}</span>
-                          </div>
-                          <p className="text-[11px] sm:text-[11px] font-semibold text-on-surface-variant mt-1">
-                            Arrives in 45–60 min
-                          </p>
-                          <div className="hidden sm:flex items-center justify-between mt-2 pt-1 border-t border-outline-variant/15 text-[10px] text-outline">
-                            <span>Rider Assigned from Store Hub</span>
-                            <span className="px-1.5 py-0.2 rounded bg-primary/10 text-primary font-bold">
-                              Fastest
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Standard Delivery */}
-                      <div
-                        onClick={() => {
-                          setDeliverySpeed("standard");
-                          setSelectedSlotId(deliverySlots[0]?.id || "slot_std_morning");
-                        }}
-                        className={`p-2.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-2 sm:gap-3 ${
-                          deliverySpeed === "standard"
-                            ? "border-primary bg-primary/5 shadow-sm"
-                            : "border-outline-variant/20 hover:border-primary/40 bg-surface-container-low/40"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          id="slot_opt_standard"
-                          name="slot_selection"
-                          checked={deliverySpeed === "standard"}
-                          onChange={() => {
-                            setDeliverySpeed("standard");
-                            setSelectedSlotId(deliverySlots[0]?.id || "slot_std_morning");
-                          }}
-                          className="mt-1 accent-primary cursor-pointer"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <label
-                              htmlFor="slot_opt_standard"
-                            className="font-headline-sm text-[12px] sm:text-xs font-bold text-on-surface cursor-pointer"
-                            >
-                              Standard Delivery
-                            </label>
-                            <span className="px-2 py-0.5 rounded text-[12px] font-black uppercase bg-primary/10 text-primary">
-                              {standardDeliveryFee > 0 ? `₹${standardDeliveryFee}` : "FREE"}
-                            </span>
-                          </div>
-                          <p className="hidden sm:block text-[11px] font-semibold text-on-surface-variant mt-1">
-                            Configured delivery window
-                          </p>
-                          {deliverySlots.length > 1 && (
-                            <label className="mt-2 sm:mt-3 block text-[11px] sm:text-[13px] font-bold text-on-surface-variant">
-                              Delivery time
-                              <select
-                                value={
-                                  deliverySlots.some((slot) => slot.id === selectedSlotId)
-                                    ? selectedSlotId
-                                    : deliverySlots[0]?.id
-                                }
-                                onClick={(event) => event.stopPropagation()}
-                                onChange={(event) => setSelectedSlotId(event.target.value)}
-                                className="mt-1 w-full rounded-lg border border-outline-variant/30 bg-white px-1.5 sm:px-2.5 py-1.5 sm:py-2 text-[9px] sm:text-xs font-semibold text-on-surface"
-                              >
-                                {deliverySlots.map((slot) => (
-                                  <option key={slot.id} value={slot.id}>
-                                    {slot.title}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          )}
-                          {deliverySlots.length > 0 && (
-                            <p className="hidden sm:block mt-2 text-[10px] font-semibold text-primary">
-                              Selected window: {selectedSlot.title}
-                            </p>
-                          )}
-                          <div className="hidden sm:flex items-center justify-between mt-2 pt-1 border-t border-outline-variant/15 text-[10px] text-outline">
-                            <span>Direct Batch Farm Fulfillment</span>
-                            <span className="px-1.5 py-0.2 rounded bg-surface-container-high text-on-surface-variant font-bold">
-                              Eco Route
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Step 2 Bottom Navigation Actions */}
 
 
@@ -1463,7 +1373,7 @@ export function CheckoutPage() {
                           {deliverySpeed === "express" ? "Express delivery" : "Standard delivery"} · {deliveryFee > 0 ? `Delivery fee ₹${deliveryFee}` : "Free delivery"}
                         </p>
                       </div>
-                      <button type="button" onClick={() => handleStepNavigation(2)} className="shrink-0 text-primary text-xs font-bold hover:underline">Change</button>
+                      <button type="button" onClick={handleChangeDeliverySlot} className="shrink-0 text-primary text-xs font-bold hover:underline">Change</button>
                     </div>
                   </section>
 
@@ -1473,7 +1383,7 @@ export function CheckoutPage() {
                         <span className="material-symbols-outlined text-primary text-[22px]">shopping_bag</span>
                         <h2 className="font-headline-sm text-base font-extrabold text-on-surface">Confirm Items ({cartCount})</h2>
                       </div>
-                      <button type="button" onClick={() => handleStepNavigation(1)} className="shrink-0 text-primary text-xs font-bold hover:underline">Edit Cart</button>
+                      <Link to="/cart" className="shrink-0 text-primary text-xs font-bold hover:underline">Edit Cart</Link>
                     </div>
                     <div className="divide-y divide-outline-variant/15">
                       {items.map((item) => (
@@ -1538,7 +1448,7 @@ export function CheckoutPage() {
                     <div className="mb-3 rounded-2xl border border-outline-variant/15 bg-surface-container-low/40 p-3">
                       <div className="mb-2 flex items-center justify-between gap-3">
                         <h3 className="text-xs font-bold text-on-surface">Items ({cartCount})</h3>
-                        <button type="button" onClick={() => handleStepNavigation(2)} className="text-[11px] font-bold text-primary hover:underline">Edit cart</button>
+                        <Link to="/cart" className="text-[11px] font-bold text-primary hover:underline">Edit cart</Link>
                       </div>
                       <div className="divide-y divide-outline-variant/15">
                         {items.map((item) => (
@@ -1549,20 +1459,26 @@ export function CheckoutPage() {
                         ))}
                       </div>
                     </div>
-                    {selectedAddress ? (
-                      <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-low/40 p-3 sm:p-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-headline-sm text-sm font-bold text-on-surface">{selectedAddress.name}</span>
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{selectedAddress.tag || "Home"}</span>
-                        </div>
-                        <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
-                          {selectedAddress.houseNo}, {selectedAddress.street}{selectedAddress.landmark ? `, ${selectedAddress.landmark}` : ""}, {selectedAddress.city} {selectedAddress.pincode}
-                        </p>
-                        <p className="mt-1 text-[11px] text-on-surface-variant">{selectedAddress.phone}</p>
+                    <div className="mt-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <h3 className="text-xs font-bold text-on-surface">Delivery Address</h3>
+                        <button type="button" onClick={() => handleStepNavigation(2)} className="text-[11px] font-bold text-primary hover:underline">Change</button>
                       </div>
-                    ) : (
-                      <p className="text-xs text-error">Select a delivery address to continue.</p>
-                    )}
+                      {selectedAddress ? (
+                        <div className="rounded-2xl border border-outline-variant/15 bg-surface-container-low/40 p-3 sm:p-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-headline-sm text-sm font-bold text-on-surface">{selectedAddress.name}</span>
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{selectedAddress.tag || "Home"}</span>
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                            {selectedAddress.houseNo}, {selectedAddress.street}{selectedAddress.landmark ? `, ${selectedAddress.landmark}` : ""}, {selectedAddress.city} {selectedAddress.pincode}
+                          </p>
+                          <p className="mt-1 text-[11px] text-on-surface-variant">{selectedAddress.phone}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-error">Select a delivery address to continue.</p>
+                      )}
+                    </div>
                     <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-outline-variant/15 bg-surface-container-low/40 p-3">
                       <div className="min-w-0">
                         <p className="font-headline-sm text-xs font-bold text-on-surface">{selectedSlot.title}</p>
@@ -1570,7 +1486,7 @@ export function CheckoutPage() {
                           {deliverySpeed === "express" ? "Express delivery" : "Standard delivery"} · {deliveryFee > 0 ? `Delivery fee ₹${deliveryFee}` : "Free delivery"}
                         </p>
                       </div>
-                      <button type="button" onClick={() => handleStepNavigation(2)} className="shrink-0 text-primary text-xs font-bold hover:underline">Change</button>
+                      <button type="button" onClick={handleChangeDeliverySlot} className="shrink-0 text-primary text-xs font-bold hover:underline">Change</button>
                     </div>
                     <label className="mt-4 flex items-start gap-2.5 rounded-2xl border border-outline-variant/15 p-3">
                       <input type="checkbox" checked={includeGstin} onChange={(event) => setIncludeGstin(event.target.checked)} className="mt-0.5 accent-primary" />
@@ -1960,7 +1876,7 @@ export function CheckoutPage() {
                   Today's order cutoff ({checkoutSettings.orderCutoffTime}) has passed.
                 </p>
               )}
-              <OrderBillSummary
+              {currentStep !== 2 && <OrderBillSummary
                 mode="checkout"
                 hideCtaOnMobile
                 ctaText={
@@ -1979,10 +1895,40 @@ export function CheckoutPage() {
                 }
                 isSubmitting={isSubmitting}
                 disabled={currentStep === 2 ? items.length === 0 || isSubmitting : !canContinueToPayment || isSubmitting}
-              />
+              />}
             </div>
           </div>
         </div>
+
+        {placedOrderId && (
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="order-success-title"
+              className="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white p-7 text-center shadow-2xl animate-in fade-in zoom-in-90 duration-300"
+            >
+              <span className="pointer-events-none absolute left-8 top-8 h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+              <span className="pointer-events-none absolute right-10 top-12 h-2.5 w-2.5 rounded-full bg-emerald-300 animate-bounce" />
+              <div className="mx-auto mb-4 flex h-20 w-20 animate-bounce items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <span className="material-symbols-outlined text-[48px]">check_circle</span>
+              </div>
+              <h2 id="order-success-title" className="font-headline-sm text-xl font-extrabold text-on-surface">
+                Order placed successfully!
+              </h2>
+              <p className="mt-2 text-sm text-on-surface-variant">
+                Your order <span className="font-bold text-primary">#{placedOrderId}</span> is confirmed.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate({ to: "/orders", search: { placed: placedOrderId } as any })}
+                className="mt-6 w-full rounded-2xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-md transition hover:bg-primary-container"
+              >
+                View my order
+              </button>
+            </section>
+          </div>
+        )}
 
         {showPinnedAddressPicker && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
@@ -2121,6 +2067,10 @@ export function CheckoutPage() {
                   onChange={(position) => {
                     setNewLat(position.lat);
                     setNewLng(position.lng);
+                  }}
+                  onAddressResolved={(address) => {
+                    if (address.city) setNewCity(address.city);
+                    if (address.pincode) setNewPincode(address.pincode);
                   }}
                 />
 

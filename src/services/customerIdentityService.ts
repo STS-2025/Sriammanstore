@@ -17,6 +17,7 @@ import {
 import { normalizeLegacyUser } from "./legacyUserMapper";
 import { resolveCustomerDataSource } from "./customerDataSourceResolver";
 import type { User } from "../types";
+import { measureLoad } from "../lib/performanceDiagnostics";
 
 /**
  * Safe, Read-Only Firebase Auth-to-Customer Profile Resolution Service
@@ -852,10 +853,14 @@ export const customerIdentityService = {
     let rawMappingDoc: Record<string, unknown> | null = null;
     try {
       if (isProduction && !options?.adapter) {
-        rawMappingDoc = await readProductionDocument("usersByUid", uid);
+        rawMappingDoc = await measureLoad("auth.uid-mapping-read", () =>
+          readProductionDocument("usersByUid", uid)
+        );
       } else {
         const adapter = resolveActiveAdapter(options);
-        rawMappingDoc = await adapter.getDocumentRaw("usersByUid", uid);
+        rawMappingDoc = await measureLoad("auth.uid-mapping-read", () =>
+          adapter.getDocumentRaw("usersByUid", uid)
+        );
       }
     } catch (err: unknown) {
       const category = classifyStorageError(err);
@@ -909,10 +914,14 @@ export const customerIdentityService = {
     let actualCollectionUsed: "onlineCustomers" | "users" = primaryCol;
     try {
       if (isProduction && !options?.adapter) {
-        rawProfileDoc = await readProductionDocument(primaryCol, resolvedUserDocId);
+        rawProfileDoc = await measureLoad("auth.customer-record-read", () =>
+          readProductionDocument(primaryCol, resolvedUserDocId)
+        );
       } else {
         const adapter = resolveActiveAdapter(options);
-        rawProfileDoc = await adapter.getDocumentRaw(primaryCol, resolvedUserDocId);
+        rawProfileDoc = await measureLoad("auth.customer-record-read", () =>
+          adapter.getDocumentRaw(primaryCol, resolvedUserDocId)
+        );
       }
     } catch (err: unknown) {
       const category = classifyStorageError(err);
@@ -933,10 +942,14 @@ export const customerIdentityService = {
     if (rawProfileDoc === null && primaryCol === "onlineCustomers" && legacySassId) {
       try {
         if (isProduction && !options?.adapter) {
-          rawProfileDoc = await readProductionDocument("users", legacySassId);
+          rawProfileDoc = await measureLoad("auth.legacy-customer-record-read", () =>
+            readProductionDocument("users", legacySassId)
+          );
         } else {
           const adapter = resolveActiveAdapter(options);
-          rawProfileDoc = await adapter.getDocumentRaw("users", legacySassId);
+          rawProfileDoc = await measureLoad("auth.legacy-customer-record-read", () =>
+            adapter.getDocumentRaw("users", legacySassId)
+          );
         }
         if (rawProfileDoc !== null) {
           actualCollectionUsed = "users";

@@ -72,7 +72,7 @@ function AccountSettingsPage() {
     return (
       <div className="min-h-screen bg-surface font-body-md text-on-surface antialiased">
         <StoreHeader />
-        <main className="mx-auto w-full max-w-3xl px-4 py-24 text-center">
+        <main className="mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-3xl flex-col items-center justify-center px-4 pb-16 pt-20 text-center">
           <p className="text-sm text-on-surface-variant">Loading your account settings…</p>
         </main>
         <StoreFooter />

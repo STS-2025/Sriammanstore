@@ -125,7 +125,7 @@ function ProductDetailsPage() {
     return (
       <div className="bg-surface font-body-md text-on-surface antialiased min-h-screen">
         <StoreHeader />
-        <main className="w-full pt-20 max-w-[1320px] mx-auto px-margin-desktop py-12">
+        <main className="mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[1320px] items-center px-margin-desktop pb-16 pt-20">
           <div className="animate-pulse flex flex-col md:flex-row gap-8">
             <div className="md:w-1/2 aspect-square bg-surface-container-low rounded-3xl"></div>
             <div className="md:w-1/2 space-y-4">

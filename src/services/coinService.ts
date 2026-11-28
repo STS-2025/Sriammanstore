@@ -5,6 +5,7 @@ import { authService } from "./authService";
 import { productionCoinReader } from "./productionCoinReader";
 import { resolveCustomerDataSource, getCustomerProfileEndpoint } from "./customerDataSourceResolver";
 import type { CoinTransaction, Order, User } from "../types";
+import { measureLoad } from "../lib/performanceDiagnostics";
 
 /** Fallback conversion values; active checkout rates come from admin businessSettings. */
 export const OFFICIAL_COIN_CONVERSION_RATE = 1;
@@ -179,9 +180,13 @@ export const coinService = {
       const currentUser = authService.getCurrentUser();
       const finalLegacySassId = resolvedLegacySassId || currentUser?.legacySassId;
       if (finalLegacySassId) {
-        storedBalance = await productionCoinReader.getCustomerCoinBalance(resolvedId, undefined, finalLegacySassId);
+        storedBalance = await measureLoad("data coin balance", () =>
+          productionCoinReader.getCustomerCoinBalance(resolvedId, undefined, finalLegacySassId)
+        );
       } else {
-        storedBalance = await productionCoinReader.getCustomerCoinBalance(resolvedId);
+        storedBalance = await measureLoad("data coin balance", () =>
+          productionCoinReader.getCustomerCoinBalance(resolvedId)
+        );
       }
     } else {
       try {

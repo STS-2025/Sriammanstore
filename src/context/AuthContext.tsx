@@ -21,6 +21,7 @@ import {
 } from "../services/authAdapter";
 import type { User } from "../types";
 import { normalizeDobString } from "../lib/dateUtils";
+import { measureLoad } from "../lib/performanceDiagnostics";
 
 export type AuthSessionType = "mock" | "firebase" | null;
 
@@ -218,6 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const isMountedRef = useRef<boolean>(true);
+  const authInitialStateLoggedRef = useRef<boolean>(false);
   const sessionTypeRef = useRef<AuthSessionType>(sessionType);
   sessionTypeRef.current = sessionType;
 
@@ -247,8 +249,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(result.profile);
         setSessionType("firebase");
         apiClient.setLegacyCustomerSubcollectionsEnabled(true);
+      } else if (result.status === "database_error") {
+        // A database outage can temporarily prevent profile resolution after a
+        // refresh. Keep the verified Firebase identity visible and allow retry;
+        // never convert this transient storage failure into a signed-out session.
+        setFirebaseUser(fbUser);
+        setUser(null);
+        setSessionType(null);
+        apiClient.setLegacyCustomerSubcollectionsEnabled(false);
       } else {
-        // Never treat an unlinked or errored Firebase user as an authenticated SASS customer session
+        // Never treat an unlinked or malformed Firebase user as an authenticated SASS customer session
         setUser(null);
         setSessionType(null);
         apiClient.setLegacyCustomerSubcollectionsEnabled(false);
@@ -328,8 +338,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsResolvingIdentity(true);
       }
 
-      const promise = customerIdentityService
-        .resolveCustomerProfile(candidateUser)
+      const promise = measureLoad("auth.customer-profile", () =>
+        customerIdentityService.resolveCustomerProfile(candidateUser)
+      )
         .then((result) => {
           latestResolvedForUidRef.current = {
             uid: targetUid,
@@ -360,6 +371,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Subscribe to Firebase Auth state changes on mount and clean up on unmount
   useEffect(() => {
     isMountedRef.current = true;
+    const authStartupStartedAt = typeof performance !== "undefined" ? performance.now() : 0;
+    const logInitialAuthState = () => {
+      if (authInitialStateLoggedRef.current || !import.meta.env.DEV || typeof performance === "undefined") return;
+      authInitialStateLoggedRef.current = true;
+      console.info(`[perf] auth.initial-state: ${Math.round(performance.now() - authStartupStartedAt)} ms`);
+    };
 
     // Synchronously restore mock session if present before Firebase listener emits (non-production modes only)
     if (authMode !== "production") {
@@ -394,16 +411,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     let unsubscribe: () => void;
+    let isCurrentAuthEffect = true;
 
     if (authMode === "production") {
       // Live Production Auth: Subscribe via authManager to the isolated production Firebase Auth SDK instance
       unsubscribe = authManager.subscribeAuthState((prodUser) => {
         if (!isMountedRef.current) return;
+        logInitialAuthState();
 
         if (prodUser && prodUser.uid) {
-          void resolveFirebaseUserInternal(prodUser).finally(() => {
-            if (isMountedRef.current) {
-              setIsLoading(false);
+          setIsLoading(true);
+          void measureLoad("auth.session-restore", async () => {
+            const retryDelaysMs = [500, 1200, 2500, 5000];
+            try {
+              for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+                if (!isCurrentAuthEffect || !isMountedRef.current) return;
+
+                // A retry is useful only while Firebase still has the same
+                // persisted customer session. Do not resolve an old identity
+                // after the user has signed out or switched accounts.
+                if (attempt > 0) {
+                  const activeUser = authManager.getCurrentUser();
+                  if (!activeUser || activeUser.uid !== prodUser.uid) return;
+                  await new Promise((resolve) => window.setTimeout(resolve, retryDelaysMs[attempt - 1]));
+                  if (!isCurrentAuthEffect || !isMountedRef.current) return;
+                  const userAfterDelay = authManager.getCurrentUser();
+                  if (!userAfterDelay || userAfterDelay.uid !== prodUser.uid) return;
+                }
+
+                const result = await resolveFirebaseUserInternal(prodUser, { force: attempt > 0 });
+                if (result.status !== "database_error") return;
+              }
+            } finally {
+              if (isCurrentAuthEffect && isMountedRef.current) setIsLoading(false);
             }
           });
         } else {
@@ -421,6 +461,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Local Emulator / Mock Auth: Subscribe via emailLinkAuthService / emulator auth
       unsubscribe = emailLinkAuthService.subscribeToAuthStateChanges((fbAuthUser) => {
         if (!isMountedRef.current) return;
+        logInitialAuthState();
 
         if (fbAuthUser && fbAuthUser.uid) {
           void resolveFirebaseUserInternal(fbAuthUser).finally(() => {
@@ -459,6 +500,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return () => {
+      isCurrentAuthEffect = false;
       isMountedRef.current = false;
       if (unsubscribe) {
         unsubscribe();
@@ -629,25 +671,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = useCallback(async () => {
-    if (sessionType === "firebase" || firebaseUser) {
-      const activeFbUser = firebaseUser ?? getAuxiliaryFirebaseUser();
-      if (activeFbUser) {
-        await resolveFirebaseUserInternal(activeFbUser, { force: true });
-        return;
+    if (isMountedRef.current) setIsLoading(true);
+    try {
+      if (sessionType === "firebase" || firebaseUser) {
+        const activeFbUser = firebaseUser ?? getAuxiliaryFirebaseUser();
+        if (activeFbUser) {
+          await resolveFirebaseUserInternal(activeFbUser, { force: true });
+          return;
+        }
       }
-    }
 
-    const currentId = user?.id || user?.userId || authService.getCurrentUser()?.id;
-    let updated: User | null = null;
-    if (currentId) {
-      updated = await authService.fetchUser(currentId);
-    }
-    if (!updated) {
-      updated = authService.getCurrentUser();
-    }
-    if (isMountedRef.current) {
-      setUser(updated);
-      setSessionType(updated ? "mock" : null);
+      const currentId = user?.id || user?.userId || authService.getCurrentUser()?.id;
+      let updated: User | null = null;
+      if (currentId) {
+        updated = await authService.fetchUser(currentId);
+      }
+      if (!updated) {
+        updated = authService.getCurrentUser();
+      }
+      if (isMountedRef.current) {
+        setUser(updated);
+        setSessionType(updated ? "mock" : null);
+      }
+    } finally {
+      if (isMountedRef.current) setIsLoading(false);
     }
   }, [sessionType, firebaseUser, resolveFirebaseUserInternal, user?.id, user?.userId]);
 

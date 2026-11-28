@@ -14,6 +14,7 @@ import {
 } from "./outboxJournal";
 import type { LegacyCartAddressAdapter } from "./legacyCartAddressAdapter";
 import type { LegacyOrderAdapter } from "./legacyOrderAdapter";
+import { measureLoad } from "../lib/performanceDiagnostics";
 
 export type ActiveDataSource = "firebase" | "emulator" | "json-server";
 
@@ -1019,6 +1020,15 @@ export class ApiClient {
   }
 
   public async get<T>(
+    endpoint: string,
+    params?: Record<string, string | number | boolean | undefined>
+  ): Promise<T> {
+    return measureLoad(`data ${parseEndpoint(endpoint, params).resource}`, () =>
+      this.getWithSource<T>(endpoint, params)
+    );
+  }
+
+  private async getWithSource<T>(
     endpoint: string,
     params?: Record<string, string | number | boolean | undefined>
   ): Promise<T> {

@@ -797,7 +797,33 @@ export interface FirestoreDriver {
  * the emulator backend is selected only by the automated test environment.
  */
 export class SdkFirestoreDriver implements FirestoreDriver {
+  private readonly inFlightDocumentReads = new Map<
+    string,
+    { promise: Promise<Record<string, unknown> | null>; startedAt: number }
+  >();
+
   constructor(private configOverrides?: Partial<EmulatorConfig>) {}
+
+  private readDocumentOnce(
+    key: string,
+    read: () => Promise<Record<string, unknown> | null>,
+  ): Promise<Record<string, unknown> | null> {
+    const existing = this.inFlightDocumentReads.get(key);
+    if (existing && Date.now() - existing.startedAt < 10_000) {
+      return existing.promise;
+    }
+
+    const promise = read();
+    const entry = { promise, startedAt: Date.now() };
+    this.inFlightDocumentReads.set(key, entry);
+    const clearIfCurrent = () => {
+      if (this.inFlightDocumentReads.get(key) === entry) {
+        this.inFlightDocumentReads.delete(key);
+      }
+    };
+    void promise.then(clearIfCurrent, clearIfCurrent);
+    return promise;
+  }
 
   private getDb() {
     if (import.meta.env.MODE === "test") {
@@ -824,17 +850,20 @@ export class SdkFirestoreDriver implements FirestoreDriver {
 
     const db = this.getDb();
     const ref = doc(db, collectionName, docId);
-    const snap = await withBoundedTimeout(
-      getDoc(ref),
+    const read = this.readDocumentOnce(`${collectionName}/${docId}`, async () => {
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return null;
+      const data = snap.data() as Record<string, unknown>;
+      if (collectionName === "storeInfo" && !("id" in data)) {
+        return { ...data };
+      }
+      return { id: snap.id, ...data };
+    });
+    return withBoundedTimeout(
+      read,
       timeoutMs,
       `getDoc(${collectionName}/${docId})`
     );
-    if (!snap.exists()) return null;
-    const data = snap.data() as Record<string, unknown>;
-    if (collectionName === "storeInfo" && !("id" in data)) {
-      return { ...data };
-    }
-    return { id: snap.id, ...data };
   }
 
   async getNestedProductDoc(
@@ -844,14 +873,17 @@ export class SdkFirestoreDriver implements FirestoreDriver {
   ): Promise<Record<string, unknown> | null> {
     const db = this.getDb();
     const ref = doc(db, "products", category, "items", productId);
-    const snap = await withBoundedTimeout(
-      getDoc(ref),
+    const read = this.readDocumentOnce(`products/${category}/items/${productId}`, async () => {
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return null;
+      const data = snap.data() as Record<string, unknown>;
+      return attachNestedProductContext(data, category, snap.id);
+    });
+    return withBoundedTimeout(
+      read,
       timeoutMs,
       `getDoc(products/${category}/items/${productId})`
     );
-    if (!snap.exists()) return null;
-    const data = snap.data() as Record<string, unknown>;
-    return attachNestedProductContext(data, category, snap.id);
   }
 
   async queryNestedProducts(

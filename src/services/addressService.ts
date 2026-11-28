@@ -9,6 +9,7 @@ import { authManager } from "./authAdapter";
 import { productionAddressReader } from "./productionAddressReader";
 import { resolveCustomerDataSource } from "./customerDataSourceResolver";
 import type { StoreDeliverySettings } from "./settingsService";
+import { measureLoad } from "../lib/performanceDiagnostics";
 
 export const addressService = {
   async getAddresses(userId?: string, legacySassId?: string): Promise<Address[]> {
@@ -27,9 +28,11 @@ export const addressService = {
 
     if (authManager.getMode() === "production") {
       if (resolvedLegacySassId) {
-        return productionAddressReader.getCustomerAddresses(resolvedUserId, undefined, resolvedLegacySassId);
+        return measureLoad("data addresses", () =>
+          productionAddressReader.getCustomerAddresses(resolvedUserId, undefined, resolvedLegacySassId)
+        );
       }
-      return productionAddressReader.getCustomerAddresses(resolvedUserId);
+      return measureLoad("data addresses", () => productionAddressReader.getCustomerAddresses(resolvedUserId));
     }
 
     const list = await apiClient.get<Address[]>("/addresses", { userId: resolvedUserId });

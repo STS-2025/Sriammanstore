@@ -9,7 +9,6 @@ import { ProductCard } from "../components/product/ProductCard";
 import { productService } from "../services/productService";
 import type { Announcement, Banner, Product, Category } from "../types";
 import { useLanguage } from "../context/LanguageContext";
-import { settingsService } from "../services/settingsService";
 import { VoiceSearchButton } from "../components/search/VoiceSearchButton";
 
 export const Route = createFileRoute("/")({
@@ -41,25 +40,8 @@ function HomePage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(499);
   const [showAllCategories, setShowAllCategories] = useState(false);
   const categoryScroller = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    let cancelled = false;
-    settingsService
-      .getBusinessSettings()
-      .then((settings) => {
-        const threshold = Number(settings["freeDeliveryThreshold"]);
-        if (!cancelled && Number.isFinite(threshold) && threshold >= 0) {
-          setFreeDeliveryThreshold(threshold);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     async function loadHomeData() {
@@ -249,7 +231,7 @@ function HomePage() {
                 <div className="benefits-group flex w-max gap-2 pr-2 sm:grid sm:w-full sm:grid-cols-4 sm:gap-3 sm:pr-0">
                   <Benefit
                     icon="local_shipping"
-                    title={`Free Delivery on ₹${freeDeliveryThreshold}+`}
+                    title="Free Standard Delivery"
                     detail="Zero packaging or surge fees"
                   />
                   <Benefit
@@ -271,7 +253,7 @@ function HomePage() {
                 <div aria-hidden="true" className="benefits-group flex w-max gap-2 pr-2 sm:hidden">
                   <Benefit
                     icon="local_shipping"
-                    title={`Free Delivery on ₹${freeDeliveryThreshold}+`}
+                    title="Free Standard Delivery"
                     detail="Zero packaging or surge fees"
                   />
                   <Benefit

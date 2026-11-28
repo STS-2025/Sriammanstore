@@ -4,6 +4,7 @@ import { customerIdentityService } from "./customerIdentityService";
 import { cartService } from "./cartService";
 import { productService } from "./productService";
 import { resolveCustomerDataSource } from "./customerDataSourceResolver";
+import { measureLoad } from "../lib/performanceDiagnostics";
 
 export interface CustomerWishlistEntry {
   productId: string;
@@ -318,28 +319,30 @@ export const wishlistService = {
     catch { return userId.trim(); }
   },
   async getWishlistProducts(wishlistId?: string, _userId?: string): Promise<WishlistProduct[]> {
-    const { customerId, adapter } = await resolveWishlistOwner();
-    try {
-      if (wishlistId && wishlistId !== "all") {
-        const rows = await adapter.getCustomerWishlistFolderProducts(customerId, wishlistId);
-        return rows.map((row) => asFolderUiItem(row, customerId, wishlistId)).filter((item) => item.productId);
+    return measureLoad("data wishlist", async () => {
+      const { customerId, adapter } = await resolveWishlistOwner();
+      try {
+        if (wishlistId && wishlistId !== "all") {
+          const rows = await adapter.getCustomerWishlistFolderProducts(customerId, wishlistId);
+          return rows.map((row) => asFolderUiItem(row, customerId, wishlistId)).filter((item) => item.productId);
+        }
+        const roots = (await adapter.getCustomerWishlistProducts(customerId))
+          .map(asEntry)
+          .filter((entry) => entry.productId)
+          .map((entry) => asUiItem(entry, "all", customerId));
+        if (wishlistId === "all" || typeof adapter.getCustomerWishlists !== "function") return roots;
+        const folders = await adapter.getCustomerWishlists(customerId);
+        const folderItems = await Promise.all(folders.map(async (folder) => {
+          const id = String(folder["id"] ?? "").trim();
+          if (!id || typeof adapter.getCustomerWishlistFolderProducts !== "function") return [];
+          const rows = await adapter.getCustomerWishlistFolderProducts(customerId, id);
+          return rows.map((row) => asFolderUiItem(row, customerId, id)).filter((item) => item.productId);
+        }));
+        return [...roots, ...folderItems.flat()];
+      } catch (error) {
+        throw customerFacingStorageError(error);
       }
-      const roots = (await adapter.getCustomerWishlistProducts(customerId))
-        .map(asEntry)
-        .filter((entry) => entry.productId)
-        .map((entry) => asUiItem(entry, "all", customerId));
-      if (wishlistId === "all" || typeof adapter.getCustomerWishlists !== "function") return roots;
-      const folders = await adapter.getCustomerWishlists(customerId);
-      const folderItems = await Promise.all(folders.map(async (folder) => {
-        const id = String(folder["id"] ?? "").trim();
-        if (!id || typeof adapter.getCustomerWishlistFolderProducts !== "function") return [];
-        const rows = await adapter.getCustomerWishlistFolderProducts(customerId, id);
-        return rows.map((row) => asFolderUiItem(row, customerId, id)).filter((item) => item.productId);
-      }));
-      return [...roots, ...folderItems.flat()];
-    } catch (error) {
-      throw customerFacingStorageError(error);
-    }
+    });
   },
 
   async getCustomerWishlistEntries(): Promise<CustomerWishlistEntry[]> {
